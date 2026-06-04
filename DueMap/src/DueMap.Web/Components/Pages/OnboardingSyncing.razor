@@ -1,0 +1,178 @@
+@page "/onboarding/syncing"
+@layout DueMap.Web.Components.Layout.OnboardingShell
+@using DueMap.Integrations.Accounting
+@using DueMap.Tenancy.Services
+@using DueMap.Web.Services
+@using Microsoft.JSInterop
+@inject PmContext Pm
+@inject IAccountingConnectionService ConnectionSvc
+@inject IPmAccountingSync Sync
+@inject IOnboardingProgressService Progress
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Setting up your workspace — DueMap</PageTitle>
+
+<div class="max-w-2xl mx-auto px-8 py-16">
+    <div class="text-center mb-10">
+        <div class="inline-flex w-14 h-14 rounded-2xl bg-indigo-100 dark:bg-indigo-500/10 items-center justify-center mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-600 dark:text-indigo-400">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+        </div>
+        <h2 class="text-2xl font-semibold tracking-tight">Setting up your workspace</h2>
+        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
+            We're pulling your customers and invoices from QuickBooks. This usually takes a few seconds — feel free to grab a coffee.
+        </p>
+    </div>
+
+    <div class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+        <ul class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+            @foreach (var step in _steps)
+            {
+                <li class="px-6 py-4 flex items-center gap-4">
+                    @* Status icon — three states: pending (dot), in-flight (spinner), done (check) *@
+                    <span class="inline-flex w-7 h-7 rounded-full items-center justify-center shrink-0
+                                 @(step.State == StepState.Done    ? "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                                 : step.State == StepState.Running ? "bg-indigo-100 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-400"
+                                 : step.State == StepState.Failed  ? "bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-400"
+                                 :                                   "bg-zinc-100 dark:bg-zinc-800 text-zinc-400")">
+                        @if (step.State == StepState.Done)
+                        {
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                        }
+                        else if (step.State == StepState.Running)
+                        {
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                        }
+                        else if (step.State == StepState.Failed)
+                        {
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        }
+                        else
+                        {
+                            <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+                        }
+                    </span>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium">@step.Label</div>
+                        @if (!string.IsNullOrEmpty(step.Detail))
+                        {
+                            <div class="text-xs text-zinc-500 mt-0.5">@step.Detail</div>
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+
+        @if (_finished && _success)
+        {
+            <div class="px-6 py-4 bg-emerald-50/50 dark:bg-emerald-500/[0.06] border-t border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between gap-4">
+                <div class="text-sm text-emerald-900 dark:text-emerald-200">All done. Taking you to your dashboard…</div>
+                <a href="/" class="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300">Go now →</a>
+            </div>
+        }
+        else if (_finished && !_success)
+        {
+            <div class="px-6 py-4 bg-rose-50/50 dark:bg-rose-500/[0.06] border-t border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between gap-4">
+                <div class="text-sm text-rose-900 dark:text-rose-200">@_errorMessage</div>
+                <a href="/connections" class="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300">Back to connections →</a>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private enum StepState { Pending, Running, Done, Failed }
+
+    private sealed class StepRow
+    {
+        public string Label { get; set; } = string.Empty;
+        public string Detail { get; set; } = string.Empty;
+        public StepState State { get; set; } = StepState.Pending;
+    }
+
+    // Three visible phases. The underlying IPmAccountingSync.SyncForAsync is one
+    // monolithic call, so phases 2 and 3 are perceptual — we mark phase 2 done
+    // as soon as the call returns, then move phase 3 to done with the totals.
+    // If progress reporting ever lands inside the sync service (IProgress<T>),
+    // wire it into these step states for richer mid-call updates.
+    private readonly StepRow[] _steps =
+    {
+        new() { Label = "Verifying your connection" },
+        new() { Label = "Fetching customers and invoices" },
+        new() { Label = "Ready to use" }
+    };
+
+    private bool _finished;
+    private bool _success;
+    private string _errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var ct = CancellationToken.None;
+        var id = await Pm.GetPmIdAsync();
+
+        // Step 1 — verify
+        _steps[0].State = StepState.Running; StateHasChanged();
+        var conn = await ConnectionSvc.GetActiveAsync(id, ct);
+        if (conn is null)
+        {
+            _steps[0].State = StepState.Failed;
+            FailAll("No active accounting connection was found. Please reconnect.");
+            return;
+        }
+        _steps[0].Detail = conn.Provider switch
+        {
+            AccountingProvider.QuickBooks => $"QuickBooks Online · realm {conn.RealmId}",
+            AccountingProvider.Xero       => $"Xero · tenant {conn.RealmId}",
+            _                             => conn.Provider.ToString()
+        };
+        _steps[0].State = StepState.Done;
+        StateHasChanged();
+
+        // Step 2 — run the sync
+        _steps[1].State = StepState.Running; StateHasChanged();
+        var result = await Sync.SyncForAsync(id, ct);
+
+        if (!result.Success)
+        {
+            _steps[1].State = StepState.Failed;
+            _steps[1].Detail = result.FailureReason ?? "Sync failed";
+            FailAll(result.FailureReason ?? "Sync failed. Please try again from /connections.");
+            return;
+        }
+
+        _steps[1].State = StepState.Done;
+        _steps[1].Detail = $"{result.CustomersSynced} customer{(result.CustomersSynced == 1 ? "" : "s")}, " +
+                           $"{result.InvoicesSynced} invoice{(result.InvoicesSynced == 1 ? "" : "s")}";
+
+        // Step 3 — final ready signal. Brief pause so the user actually
+        // perceives the third step lighting up.
+        _steps[2].State = StepState.Running; StateHasChanged();
+        await Task.Delay(400, ct);
+        _steps[2].State = StepState.Done;
+        _steps[2].Detail = "Your workspace is set up";
+        _finished = true;
+        _success = true;
+        StateHasChanged();
+
+        // Connect step is officially complete the moment the first sync succeeds —
+        // stamp it so the kiosk router lets the PM advance to step 2.
+        await Progress.MarkConnectDoneAsync(id, ct);
+
+        // Brief read-pause then forward to the next onboarding step. The
+        // dashboard tour now fires AFTER step 3 (Preflight) on the way to /,
+        // so we don't pass ?tour=onboarding here.
+        await Task.Delay(1500, ct);
+        Nav.NavigateTo("/onboarding/close-settings", forceLoad: false, replace: true);
+    }
+
+    private void FailAll(string message)
+    {
+        _finished = true;
+        _success = false;
+        _errorMessage = message;
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,29 @@
+@page "/t/login/{token}"
+@model DueMap.Web.Pages.Tenant.RedeemModel
+@{
+    Layout = null;
+}
+@* This page is server-handled in OnGet — body is only rendered on the
+   error path, when the token couldn't be redeemed. Successful redeems
+   set the cookie + redirect to /t before the response body is sent. *@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sign-in link expired</title>
+    <link rel="stylesheet" href="~/css/app.css" />
+</head>
+<body class="min-h-screen bg-stone-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+<div class="max-w-md mx-auto px-6 py-16 text-center">
+    <div class="inline-flex w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 items-center justify-center mb-3">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    </div>
+    <h1 class="text-xl font-semibold tracking-tight">This sign-in link won't work</h1>
+    <p class="mt-2 text-sm text-zinc-500">It may have expired, already been used, or been mistyped.</p>
+    <a href="/t/login" class="inline-flex items-center gap-1.5 mt-6 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+        Request a new link
+    </a>
+</div>
+</body>
+</html>

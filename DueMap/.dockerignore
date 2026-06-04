@@ -1,0 +1,16 @@
+**/.vs/
+**/bin/
+**/obj/
+**/.idea/
+**/*.user
+**/*.suo
+**/TestResults/
+.git/
+.gitignore
+.dataprotection-keys/
+**/launchSettings.json
+**/appsettings.Development.json
+**/Dockerfile
+docker-compose*.yml
+.github/
+*.md

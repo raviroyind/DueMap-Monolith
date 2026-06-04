@@ -1,0 +1,189 @@
+@page "/onboarding/notice-preferences"
+@layout DueMap.Web.Components.Layout.OnboardingShell
+@using DueMap.Tenancy
+@using DueMap.Tenancy.Domain
+@using DueMap.Tenancy.Services
+@using DueMap.Web.Components.Shared
+@using DueMap.Web.Services
+@inject PmContext Pm
+@inject IPmNoticePreferencesService Prefs
+@inject IOnboardingProgressService Progress
+@inject NavigationManager Nav
+
+<PageTitle>Notice preferences — DueMap</PageTitle>
+
+<div class="max-w-3xl mx-auto px-8 py-10 space-y-6">
+
+    <div>
+        <h2 class="text-2xl font-semibold tracking-tight">Choose what tenants hear from us</h2>
+        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-2xl">
+            These master toggles control which notice types DueMap can send across your whole portfolio.
+            You can override any of these per lease later. If a master is off, no notice of that kind
+            goes out — period. Use <strong>Edit template</strong> on any row to customise the email
+            wording, theme, and preview.
+        </p>
+    </div>
+
+    @if (_loading || _form is null)
+    {
+        <p class="text-sm text-zinc-500">Loading…</p>
+    }
+    else
+    {
+        <EditForm Model="_form" OnValidSubmit="SaveAsync" class="space-y-5">
+            <DataAnnotationsValidator />
+
+            @* PRE-DUE *@
+            <section class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+                <header class="px-6 py-4 flex items-start justify-between gap-4 border-b border-zinc-200/80 dark:border-zinc-800">
+                    <div>
+                        <div class="text-sm font-semibold">Pre-due reminder</div>
+                        <div class="text-xs text-zinc-500 mt-0.5">A friendly nudge a few days before rent is due.</div>
+                    </div>
+                    <label class="inline-flex items-center cursor-pointer select-none">
+                        <input type="checkbox" @bind="_form.PreDueMasterEnabled" class="sr-only peer" />
+                        <span class="w-11 h-6 rounded-full bg-zinc-200 dark:bg-zinc-700 relative
+                                     peer-checked:bg-indigo-600 transition-colors duration-150
+                                     after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5
+                                     after:rounded-full after:bg-white after:shadow
+                                     peer-checked:after:translate-x-5 after:transition-transform after:duration-150"></span>
+                    </label>
+                </header>
+                <div class="px-6 py-4 flex items-center justify-between gap-6 border-b border-zinc-100 dark:border-zinc-800/60 @(_form.PreDueMasterEnabled ? "" : "opacity-50")">
+                    <div>
+                        <div class="text-sm font-medium">Days before due date</div>
+                        <p class="text-xs text-zinc-500 mt-0.5">Tenants receive the reminder this many calendar days before rent is due.</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <input type="number" min="1" max="60" @bind="_form.PreDueDefaultDaysBefore"
+                               disabled="@(!_form.PreDueMasterEnabled)"
+                               class="w-20 px-3 py-2 rounded-lg text-sm font-medium tabular-nums text-right bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 disabled:opacity-50" />
+                        <span class="text-sm text-zinc-500">days</span>
+                    </div>
+                </div>
+                <TemplateRow Code="pre_due_reminder" Label="Pre-due reminder" OnEdit="OpenTemplateAsync" />
+            </section>
+
+            @* DUE-DATE *@
+            <section class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+                <header class="px-6 py-4 flex items-start justify-between gap-4 border-b border-zinc-200/80 dark:border-zinc-800">
+                    <div>
+                        <div class="text-sm font-semibold">Due-date reminder</div>
+                        <div class="text-xs text-zinc-500 mt-0.5">Sent on the morning rent is due. No additional settings.</div>
+                    </div>
+                    <label class="inline-flex items-center cursor-pointer select-none">
+                        <input type="checkbox" @bind="_form.DueDateMasterEnabled" class="sr-only peer" />
+                        <span class="w-11 h-6 rounded-full bg-zinc-200 dark:bg-zinc-700 relative
+                                     peer-checked:bg-indigo-600 transition-colors duration-150
+                                     after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5
+                                     after:rounded-full after:bg-white after:shadow
+                                     peer-checked:after:translate-x-5 after:transition-transform after:duration-150"></span>
+                    </label>
+                </header>
+                <TemplateRow Code="due_date_reminder" Label="Due-date reminder" OnEdit="OpenTemplateAsync" />
+            </section>
+
+            @* POST-DUE *@
+            <section class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+                <header class="px-6 py-4 flex items-start justify-between gap-4 border-b border-zinc-200/80 dark:border-zinc-800">
+                    <div>
+                        <div class="text-sm font-semibold">Post-due notice + late fee</div>
+                        <div class="text-xs text-zinc-500 mt-0.5">Sent after the configured grace period. May include a state-compliant late fee.</div>
+                    </div>
+                    <label class="inline-flex items-center cursor-pointer select-none">
+                        <input type="checkbox" @bind="_form.PostDueMasterEnabled" class="sr-only peer" />
+                        <span class="w-11 h-6 rounded-full bg-zinc-200 dark:bg-zinc-700 relative
+                                     peer-checked:bg-indigo-600 transition-colors duration-150
+                                     after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5
+                                     after:rounded-full after:bg-white after:shadow
+                                     peer-checked:after:translate-x-5 after:transition-transform after:duration-150"></span>
+                    </label>
+                </header>
+                <div class="px-6 py-4 flex items-center justify-between gap-6 border-b border-zinc-100 dark:border-zinc-800/60 @(_form.PostDueMasterEnabled ? "" : "opacity-50")">
+                    <div>
+                        <div class="text-sm font-medium">Grace period</div>
+                        <p class="text-xs text-zinc-500 mt-0.5">Number of days after the due date before the first post-due notice goes out.</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <input type="number" min="0" max="30" @bind="_form.PostDueDefaultGraceDays"
+                               disabled="@(!_form.PostDueMasterEnabled)"
+                               class="w-20 px-3 py-2 rounded-lg text-sm font-medium tabular-nums text-right bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 disabled:opacity-50" />
+                        <span class="text-sm text-zinc-500">days</span>
+                    </div>
+                </div>
+                @* Both grace-reminder + late-fee templates surface here so PMs can
+                   tune both in onboarding without leaving the wizard. *@
+                <TemplateRow Code="grace_period_reminder" Label="Grace-period reminder" Hint="Sent the morning after the due date" OnEdit="OpenTemplateAsync" />
+                <TemplateRow Code="late_fee_notice"        Label="Late-fee notice"        Hint="Sent when a late fee is assessed"   OnEdit="OpenTemplateAsync" />
+            </section>
+
+            <p class="text-xs text-zinc-400">
+                Per-state defaults and per-lease overrides are tunable from the Notice Preferences page in the main app.
+            </p>
+
+            <div class="flex items-center justify-end gap-3">
+                @if (_error is not null)
+                {
+                    <span class="text-sm text-rose-600 dark:text-rose-400">@_error</span>
+                }
+                <button type="submit" disabled="@_saving"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm disabled:opacity-50">
+                    @(_saving ? "Saving…" : "Save and continue →")
+                </button>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@* Same shared modal used by /notice-preferences. Mounted once at page root so
+   every TemplateRow's button can pop the same instance. *@
+@if (_pmId is int pmId)
+{
+    <EditTemplateModal @ref="_templateModal" PropertyManagerId="pmId" />
+}
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private string? _error;
+    private int? _pmId;
+    private PmNoticePreferences? _form;
+    private EditTemplateModal? _templateModal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var id = await Pm.GetPmIdAsync();
+        _pmId = id;
+        _form = await Prefs.GetOrCreateAsync(id, CancellationToken.None);
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_form is null) return;
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            _form.PropertyManagerId = _pmId!.Value;
+            await Prefs.UpdateAsync(_form, CancellationToken.None);
+            await Progress.MarkNoticePrefsDoneAsync(_pmId.Value, CancellationToken.None);
+            Nav.NavigateTo("/onboarding/preflight");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task OpenTemplateAsync((string Code, string Label) args)
+    {
+        if (_templateModal is null) return;
+        await _templateModal.ShowAsync(args.Code, args.Label);
+    }
+}

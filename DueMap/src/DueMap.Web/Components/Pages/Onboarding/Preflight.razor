@@ -1,0 +1,463 @@
+@page "/onboarding/preflight"
+@layout DueMap.Web.Components.Layout.OnboardingShell
+@using DueMap.Integrations.Notices
+@using DueMap.Tenancy
+@using DueMap.Tenancy.Domain
+@using DueMap.Tenancy.Services
+@using DueMap.Web.Services
+@inject PmContext Pm
+@inject ICustomerRepository Customers
+@inject IPropertyManagerReader PmReader
+@inject IEmailSender EmailSender
+@inject IOnboardingProgressService Progress
+@inject NavigationManager Nav
+
+<PageTitle>Notify your tenants — DueMap</PageTitle>
+
+<div class="max-w-6xl mx-auto px-8 py-10 space-y-6">
+
+    <div>
+        <h2 class="text-2xl font-semibold tracking-tight">Notify your tenants (optional)</h2>
+        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-3xl">
+            Give your tenants a heads-up before they start receiving automated reminders and late-fee notices.
+            Pick who to email, edit the message if you'd like, and send. You can skip this step now and
+            do it later from the Tenants page.
+        </p>
+    </div>
+
+    @if (_loading)
+    {
+        <p class="text-sm text-zinc-500">Loading customers…</p>
+    }
+    else
+    {
+        @* ---- FILTERS ---- *@
+        <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-medium text-zinc-500 mb-1.5">Search by name or email</label>
+                    <input type="search" placeholder="e.g. Jane Doe, jane@@example.com"
+                           @bind="_search" @bind:event="oninput" @bind:after="OnFilterChanged"
+                           class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-500 mb-1.5">Status</label>
+                    <select @bind="_statusFilter" @bind:after="OnFilterChanged"
+                            class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                        <option value="all">All tenants</option>
+                        <option value="pending">Not yet notified</option>
+                        <option value="done">Already notified</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        @* ---- BULK BAR ---- *@
+        <div class="flex flex-wrap items-center gap-3 text-sm">
+            <button @onclick="SelectAllOnPage"
+                    class="text-indigo-600 dark:text-indigo-400 hover:underline">Select all on page</button>
+            <span class="text-zinc-300 dark:text-zinc-600">·</span>
+            <button @onclick="SelectNone"
+                    class="text-zinc-600 dark:text-zinc-400 hover:underline">Clear selection</button>
+            <span class="text-zinc-400 dark:text-zinc-500 ml-auto">
+                @_selected.Count selected · @_filtered.Count match · @_allCustomers.Count total
+            </span>
+            <button @onclick="OpenSendModal" disabled="@(_selected.Count == 0)"
+                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                Send notification email
+            </button>
+        </div>
+
+        @* ---- GRID ---- *@
+        <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+            <table class="w-full text-sm">
+                <thead class="bg-zinc-50/60 dark:bg-zinc-900/60 text-left">
+                    <tr>
+                        <th class="px-4 py-2.5 w-10">
+                            <input type="checkbox"
+                                   checked="@AllOnPageSelected()"
+                                   @onchange="ToggleAllOnPage" />
+                        </th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Tenant</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Email</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-40">Preflight</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                    @if (_pageRows.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="4" class="px-4 py-10 text-center text-sm text-zinc-500">
+                                No customers match these filters.
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var c in _pageRows)
+                    {
+                        var canPick = !string.IsNullOrWhiteSpace(c.Email);
+                        <tr class="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30">
+                            <td class="px-4 py-2.5">
+                                <input type="checkbox"
+                                       disabled="@(!canPick)"
+                                       checked="@_selected.Contains(c.Id)"
+                                       @onchange="@(e => ToggleOne(c.Id, (bool)e.Value!))" />
+                            </td>
+                            <td class="px-3 py-2.5">
+                                <div class="font-medium">@c.DisplayName</div>
+                            </td>
+                            <td class="px-3 py-2.5 text-zinc-600 dark:text-zinc-300">
+                                @(string.IsNullOrWhiteSpace(c.Email)
+                                    ? (MarkupString)"<span class=\"text-rose-500 text-xs\">no email on file</span>"
+                                    : (MarkupString)System.Net.WebUtility.HtmlEncode(c.Email))
+                            </td>
+                            <td class="px-3 py-2.5 text-xs">
+                                @if (c.PreflightNotifiedAt is DateTime sent)
+                                {
+                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Sent @sent.ToString("yyyy-MM-dd")
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="text-zinc-400">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            @* ---- PAGER ---- *@
+            <div class="px-4 py-3 border-t border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-500">
+                <div>Page @(_page + 1) of @TotalPages</div>
+                <div class="flex items-center gap-2">
+                    <button @onclick="PrevPage" disabled="@(_page == 0)"
+                            class="px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 disabled:opacity-40">Prev</button>
+                    <button @onclick="NextPage" disabled="@(_page >= TotalPages - 1)"
+                            class="px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 disabled:opacity-40">Next</button>
+                </div>
+            </div>
+        </div>
+
+        @* ---- FOOTER ACTIONS ----
+           "Done" always finishes step 3 — whether the PM sent zero, some, or
+           every preflight. The step flag tracks "has the PM seen this screen",
+           the per-customer flag tracks "has THIS tenant been emailed". *@
+        <div class="flex items-center justify-between pt-2">
+            <span class="text-xs text-zinc-500">
+                @(_anyNotified
+                    ? $"{NotifiedCount} tenant(s) notified so far. You can come back to this from the Tenants page."
+                    : "You can come back to this from the Tenants page at any time.")
+            </span>
+            <button @onclick="CompleteOnboardingAsync"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm">
+                Done — go to dashboard →
+            </button>
+        </div>
+    }
+</div>
+
+@* ---- SEND MODAL ---- *@
+@if (_modalOpen)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm"
+         @onclick="CloseModal">
+        <div class="w-full max-w-3xl rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-xl overflow-hidden"
+             @onclick:stopPropagation="true">
+
+            <div class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between">
+                <div>
+                    <div class="text-sm font-semibold">Preflight notification email</div>
+                    <div class="text-xs text-zinc-500 mt-0.5">Will be sent to @_selected.Count tenant@(_selected.Count == 1 ? "" : "s") with an email on file.</div>
+                </div>
+                <button @onclick="CloseModal" class="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+            </div>
+
+            <div class="px-6 py-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-zinc-500 mb-1.5">Subject</label>
+                    <input type="text" @bind="_emailSubject"
+                           class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-500 mb-1.5">Message preview (editable)</label>
+                    @* contentEditable div + a tiny formatting bar gives the PM a
+                       lightweight rich-text experience without pulling in a heavy
+                       editor library. The HTML it produces is the literal email
+                       body — kept simple to render reliably across mail clients. *@
+                    <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+                        <div class="flex items-center gap-1 px-2 py-1 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/40 text-xs">
+                            <button type="button" @onclick="@(() => Exec("bold"))"      class="px-2 py-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 font-bold">B</button>
+                            <button type="button" @onclick="@(() => Exec("italic"))"    class="px-2 py-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 italic">I</button>
+                            <button type="button" @onclick="@(() => Exec("underline"))" class="px-2 py-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 underline">U</button>
+                            <span class="text-zinc-300 dark:text-zinc-600 mx-1">·</span>
+                            <button type="button" @onclick="@(() => Exec("insertUnorderedList"))" class="px-2 py-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700">• List</button>
+                        </div>
+                        <div @ref="_editorRef"
+                             contenteditable="true"
+                             class="min-h-[220px] max-h-[40vh] overflow-auto px-4 py-3 text-sm focus:outline-none prose prose-sm dark:prose-invert max-w-none"
+                             @oninput="OnEditorInput">@((MarkupString)_emailBody)</div>
+                    </div>
+                    <p class="mt-1 text-[11px] text-zinc-400">
+                        Tip: each recipient sees this same content — keep it general. The tenant's
+                        first name is auto-personalized in the greeting.
+                    </p>
+                </div>
+            </div>
+
+            <div class="px-6 py-4 border-t border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60 flex items-center justify-end gap-2">
+                @if (_sendError is not null)
+                {
+                    <span class="text-xs text-rose-600 dark:text-rose-400 mr-auto">@_sendError</span>
+                }
+                <button @onclick="CloseModal"
+                        class="px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70">
+                    Cancel
+                </button>
+                <button @onclick="SendAsync" disabled="@_sending"
+                        class="inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm disabled:opacity-50">
+                    @(_sending ? "Sending…" : $"Send to {_selected.Count}")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private int _pmId;
+    private bool _loading = true;
+
+    private List<Customer> _allCustomers = new();
+    private List<Customer> _filtered = new();
+    private List<Customer> _pageRows = new();
+    private readonly HashSet<int> _selected = new();
+
+    private string _search = string.Empty;
+    private string _statusFilter = "pending";
+
+    private const int PageSize = 25;
+    private int _page;
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(_filtered.Count / (double)PageSize));
+
+    // --- modal state ---
+    private bool _modalOpen;
+    private bool _sending;
+    private string? _sendError;
+    private string _emailSubject = "A quick heads-up about your rent reminders";
+    private string _emailBody = DefaultBodyHtml;
+    private Microsoft.AspNetCore.Components.ElementReference _editorRef;
+
+    // Default copy — neutral, friendly. PM can rewrite freely in the modal.
+    // Verbatim string (NOT raw string) — the Razor compiler chokes on C# 11
+    // raw string literals inside @code blocks. See REG-4 in the QA plan.
+    private const string DefaultBodyHtml =
+        "<p>Hi there,</p>" +
+        "<p>We've set up a new system to help us keep rent reminders consistent and timely. " +
+        "Starting soon you'll receive automated emails from us when rent is coming due, and " +
+        "again if a payment slips past due date.</p>" +
+        "<p>Nothing about how you pay rent is changing — this is just a heads-up so the emails " +
+        "don't catch you by surprise.</p>" +
+        "<p>Thanks!</p>";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _pmId = await Pm.GetPmIdAsync();
+        _allCustomers = (await Customers.ListByPropertyManagerAsync(_pmId, CancellationToken.None)).ToList();
+        ApplyFilters();
+        _loading = false;
+    }
+
+    private void OnFilterChanged()
+    {
+        _page = 0;
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        IEnumerable<Customer> q = _allCustomers;
+
+        if (_statusFilter == "pending") q = q.Where(c => c.PreflightNotifiedAt is null);
+        else if (_statusFilter == "done") q = q.Where(c => c.PreflightNotifiedAt is not null);
+
+        if (!string.IsNullOrWhiteSpace(_search))
+        {
+            var needle = _search.Trim();
+            q = q.Where(c =>
+                c.DisplayName.Contains(needle, StringComparison.OrdinalIgnoreCase)
+             || (c.Email != null && c.Email.Contains(needle, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        _filtered = q.ToList();
+        if (_page >= TotalPages) _page = TotalPages - 1;
+        if (_page < 0) _page = 0;
+        SlicePage();
+    }
+
+    private void SlicePage()
+    {
+        _pageRows = _filtered.Skip(_page * PageSize).Take(PageSize).ToList();
+    }
+
+    private void PrevPage() { if (_page > 0) { _page--; SlicePage(); } }
+    private void NextPage() { if (_page < TotalPages - 1) { _page++; SlicePage(); } }
+
+    private bool AllOnPageSelected() =>
+        _pageRows.Count > 0 && _pageRows
+            .Where(c => !string.IsNullOrWhiteSpace(c.Email))
+            .All(c => _selected.Contains(c.Id));
+
+    private void ToggleAllOnPage(ChangeEventArgs e)
+    {
+        var on = (bool)e.Value!;
+        foreach (var c in _pageRows.Where(c => !string.IsNullOrWhiteSpace(c.Email)))
+        {
+            if (on) _selected.Add(c.Id);
+            else    _selected.Remove(c.Id);
+        }
+    }
+
+    private void ToggleOne(int id, bool on)
+    {
+        if (on) _selected.Add(id);
+        else    _selected.Remove(id);
+    }
+
+    private void SelectAllOnPage()
+    {
+        foreach (var c in _pageRows.Where(c => !string.IsNullOrWhiteSpace(c.Email)))
+            _selected.Add(c.Id);
+    }
+
+    private void SelectNone() => _selected.Clear();
+
+    // --- modal ---
+    private void OpenSendModal() { _modalOpen = true; _sendError = null; }
+    private void CloseModal()    { _modalOpen = false; }
+
+    [Microsoft.AspNetCore.Components.Inject]
+    private Microsoft.JSInterop.IJSRuntime JS { get; set; } = default!;
+
+    // execCommand is deprecated but still works in every shipping browser and
+    // is dramatically simpler than wiring up a real editor for this one modal.
+    // If we ever standardize on Tiptap/ProseMirror, replace this whole block.
+    private async Task Exec(string command)
+    {
+        await JS.InvokeVoidAsync("document.execCommand", command, false, null);
+    }
+
+    private void OnEditorInput(ChangeEventArgs e)
+    {
+        // Blazor doesn't auto-bind contentEditable HTML — capture it on input
+        // so SendAsync has the live content.
+        _emailBody = e.Value?.ToString() ?? string.Empty;
+    }
+
+    private async Task SendAsync()
+    {
+        _sending = true;
+        _sendError = null;
+        try
+        {
+            var ct = CancellationToken.None;
+
+            // PM workspace name for the branded chrome — the email is "from"
+            // the PM, not from DueMap. Fall back to a generic label if the
+            // lookup fails so we never block the send.
+            var pm = await PmReader.GetAsync(_pmId, ct);
+            var workspaceName = pm?.Name ?? "Your property manager";
+
+            // Resolve which selected customers actually have a usable email.
+            // The grid already disables checkboxes for no-email rows but we
+            // re-check here in case the DB drifted between modal-open and send.
+            var targets = _allCustomers
+                .Where(c => _selected.Contains(c.Id) && !string.IsNullOrWhiteSpace(c.Email))
+                .ToList();
+
+            // Send one email per tenant. We don't fan-out concurrently — a
+            // typical preflight is small (1–50 tenants) and SendGrid trial
+            // accounts rate-limit aggressively. Sequential keeps us safe.
+            // Successful sends are batched at the end into a single
+            // MarkPreflightSentAsync call so the DB write is one round-trip.
+            var succeeded = new List<int>(targets.Count);
+            foreach (var c in targets)
+            {
+                try
+                {
+                    var branded = TransactionalEmailBuilder.Build(new TransactionalEmailRequest(
+                        Subject: _emailSubject,
+                        Headline: _emailSubject,                          // PM-edited subject doubles as the in-body headline
+                        IntroParagraph: _emailBody,                       // contentEditable HTML, used verbatim
+                        AdditionalParagraphs: Array.Empty<string>(),
+                        PrimaryCtaLabel: null,
+                        PrimaryCtaUrl: null,
+                        FooterNote: null,
+                        WorkspaceName: workspaceName,
+                        Preheader: null));
+
+                    var result = await EmailSender.SendAsync(new DispatchRequest(
+                        Channel: DispatchChannel.Email,
+                        To: c.Email!,
+                        ToDisplayName: c.DisplayName,
+                        Subject: branded.Subject,
+                        BodyHtml: branded.BodyHtml,
+                        BodyText: branded.BodyText), ct);
+
+                    if (result.Status == DispatchStatus.Queued)
+                    {
+                        succeeded.Add(c.Id);
+                    }
+                }
+                catch
+                {
+                    // One bad address shouldn't stop the rest. The customer
+                    // won't be stamped, so the PM can retry from the grid.
+                }
+            }
+
+            if (succeeded.Count > 0)
+            {
+                await Customers.MarkPreflightSentAsync(_pmId, succeeded, ct);
+            }
+
+            // Refresh local state so the grid pills flip to "Sent" instantly.
+            _allCustomers = (await Customers.ListByPropertyManagerAsync(_pmId, ct)).ToList();
+            _selected.Clear();
+            ApplyFilters();
+
+            // If the batch was partial, leave the modal open with an error so
+            // the PM knows. Full success closes the modal.
+            if (succeeded.Count < targets.Count)
+            {
+                _sendError = $"Sent to {succeeded.Count} of {targets.Count} — {targets.Count - succeeded.Count} bounced or failed. " +
+                             "Check the address on the failed rows and try again.";
+            }
+            else
+            {
+                _modalOpen = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _sendError = ex.Message;
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+
+    // --- finish ---
+
+    private bool _anyNotified => _allCustomers.Any(c => c.PreflightNotifiedAt is not null);
+    private int  NotifiedCount => _allCustomers.Count(c => c.PreflightNotifiedAt is not null);
+
+    private async Task CompleteOnboardingAsync()
+    {
+        await Progress.MarkPreflightDoneAsync(_pmId, CancellationToken.None);
+        Nav.NavigateTo("/?tour=onboarding", forceLoad: false, replace: true);
+    }
+}

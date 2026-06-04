@@ -1,0 +1,578 @@
+@*
+    EditTemplateModal — inline editor for a single PM template override.
+
+    Triggered from anywhere that has a "this is the template for X" affordance
+    (e.g. the Edit template buttons on /notice-preferences). Keeps the user on
+    their current page instead of routing to /templates and losing context.
+
+    Scope: edits the PM-generic override (state_id = null) for the given
+    notice_type_code. State-specific overrides live on /templates where the
+    full grid is the right surface — that page handles the multi-state matrix.
+    This modal is for the 80% case: "I want to tweak the words for this kind
+    of notice across my portfolio."
+
+    Parent control: parent calls Show(noticeTypeCode, friendlyName). The modal
+    handles its own visibility, loading, save, and dismiss; the parent gets a
+    notification via OnSaved when an override was persisted, so it can refresh
+    any downstream "last edited" indicators.
+*@
+@using DueMap.Notices
+@using DueMap.Notices.Domain
+@using DueMap.Rules
+@using RulesState = DueMap.Rules.Domain.State
+@using Microsoft.JSInterop
+@using Scriban
+@using Scriban.Runtime
+@inject INoticeTemplateService TemplateResolver
+@inject IPmTemplateOverrideService Overrides
+@inject INoticeTypeReader NoticeTypeReader
+@inject IStateReader StateReader
+@inject IJSRuntime JS
+
+@if (_visible && _draft is not null)
+{
+    <div class="fixed inset-0 z-50 bg-zinc-900/40 backdrop-blur-sm flex items-center justify-center p-6"
+         @onclick="Close">
+        <div class="w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200/80 dark:border-zinc-800 max-h-[90vh] flex flex-col"
+             @onclick:stopPropagation="true">
+
+            <!-- HEADER -->
+            <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between gap-3 shrink-0">
+                <div class="min-w-0">
+                    <h3 class="text-base font-semibold">Edit template</h3>
+                    <p class="text-xs text-zinc-500 mt-0.5">@_friendlyName · applies across your portfolio</p>
+                </div>
+                <button class="p-1.5 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors duration-150"
+                        @onclick="Close" aria-label="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+            </header>
+
+            <!-- BODY (scrolls if content exceeds modal height) -->
+            <div class="px-6 py-5 space-y-5 overflow-y-auto">
+
+                @* Type + State pickers — only when the caller asked for them
+                   (Templates page). When opened from NoticePreferences the type
+                   is fixed and these don't render. *@
+                @if (_showPicker)
+                {
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Notice type</label>
+                            <select value="@_draft.NoticeTypeId" @onchange="OnNoticeTypeChangedAsync" disabled="@(_draft.Id != 0)"
+                                    class="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60 disabled:cursor-not-allowed transition-shadow duration-150">
+                                @foreach (var t in _noticeTypes)
+                                {
+                                    <option value="@t.Id">@t.DisplayName (@t.Code)</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">State (optional)</label>
+                            <select value="@(_draft.StateId?.ToString() ?? "")" @onchange="OnStateChangedAsync" disabled="@(_draft.Id != 0)"
+                                    class="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60 disabled:cursor-not-allowed transition-shadow duration-150">
+                                <option value="">All states (generic)</option>
+                                @foreach (var s in _states)
+                                {
+                                    <option value="@s.Id">@s.Code — @s.Name</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(_hint))
+                {
+                    <div class="rounded-lg border border-indigo-200/60 dark:border-indigo-500/15 bg-indigo-50/40 dark:bg-indigo-500/[0.06] px-3.5 py-2.5 flex items-start justify-between gap-3">
+                        <div class="flex items-start gap-2.5 min-w-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-600 dark:text-indigo-400 mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                            <div class="text-xs text-indigo-900 dark:text-indigo-200 leading-relaxed">@_hint</div>
+                        </div>
+                        <button type="button" @onclick="ResetToDefaultAsync"
+                                class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shrink-0">
+                            Reset to default
+                        </button>
+                    </div>
+                }
+
+                <div>
+                    <label for="tpl-subject" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Subject</label>
+                    <input id="tpl-subject" type="text" @bind="_draft.Subject" @bind:event="oninput"
+                           @onfocus="@(() => _focusedFieldId = "tpl-subject")"
+                           maxlength="400"
+                           class="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150" />
+                </div>
+
+                @* Theme picker — swatches drive the Preview tab's chrome. v1 is
+                   preview-only; the saved BodyHtml is still the bare body that
+                   the existing send pipeline emits. Wiring chrome into actual
+                   sends is a follow-up (schema + renderer change). *@
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Email design</label>
+                        <span class="text-[10px] uppercase tracking-wider font-medium text-zinc-400">Preview only</span>
+                    </div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        @foreach (var theme in EmailThemes.All)
+                        {
+                            var selected = theme.Key == _themeKey;
+                            <button type="button"
+                                    @onclick="@(() => _themeKey = theme.Key)"
+                                    title="@theme.Label"
+                                    class="@(selected
+                                        ? "ring-2 ring-offset-2 dark:ring-offset-zinc-900 ring-indigo-500"
+                                        : "ring-1 ring-zinc-200 dark:ring-zinc-700 hover:ring-zinc-300 dark:hover:ring-zinc-600")
+                                        inline-flex items-center gap-2 h-9 px-3 rounded-lg text-xs font-medium bg-white dark:bg-zinc-800 transition-shadow duration-150">
+                                <span class="w-4 h-4 rounded-full shrink-0" style="background:@theme.AccentHex"></span>
+                                <span>@theme.Label</span>
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                <div>
+                    <label for="tpl-html-body" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">HTML body</label>
+
+                    @* Tab strip: large segmented control with a clear active state.
+                       Sits on its own line above the editor so it can't be missed,
+                       and uses indigo accent + white card lift on the active tab so
+                       the user always knows which mode they're in. *@
+                    <div class="inline-flex p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-700/60 text-sm mb-2.5">
+                        <button type="button" @onclick="@(() => _htmlTab = HtmlTab.Design)"
+                                class="@(_htmlTab == HtmlTab.Design
+                                    ? "bg-white dark:bg-zinc-900 text-indigo-700 dark:text-indigo-300 shadow-sm ring-1 ring-indigo-500/15"
+                                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200")
+                                    inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-150">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+                            Design
+                        </button>
+                        <button type="button" @onclick="@(() => _htmlTab = HtmlTab.Preview)"
+                                class="@(_htmlTab == HtmlTab.Preview
+                                    ? "bg-white dark:bg-zinc-900 text-indigo-700 dark:text-indigo-300 shadow-sm ring-1 ring-indigo-500/15"
+                                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200")
+                                    inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-150">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                            Preview
+                        </button>
+                    </div>
+
+                    @if (_htmlTab == HtmlTab.Design)
+                    {
+                        <textarea id="tpl-html-body" rows="10" @bind="_draft.BodyHtml" @bind:event="oninput"
+                                  @onfocus="@(() => _focusedFieldId = "tpl-html-body")"
+                                  class="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm font-mono border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150"></textarea>
+                    }
+                    else
+                    {
+                        @* Email-style preview pane: the chosen theme's chrome wraps
+                           the rendered body with sample data substituted. The light
+                           backdrop simulates the inbox surround so the chrome's own
+                           shadow + radius are visible. *@
+                        <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-950/60 p-4 min-h-[280px]">
+                            @if (string.IsNullOrWhiteSpace(_draft.BodyHtml))
+                            {
+                                <p class="text-sm text-zinc-400 italic px-4 py-12 text-center">Nothing to preview yet.</p>
+                            }
+                            else
+                            {
+                                <div class="rt-editor">
+                                    @((MarkupString)EmailThemes.Wrap(RenderPreview(_draft.BodyHtml), EmailThemes.Resolve(_themeKey)))
+                                </div>
+                            }
+                            <p class="text-[11px] text-zinc-500 mt-3 px-1 text-center">
+                                Sample data: <span class="font-medium">Jane Smith</span> · <span class="font-medium">$1,250.00</span> · <span class="font-medium">@SampleDueDate</span>. Real notices use the lease's actual values at send time.
+                            </p>
+                        </div>
+                    }
+                </div>
+
+                <div>
+                    <label for="tpl-text-body" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Plain-text body</label>
+                    <textarea id="tpl-text-body" rows="6" @bind="_draft.BodyText" @bind:event="oninput"
+                              @onfocus="@(() => _focusedFieldId = "tpl-text-body")"
+                              class="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm font-mono border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150"></textarea>
+                </div>
+
+                <div class="flex items-start gap-2 flex-wrap">
+                    <span class="text-xs text-zinc-500 dark:text-zinc-400 pt-1 shrink-0">Insert placeholder:</span>
+                    @foreach (var p in Placeholders)
+                    {
+                        <button type="button"
+                                @onclick="@(() => InsertPlaceholderAsync(p.Token))"
+                                title="@p.Description — inserts at cursor in the last focused field"
+                                class="var-pill cursor-pointer hover:brightness-110 transition">
+                            @p.Label
+                        </button>
+                    }
+                </div>
+
+                <div class="flex items-start gap-2 flex-wrap">
+                    <span class="text-xs text-zinc-500 dark:text-zinc-400 pt-1 shrink-0">Insert snippet:</span>
+                    @foreach (var s in Snippets)
+                    {
+                        <button type="button"
+                                @onclick="@(() => InsertPlaceholderAsync(s.Html))"
+                                title="@s.Description"
+                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition-colors duration-150">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                            @s.Label
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <!-- FOOTER -->
+            <footer class="px-6 py-3.5 border-t border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60 flex items-center justify-end gap-2 shrink-0">
+                <button class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors duration-150"
+                        @onclick="Close">Cancel</button>
+                <button class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-colors duration-150 disabled:opacity-50"
+                        @onclick="SaveAsync" disabled="@_saving">
+                    @(_saving ? "Saving…" : "Save template")
+                </button>
+            </footer>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int PropertyManagerId { get; set; }
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    private bool _visible;
+    private bool _saving;
+    private string _friendlyName = string.Empty;
+    private string _noticeTypeCode = string.Empty;
+    private int _noticeTypeId;
+    private string? _hint;
+    private PmTemplateOverride? _draft;
+
+    // Picker mode (Templates page) shows notice-type + state dropdowns at the
+    // top. Direct mode (NoticePreferences) hides them — the caller already
+    // committed to a specific notice type.
+    private bool _showPicker;
+    private IReadOnlyList<NoticeType> _noticeTypes = Array.Empty<NoticeType>();
+    private IReadOnlyList<RulesState> _states = Array.Empty<RulesState>();
+
+    // ID of the last text field the user focused (subject / html body / plain body).
+    // Used by the placeholder chips to know which textarea to inject into. Default
+    // to the HTML body — that's where copy gets edited most often.
+    private string _focusedFieldId = "tpl-html-body";
+
+    private enum HtmlTab { Design, Preview }
+    private HtmlTab _htmlTab = HtmlTab.Design;
+
+    // Currently-selected email theme key (v1 = preview-only chrome wrapping).
+    private string _themeKey = EmailThemes.DefaultKey;
+
+    // Today + 5 days, formatted human-friendly. Used in the preview substitution
+    // for {{ due_date }} so the rendered preview looks like a real upcoming notice.
+    private static string SampleDueDate => DateTime.Today.AddDays(5).ToString("MMMM d, yyyy");
+
+    // Sample values shown in the preview pane. Keep keys aligned with the
+    // Placeholders catalogue above + required_vars on the seeded templates.
+    private static readonly (string Key, string Value)[] SampleValues =
+    {
+        ("tenant_name",  "Jane Smith"),
+        ("amount_owed",  "$1,250.00"),
+        ("monthly_rent", "$1,250.00"),
+        ("lease_id",     "L-00042"),
+        ("grace_days",   "5"),
+        ("pay_url",      "https://example.com/pay/sample-token")
+    };
+
+    /// <summary>
+    /// Renders the preview through real Scriban so {{ var }} substitutions
+    /// AND control flow like {% if pay_url %}…{% endif %} both work. We hand
+    /// it a synthetic variable bag built from <see cref="SampleValues"/>; the
+    /// real send pipeline gets its values from the lease + invoice rows.
+    ///
+    /// Errors are swallowed and the raw template is returned so a typo in
+    /// a {{ }} tag never crashes the modal — the PM can spot the problem
+    /// faster from the rendered glitch than from a stack trace.
+    /// </summary>
+    private static string RenderPreview(string html)
+    {
+        try
+        {
+            var template = Template.Parse(html);
+            if (template.HasErrors) return html;
+
+            var script = new ScriptObject();
+            foreach (var (key, value) in SampleValues)
+            {
+                script[key] = value;
+            }
+            script["due_date"] = SampleDueDate;
+
+            var context = new TemplateContext();
+            context.PushGlobal(script);
+            return template.Render(context);
+        }
+        catch
+        {
+            return html;
+        }
+    }
+
+    private sealed record PlaceholderDef(string Label, string Token, string Description);
+
+    // Catalogue surfaced as clickable chips. Keep in sync with required_vars
+    // declared on the system templates (seed_notice_templates*.sql).
+    private static readonly PlaceholderDef[] Placeholders =
+    {
+        new("tenant_name",  "{{ tenant_name }}",  "Tenant's full name"),
+        new("amount_owed",  "{{ amount_owed }}",  "Amount currently owed (formatted as currency)"),
+        new("due_date",     "{{ due_date }}",     "Rent due date for this lease"),
+        new("monthly_rent", "{{ monthly_rent }}", "Monthly rent on the lease"),
+        new("lease_id",     "{{ lease_id }}",     "Internal lease identifier"),
+        new("grace_days",   "{{ grace_days }}",   "Effective grace period in days"),
+        new("pay_url",      "{{ pay_url }}",      "Public payment URL from QuickBooks or Xero — tenant clicks to pay online")
+    };
+
+    private sealed record SnippetDef(string Label, string Html, string Description);
+
+    // Pre-built HTML blocks PMs can drop into the body with one click. Bigger
+    // than a token chip — these insert full styled markup. The Pay Now button
+    // uses indigo as a neutral default; a future enhancement could pick up the
+    // current theme's accent color.
+    private static readonly SnippetDef[] Snippets =
+    {
+        new(
+            "Pay Now button",
+            // Verbatim string (not C# 11 raw) — Razor's compiler can't parse
+            // triple-quoted literals inside @code reliably under .NET 8.
+            // The {% if pay_url %} wrap means the button hides itself when
+            // the invoice has no public payment URL (payments not enabled
+            // in QuickBooks, or Xero's OnlineInvoice endpoint returned empty).
+            "\n{% if pay_url %}\n" +
+            "<p style=\"text-align:center;margin:24px 0;\">\n" +
+            "  <a href=\"{{ pay_url }}\" style=\"display:inline-block;padding:12px 28px;background:#4F46E5;color:white;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;\">\n" +
+            "    Pay rent online\n" +
+            "  </a>\n" +
+            "</p>\n" +
+            "{% endif %}\n",
+            "Inserts a styled button that links to the invoice's public payment URL. Auto-hides when the invoice has no pay link.")
+    };
+
+    /// <summary>
+    /// Direct mode: open the modal for a specific notice type, fixed to the
+    /// PM-generic override (state = null). Used by NoticePreferences where the
+    /// user already knows which kind of notice they're editing.
+    /// </summary>
+    public async Task ShowAsync(string noticeTypeCode, string friendlyName)
+    {
+        await ResetStateAsync();
+        _showPicker = false;
+        _noticeTypeCode = noticeTypeCode;
+        _friendlyName = friendlyName;
+
+        var match = _noticeTypes.FirstOrDefault(t => t.Code == noticeTypeCode);
+        if (match is null)
+        {
+            _hint = $"Unknown notice type '{noticeTypeCode}'. Configure it in the notice_types catalogue first.";
+            _draft = new PmTemplateOverride { PropertyManagerId = PropertyManagerId, IsActive = true };
+            _visible = true;
+            return;
+        }
+        _noticeTypeId = match.Id;
+
+        // Existing PM-generic override?
+        var existing = (await Overrides.ListForPmAsync(PropertyManagerId, CancellationToken.None))
+            .FirstOrDefault(o => o.IsActive && o.NoticeTypeId == _noticeTypeId && o.StateId is null);
+
+        if (existing is not null)
+        {
+            HydrateFromExisting(existing);
+            _hint = "Editing your existing customization. Click Reset to default to discard your changes and start from the system template.";
+        }
+        else
+        {
+            _draft = NewBlankDraft(_noticeTypeId, stateId: null);
+            await PrefillFromDefaultAsync();
+        }
+
+        _visible = true;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Picker mode for editing an EXISTING override. Type + state are locked
+    /// (you can't change which row this is); the form just shows the saved
+    /// subject/body for tweaking. Used by the Templates page's row Edit button.
+    /// </summary>
+    public async Task ShowExistingAsync(PmTemplateOverride row)
+    {
+        await ResetStateAsync();
+        _showPicker = true;
+        HydrateFromExisting(row);
+        _noticeTypeId = row.NoticeTypeId;
+        _noticeTypeCode = _noticeTypes.FirstOrDefault(t => t.Id == row.NoticeTypeId)?.Code ?? string.Empty;
+        _friendlyName = _noticeTypes.FirstOrDefault(t => t.Id == row.NoticeTypeId)?.DisplayName ?? "Override";
+        _hint = "Editing your existing customization. Click Reset to default to discard your changes and start from the system template.";
+        _visible = true;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Picker mode for creating a NEW override. Type + state dropdowns are
+    /// editable; system defaults reload as the user picks each combination.
+    /// Used by the Templates page's "New override" button.
+    /// </summary>
+    public async Task ShowNewWithPickerAsync()
+    {
+        await ResetStateAsync();
+        _showPicker = true;
+
+        var first = _noticeTypes.FirstOrDefault();
+        _noticeTypeId = first?.Id ?? 0;
+        _noticeTypeCode = first?.Code ?? string.Empty;
+        _friendlyName = first?.DisplayName ?? "Override";
+
+        _draft = NewBlankDraft(_noticeTypeId, stateId: null);
+        await PrefillFromDefaultAsync();
+
+        _visible = true;
+        StateHasChanged();
+    }
+
+    // Resets all per-open transient state and loads the catalogues. Lookups are
+    // memoised on the first call across opens to avoid hammering EF.
+    private async Task ResetStateAsync()
+    {
+        _hint = null;
+        _saving = false;
+        _htmlTab = HtmlTab.Design;
+        _themeKey = EmailThemes.DefaultKey;
+        _focusedFieldId = "tpl-html-body";
+
+        if (_noticeTypes.Count == 0)
+        {
+            _noticeTypes = await NoticeTypeReader.ListAllAsync(CancellationToken.None);
+        }
+        if (_states.Count == 0)
+        {
+            _states = await StateReader.ListAllAsync(CancellationToken.None);
+        }
+    }
+
+    private static PmTemplateOverride NewBlankDraft(int noticeTypeId, int? stateId) => new()
+    {
+        NoticeTypeId = noticeTypeId,
+        StateId = stateId,
+        Subject = string.Empty,
+        BodyHtml = string.Empty,
+        BodyText = string.Empty,
+        IsActive = true
+    };
+
+    private void HydrateFromExisting(PmTemplateOverride row)
+    {
+        _draft = new PmTemplateOverride
+        {
+            Id = row.Id,
+            PropertyManagerId = row.PropertyManagerId,
+            NoticeTypeId = row.NoticeTypeId,
+            StateId = row.StateId,
+            Subject = row.Subject,
+            BodyHtml = row.BodyHtml,
+            BodyText = row.BodyText,
+            IsActive = row.IsActive
+        };
+    }
+
+    // Picker change handlers — used in _showPicker mode. When the user changes
+    // the notice type or state, the form re-seeds with the matching system
+    // default so they don't stare at a blank slate.
+    private async Task OnNoticeTypeChangedAsync(ChangeEventArgs e)
+    {
+        if (_draft is null || _draft.Id != 0) return;
+        if (int.TryParse(e.Value?.ToString(), out var id))
+        {
+            _draft.NoticeTypeId = id;
+            _noticeTypeId = id;
+            _noticeTypeCode = _noticeTypes.FirstOrDefault(t => t.Id == id)?.Code ?? string.Empty;
+            _friendlyName = _noticeTypes.FirstOrDefault(t => t.Id == id)?.DisplayName ?? "Override";
+        }
+        await PrefillFromDefaultAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnStateChangedAsync(ChangeEventArgs e)
+    {
+        if (_draft is null || _draft.Id != 0) return;
+        _draft.StateId = int.TryParse(e.Value?.ToString(), out var sid) ? sid : (int?)null;
+        await PrefillFromDefaultAsync();
+        StateHasChanged();
+    }
+
+    private async Task PrefillFromDefaultAsync()
+    {
+        if (_draft is null) return;
+        var version = await TemplateResolver.ResolveActiveVersionAsync(
+            _draft.StateId, _noticeTypeCode,
+            DateOnly.FromDateTime(DateTime.UtcNow), CancellationToken.None);
+
+        if (version is null)
+        {
+            _draft.Subject  = string.Empty;
+            _draft.BodyHtml = string.Empty;
+            _draft.BodyText = string.Empty;
+            var stateLabel = _draft.StateId is int sid ? StateCode(sid) : "all states";
+            _hint = $"No system default exists for {_friendlyName} ({stateLabel}). Starting from a blank slate.";
+            return;
+        }
+
+        _draft.Subject  = version.Subject;
+        _draft.BodyHtml = version.BodyHtml;
+        _draft.BodyText = version.BodyText;
+
+        var stateLabel2 = _draft.StateId is int sid2 ? StateCode(sid2) : "all states";
+        _hint = $"Pre-filled from the system default ({stateLabel2}). Edit freely — required placeholders are still enforced on save.";
+    }
+
+    private string StateCode(int id) =>
+        _states.FirstOrDefault(s => s.Id == id)?.Code ?? $"#{id}";
+
+    private async Task ResetToDefaultAsync()
+    {
+        await PrefillFromDefaultAsync();
+        StateHasChanged();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_draft is null) return;
+        // PropertyManagerId is the only field both NewBlank and HydrateFromExisting
+        // can't reliably populate (NewBlank is static; Hydrate carries it through
+        // from the source row but we belt-and-suspender it here). Setting it
+        // unconditionally is a no-op when already correct.
+        _draft.PropertyManagerId = PropertyManagerId;
+
+        _saving = true;
+        try
+        {
+            await Overrides.UpsertAsync(_draft, CancellationToken.None);
+            _visible = false;
+            if (OnSaved.HasDelegate) await OnSaved.InvokeAsync();
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Close()
+    {
+        _visible = false;
+        _draft = null;
+    }
+
+    // Drops the placeholder token at the current caret position of whichever
+    // text field the user last focused. The JS helper dispatches an `input`
+    // event so the @bind:event="oninput" binding on the textarea sees the
+    // change and updates _draft.BodyHtml / BodyText / Subject in C#.
+    private async Task InsertPlaceholderAsync(string token)
+    {
+        await JS.InvokeVoidAsync("dueMapTemplate.insertAtCursor", _focusedFieldId, token);
+    }
+}

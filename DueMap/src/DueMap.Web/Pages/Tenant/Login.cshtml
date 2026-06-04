@@ -1,0 +1,79 @@
+@page "/t/login"
+@model DueMap.Web.Pages.Tenant.LoginModel
+@{
+    Layout = null;
+    ViewData["Title"] = "Sign in — tenant portal";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="~/css/app.css" />
+</head>
+<body class="min-h-screen bg-stone-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+<div class="max-w-md mx-auto px-6 py-16">
+
+    <div class="text-center mb-8">
+        <div class="inline-flex w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 items-center justify-center mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a2 2 0 0 1-2 2h-4v-7h-6v7H5a2 2 0 0 1-2-2z"/></svg>
+        </div>
+        <h1 class="text-xl font-semibold tracking-tight">Tenant sign-in</h1>
+        <p class="mt-1 text-sm text-zinc-500">Access your rent payments, invoices, and lease details.</p>
+    </div>
+
+    @if (Model.Confirmation is not null)
+    {
+        <div class="rounded-xl border border-emerald-200/70 dark:border-emerald-500/20 bg-emerald-50/60 dark:bg-emerald-500/5 px-4 py-4">
+            <div class="flex items-start gap-2.5">
+                <span class="mt-0.5 inline-flex w-5 h-5 items-center justify-center rounded-full bg-emerald-500 text-white shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </span>
+                <div class="text-sm text-emerald-900 dark:text-emerald-200">@Model.Confirmation</div>
+            </div>
+        </div>
+    }
+    else
+    {
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="mb-4 rounded-xl border border-rose-200/70 dark:border-rose-500/20 bg-rose-50/60 dark:bg-rose-500/5 px-4 py-3 text-sm text-rose-900 dark:text-rose-200">
+                @Model.ErrorMessage
+            </div>
+        }
+
+        <form method="post" class="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm p-6 space-y-4">
+            <div>
+                <label for="email" class="block text-sm font-medium mb-1.5">Email</label>
+                <input id="email" type="email" asp-for="Input.Email" required autofocus
+                       placeholder="you@example.com"
+                       class="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" />
+            </div>
+
+            <div>
+                <label for="password" class="flex items-center justify-between text-sm font-medium mb-1.5">
+                    <span>Password</span>
+                    <span class="text-xs font-normal text-zinc-500">optional</span>
+                </label>
+                <input id="password" type="password" asp-for="Input.Password"
+                       placeholder="leave blank to email me a sign-in link"
+                       class="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" />
+                <p class="mt-1.5 text-xs text-zinc-500">
+                    First time here? Leave this empty — we'll email you a one-time sign-in link.
+                </p>
+            </div>
+
+            <button type="submit"
+                    class="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm">
+                Continue
+            </button>
+        </form>
+    }
+
+    <p class="mt-6 text-center text-[11px] text-zinc-400">
+        Sign-in protected. Magic links expire after 15 minutes.
+    </p>
+</div>
+</body>
+</html>

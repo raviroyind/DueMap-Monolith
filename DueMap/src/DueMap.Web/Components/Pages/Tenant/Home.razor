@@ -1,0 +1,165 @@
+@page "/t"
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@layout DueMap.Web.Components.Layout.TenantLayout
+@using DueMap.Tenancy
+@using DueMap.Tenancy.Domain
+@using DueMap.Tenancy.Services
+@using DueMap.Web.Services
+@inject TenantContext Tenant
+@inject IRentInvoiceRepository Invoices
+@inject ILeaseReader Leases
+@inject NavigationManager Nav
+
+<PageTitle>Your rent — Tenant portal</PageTitle>
+
+<div class="max-w-3xl mx-auto px-6 py-10 space-y-6">
+
+    @if (_loading)
+    {
+        <p class="text-sm text-zinc-500">Loading…</p>
+    }
+    else if (_session is null)
+    {
+        @* Auth gate is also re-checked here in case the cookie expired
+           between layout render and page load. *@
+        <p class="text-sm text-zinc-500">Redirecting to sign-in…</p>
+    }
+    else
+    {
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Hi @FirstName(_session.DisplayName) 👋</h1>
+            <p class="mt-1 text-sm text-zinc-500">Here's where your rent stands today.</p>
+        </div>
+
+        @* CURRENT BALANCE HERO *@
+        <section class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+            <div class="px-6 py-6 flex items-start justify-between gap-6 flex-wrap">
+                <div>
+                    <div class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-1">Outstanding balance</div>
+                    <div class="text-4xl font-semibold tabular-nums">
+                        @FormatMoney(_outstanding, _currency)
+                    </div>
+                    @if (_nextDueDate is DateOnly next)
+                    {
+                        <div class="mt-2 text-sm text-zinc-500">
+                            Next payment due <span class="font-medium text-zinc-700 dark:text-zinc-300">@next.ToString("MMMM d, yyyy")</span>
+                        </div>
+                    }
+                </div>
+
+                @if (!string.IsNullOrEmpty(_currentPayUrl) && _outstanding > 0)
+                {
+                    <a href="@_currentPayUrl" target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm">
+                        Pay now
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+                    </a>
+                }
+            </div>
+
+            @if (_lease is not null)
+            {
+                <div class="px-6 py-4 border-t border-zinc-200/80 dark:border-zinc-800 grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                    <div>
+                        <div class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-0.5">Monthly rent</div>
+                        <div class="font-medium tabular-nums">@FormatMoney(_lease.MonthlyRent, _currency)</div>
+                    </div>
+                    <div>
+                        <div class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-0.5">Lease start</div>
+                        <div class="font-medium tabular-nums">@_lease.StartDate.ToString("MMM d, yyyy")</div>
+                    </div>
+                    @if (_lease.EndDate is DateOnly end)
+                    {
+                        <div>
+                            <div class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-0.5">Lease end</div>
+                            <div class="font-medium tabular-nums">@end.ToString("MMM d, yyyy")</div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+
+        <div class="text-sm">
+            <a href="/t/invoices" class="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300">
+                See all invoices
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </a>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private TenantSessionContext? _session;
+    private Lease? _lease;
+    private decimal _outstanding;
+    private DateOnly? _nextDueDate;
+    private string? _currentPayUrl;
+    private string _currency = "USD";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var ct = CancellationToken.None;
+        _session = await Tenant.GetAsync(ct);
+        if (_session is null)
+        {
+            Nav.NavigateTo("/t/login", replace: true);
+            return;
+        }
+
+        // Customer -> their lease(s). Take the first active one — multi-lease
+        // tenants are rare; v1 lists the primary in the header. The /t/invoices
+        // page shows all rows regardless of lease.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var leases = await Leases.ListActiveAsync(_session.PropertyManagerId, today, ct);
+        _lease = leases.FirstOrDefault(l => l.CustomerId == _session.CustomerId);
+
+        // Outstanding = sum of Open invoices for this customer (across leases).
+        var allInvoices = await Invoices.ListByPropertyManagerAsync(_session.PropertyManagerId, ct);
+        var mine = allInvoices.Where(i => i.CustomerId == _session.CustomerId).ToList();
+        _outstanding = mine.Where(i => i.Status == RentInvoiceStatus.Open).Sum(i => i.Balance);
+        _nextDueDate = mine.Where(i => i.Status == RentInvoiceStatus.Open)
+                           .Select(i => (DateOnly?)i.DueDate)
+                           .OrderBy(d => d).FirstOrDefault();
+
+        // Lift the pay URL + currency off the current invoice (newest open).
+        var current = mine.Where(i => i.Status == RentInvoiceStatus.Open)
+                          .OrderBy(i => i.DueDate)
+                          .FirstOrDefault();
+        if (current is not null)
+        {
+            _currentPayUrl = current.PublicPaymentUrl;
+            _currency = current.Currency ?? "USD";
+        }
+
+        _loading = false;
+    }
+
+    private static string FirstName(string? displayName)
+    {
+        if (string.IsNullOrWhiteSpace(displayName)) return "there";
+        // "Jane Smith" -> "Jane", "Rodriguez, Carlos" -> "Carlos"
+        var s = displayName.Trim();
+        if (s.Contains(',', StringComparison.Ordinal))
+        {
+            var parts = s.Split(',', 2);
+            return parts[1].Trim().Split(' ', 2)[0];
+        }
+        return s.Split(' ', 2)[0];
+    }
+
+    private static string FormatMoney(decimal amount, string currency)
+    {
+        var symbol = currency.ToUpperInvariant() switch
+        {
+            "USD" or "CAD" or "AUD" => "$",
+            "EUR" => "€",
+            "GBP" => "£",
+            "INR" => "₹",
+            _ => null
+        };
+        return symbol is null
+            ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:N2} {1}", amount, currency.ToUpperInvariant())
+            : string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0}{1:N2}", symbol, amount);
+    }
+}

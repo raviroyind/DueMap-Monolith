@@ -1,0 +1,3 @@
+## Claude Code — per-machine settings (each contributor's own overrides).
+## Project-wide settings live in DueMap/.claude/settings.json instead.
+.claude/settings.local.json

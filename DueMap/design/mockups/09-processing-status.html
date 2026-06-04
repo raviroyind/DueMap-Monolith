@@ -1,0 +1,517 @@
+<!--
+  DueMap — Screen 9 · /processing-status
+  ---------------------------------------------------------------
+  Lucide icons used:
+    sparkles, sun, moon, search, command, chevron-up, chevron-down,
+    chevron-right, home, link-2, bell, file-text, building-2, users,
+    activity, refresh-cw, play, check-circle-2, alert-triangle,
+    x-circle, clock, send, file-warning, bell-ring, calendar-clock,
+    receipt, more-horizontal, info, arrow-up-right, zap
+  ---------------------------------------------------------------
+  Notes on the design:
+    - This is the "did the system do its job today?" page — quiet,
+      operational, never alarming unless something genuinely failed.
+    - KPI strip at the top reads back the answer at a glance:
+      today's run, 7-day success rate, weekly action count, next
+      scheduled tick.
+    - Runs are a vertical list (not a tight table). Each row has
+      enough room for the breakdown — pre-due / due-date / grace /
+      late-fee — surfaced as small icon counters. Matches the
+      Notice settings icon-cluster pattern from /leases.
+    - The "Trigger now" button is a power-user affordance — manually
+      fire the sweep job instead of waiting for cron. Opens a
+      lightweight confirmation in the popover.
+    - Failed runs render with an amber-tinted left edge and the
+      failure reason directly visible. No drilling required to see
+      what went wrong.
+    - One row is shown in "expanded" state at the top to demonstrate
+      the per-action drill-down (lease → action → status). In
+      production this is click-to-toggle.
+-->
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Processing status · DueMap</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { fontFamily: { sans: ['-apple-system','BlinkMacSystemFont','"SF Pro Display"','"SF Pro Text"','"Segoe UI"','system-ui','sans-serif'] } } }
+    };
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+  <style>
+    /* Action-kind counter pill — small, scannable */
+    .action-pill {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 2px 6px 2px 5px; border-radius: 6px;
+      font-size: 11px; font-weight: 500; line-height: 1;
+      background-color: rgb(244 244 245); color: rgb(82 82 91);
+    }
+    .dark .action-pill { background-color: rgb(39 39 42); color: rgb(161 161 170); }
+    .action-pill.has-value { background-color: rgb(238 242 255); color: rgb(67 56 202); }
+    .dark .action-pill.has-value { background-color: rgb(67 56 202 / 0.18); color: rgb(165 180 252); }
+    .action-pill.late-fee { background-color: rgb(254 226 226); color: rgb(159 18 57); }
+    .dark .action-pill.late-fee { background-color: rgb(244 63 94 / 0.15); color: rgb(252 165 165); }
+  </style>
+</head>
+<body class="h-full font-sans antialiased bg-stone-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
+
+<div class="flex h-full min-h-screen">
+
+  <!-- SIDEBAR (Processing status active) -->
+  <aside class="w-64 shrink-0 border-r border-zinc-200/80 bg-white dark:bg-zinc-900 dark:border-zinc-800 flex flex-col">
+    <div class="h-16 flex items-center gap-2.5 px-5 border-b border-zinc-200/80 dark:border-zinc-800">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center shadow-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
+      </div>
+      <span class="text-[15px] font-semibold tracking-tight">DueMap</span>
+    </div>
+    <nav class="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
+      <div>
+        <div class="px-2 pb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Workspace</div>
+        <ul class="space-y-0.5">
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Dashboard</a></li>
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/></svg>Accounting</a></li>
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>Notice preferences</a></li>
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Templates</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="px-2 pb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Portfolio</div>
+        <ul class="space-y-0.5">
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>Leases</a></li>
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Link customers</a></li>
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm font-medium bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.5.5 0 0 1-.96 0L9.24 3.18a.5.5 0 0 0-.96 0l-2.35 8.36A2 2 0 0 1 4 13H2"/></svg>Processing status</a></li>
+        </ul>
+      </div>
+    </nav>
+    <div class="border-t border-zinc-200/80 dark:border-zinc-800 p-3">
+      <button class="w-full flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors duration-150">
+        <div class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-semibold text-zinc-600 dark:text-zinc-300">RR</div>
+        <div class="flex-1 min-w-0 text-left">
+          <div class="text-sm font-medium truncate">Ravi Roy</div>
+          <div class="text-xs text-zinc-500 truncate">Demo Property Mgmt</div>
+        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="m18 15-6-6-6 6"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="flex-1 flex flex-col min-w-0">
+
+    <header class="sticky top-0 z-30 h-16 flex items-center justify-between px-8 border-b border-zinc-200/80 bg-white/70 backdrop-blur-md dark:bg-zinc-900/70 dark:border-zinc-800">
+      <h1 class="text-base font-semibold">Processing status</h1>
+      <div class="flex items-center gap-2">
+        <button class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-zinc-500 bg-zinc-100/70 hover:bg-zinc-200/70 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors duration-150">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <span>Search…</span>
+          <span class="flex items-center gap-0.5 ml-4 text-[10px] font-medium text-zinc-400 dark:text-zinc-500"><kbd class="px-1 py-0.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700">⌘</kbd><kbd class="px-1 py-0.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700">K</kbd></span>
+        </button>
+        <button onclick="document.documentElement.classList.toggle('dark')" class="p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150" aria-label="Toggle theme">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden dark:block"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="block dark:hidden"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto">
+      <div class="max-w-6xl mx-auto px-8 py-8 space-y-6">
+
+        <!-- PAGE HEADER -->
+        <div class="flex items-end justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-semibold tracking-tight">Processing status</h2>
+            <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-2xl">
+              Daily runs of the late-fee orchestrator. The sweep job ticks every 15 minutes; each run processes one PM's leases for the business date in their local time zone.
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 shadow-sm transition-colors duration-150">
+              <!-- Lucide: refresh-cw -->
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+              Refresh
+            </button>
+            <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all duration-200 ease-out">
+              <!-- Lucide: play -->
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+              Trigger now
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI STRIP -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+          <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Today</div>
+              <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Completed
+              </span>
+            </div>
+            <div class="text-2xl font-semibold tracking-tight tabular-nums">42</div>
+            <div class="mt-1 text-xs text-zinc-500">leases evaluated</div>
+          </div>
+
+          <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Success rate</div>
+              <span class="text-xs text-zinc-400 tabular-nums">7d</span>
+            </div>
+            <div class="text-2xl font-semibold tracking-tight tabular-nums">100<span class="text-zinc-400 text-lg">%</span></div>
+            <div class="mt-1 text-xs text-zinc-500"><span class="tabular-nums">7</span> of <span class="tabular-nums">7</span> runs completed</div>
+          </div>
+
+          <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Actions this week</div>
+              <span class="text-xs text-zinc-400 tabular-nums">7d</span>
+            </div>
+            <div class="text-2xl font-semibold tracking-tight tabular-nums">28</div>
+            <div class="mt-1 text-xs text-zinc-500"><span class="tabular-nums">22</span> notices sent · <span class="tabular-nums">3</span> late fees</div>
+          </div>
+
+          <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Next scheduled</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="text-2xl font-semibold tracking-tight tabular-nums">8m</div>
+            <div class="mt-1 text-xs text-zinc-500">May 20 · 00:00 PM local</div>
+          </div>
+
+        </div>
+
+        <!-- RUN LIST -->
+        <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+
+          <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div class="text-sm font-semibold">Recent runs</div>
+              <span class="text-xs text-zinc-500">Last 30 days</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900 transition-colors">
+                All <span class="text-zinc-400 dark:text-zinc-500 tabular-nums">30</span>
+              </button>
+              <button class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Completed <span class="text-zinc-400 tabular-nums">29</span>
+              </button>
+              <button class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                Failed <span class="text-zinc-400 tabular-nums">1</span>
+              </button>
+            </div>
+          </header>
+
+          <ul class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+
+            <!-- TODAY · COMPLETED · EXPANDED to show drill-down -->
+            <li class="border-l-2 border-emerald-500/50">
+              <div class="px-6 py-4 flex items-center gap-4 hover:bg-zinc-50/40 dark:hover:bg-zinc-800/20 transition-colors cursor-pointer">
+                <!-- Status icon -->
+                <span class="inline-flex w-9 h-9 rounded-full bg-emerald-50 dark:bg-emerald-500/10 items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                  <!-- Lucide: check-circle-2 -->
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                </span>
+
+                <!-- Date + summary -->
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <div class="text-sm font-semibold">Today · May 19</div>
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Completed
+                    </span>
+                  </div>
+                  <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <span><span class="tabular-nums">42</span> leases evaluated</span>
+                    <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                    <span><span class="tabular-nums">4</span> actions</span>
+                    <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                    <span class="tabular-nums">00:00 PM → 00:00 PM · 412 ms</span>
+                  </div>
+                </div>
+
+                <!-- Action breakdown pills -->
+                <div class="hidden md:flex items-center gap-1.5">
+                  <span class="action-pill has-value" title="Pre-due reminders">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
+                    1
+                  </span>
+                  <span class="action-pill has-value" title="Due-date reminders">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><circle cx="16" cy="16" r="6"/></svg>
+                    1
+                  </span>
+                  <span class="action-pill has-value" title="Grace reminders">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                    1
+                  </span>
+                  <span class="action-pill late-fee" title="Late fees assessed">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 17a5 5 0 0 0 10 0c0-2.76-2.5-5-5-3-2.5-2-5 .24-5 3Z"/><path d="M22 11h-4l-2 6.5"/><path d="M17 22a2 5 0 0 1-3-5"/></svg>
+                    1
+                  </span>
+                </div>
+
+                <!-- Expand chevron -->
+                <button class="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-1 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rotate-180"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+              </div>
+
+              <!-- Drill-down body (visible because this row is expanded) -->
+              <div class="px-6 pb-5 bg-zinc-50/40 dark:bg-zinc-900/40 border-t border-zinc-100 dark:border-zinc-800/60">
+                <div class="text-[11px] uppercase tracking-wider font-medium text-zinc-500 pt-4 pb-2">Actions executed</div>
+                <ul class="space-y-1">
+                  <li class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/60 dark:hover:bg-zinc-800/40 transition-colors">
+                    <span class="inline-flex w-6 h-6 rounded-md bg-rose-50 dark:bg-rose-500/10 items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 17a5 5 0 0 0 10 0c0-2.76-2.5-5-5-3-2.5-2-5 .24-5 3Z"/><path d="M22 11h-4l-2 6.5"/></svg>
+                    </span>
+                    <div class="flex-1 min-w-0 text-sm">
+                      Late fee <span class="font-medium tabular-nums">$147.50</span> assessed on lease
+                      <a href="#" class="font-medium hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">#1026</a>
+                    </div>
+                    <span class="text-xs text-zinc-400 tabular-nums">00:00 PM</span>
+                  </li>
+                  <li class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/60 dark:hover:bg-zinc-800/40 transition-colors">
+                    <span class="inline-flex w-6 h-6 rounded-md bg-rose-50 dark:bg-rose-500/10 items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                    </span>
+                    <div class="flex-1 min-w-0 text-sm">
+                      Late-fee notice sent to <span class="font-medium">Carla Occupant</span> · lease <a href="#" class="font-medium hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">#1026</a>
+                    </div>
+                    <span class="text-xs text-zinc-400 tabular-nums">00:00 PM</span>
+                  </li>
+                  <li class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/60 dark:hover:bg-zinc-800/40 transition-colors">
+                    <span class="inline-flex w-6 h-6 rounded-md bg-amber-50 dark:bg-amber-500/10 items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v3"/><path d="M12 18h.01"/></svg>
+                    </span>
+                    <div class="flex-1 min-w-0 text-sm">
+                      Grace-period reminder sent on lease <a href="#" class="font-medium hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">#1025</a> · day 1 of 5
+                    </div>
+                    <span class="text-xs text-zinc-400 tabular-nums">00:00 PM</span>
+                  </li>
+                  <li class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/60 dark:hover:bg-zinc-800/40 transition-colors">
+                    <span class="inline-flex w-6 h-6 rounded-md bg-indigo-50 dark:bg-indigo-500/10 items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
+                    </span>
+                    <div class="flex-1 min-w-0 text-sm">
+                      Pre-due reminder sent on lease <a href="#" class="font-medium hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">#1052</a>
+                    </div>
+                    <span class="text-xs text-zinc-400 tabular-nums">00:00 PM</span>
+                  </li>
+                </ul>
+
+                <div class="mt-3 flex items-center justify-between text-xs">
+                  <div class="text-zinc-500"><span class="tabular-nums">38</span> leases had no action today (current cycle, not yet at a notice trigger).</div>
+                  <a href="#" class="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors inline-flex items-center gap-1">
+                    Open full log
+                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+                  </a>
+                </div>
+              </div>
+            </li>
+
+            <!-- COLLAPSED · Completed -->
+            <li>
+              <div class="px-6 py-4 flex items-center gap-4 hover:bg-zinc-50/40 dark:hover:bg-zinc-800/20 transition-colors cursor-pointer">
+                <span class="inline-flex w-9 h-9 rounded-full bg-emerald-50 dark:bg-emerald-500/10 items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                </span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <div class="text-sm font-semibold">Yesterday · May 18</div>
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Completed
+                    </span>
+                  </div>
+                  <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <span><span class="tabular-nums">42</span> leases evaluated</span>
+                    <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                    <span><span class="tabular-nums">2</span> actions</span>
+                    <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                    <span class="tabular-nums">00:00 PM → 00:00 PM · 388 ms</span>
+                  </div>
+                </div>
+                <div class="hidden md:flex items-center gap-1.5">
+                  <span class="action-pill has-value"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>2</span>
+                  <span class="action-pill"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><circle cx="16" cy="16" r="6"/></svg></span>
+                  <span class="action-pill"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg></span>
+                  <span class="action-pill"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 17a5 5 0 0 0 10 0c0-2.76-2.5-5-5-3-2.5-2-5 .24-5 3Z"/><path d="M22 11h-4l-2 6.5"/></svg></span>
+                </div>
+                <button class="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-1 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+              </div>
+            </li>
+
+            <!-- FAILED row (rose left edge + visible failure reason) -->
+            <li class="border-l-2 border-rose-500/60">
+              <div class="px-6 py-4 flex items-start gap-4 hover:bg-zinc-50/40 dark:hover:bg-zinc-800/20 transition-colors cursor-pointer">
+                <span class="inline-flex w-9 h-9 rounded-full bg-rose-50 dark:bg-rose-500/10 items-center justify-center text-rose-600 dark:text-rose-400 shrink-0 mt-0.5">
+                  <!-- Lucide: x-circle -->
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+                </span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <div class="text-sm font-semibold">May 11</div>
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400">
+                      <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>Failed
+                    </span>
+                  </div>
+                  <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <span><span class="tabular-nums">0</span> leases processed</span>
+                    <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                    <span class="tabular-nums">00:00 PM → 00:00 PM · 3.2 s</span>
+                  </div>
+                  <div class="mt-2 rounded-lg border border-rose-200/60 dark:border-rose-500/15 bg-rose-50/40 dark:bg-rose-500/[0.06] px-3 py-2 flex items-start gap-2.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-rose-600 dark:text-rose-400 mt-0.5 shrink-0"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                    <div class="text-xs text-rose-900 dark:text-rose-200 leading-relaxed">
+                      <strong>Accounting sync failed:</strong> QuickBooks token expired and could not be refreshed. Processing skipped to keep notices from going out on stale data.
+                      <a href="/connections" class="font-medium underline hover:no-underline ml-1">Reconnect QuickBooks</a>
+                    </div>
+                  </div>
+                </div>
+                <button class="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-1 shrink-0 mt-0.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+              </div>
+            </li>
+
+            <!-- A few more collapsed Completed rows -->
+            <li>
+              <div class="px-6 py-4 flex items-center gap-4 hover:bg-zinc-50/40 dark:hover:bg-zinc-800/20 transition-colors cursor-pointer">
+                <span class="inline-flex w-9 h-9 rounded-full bg-emerald-50 dark:bg-emerald-500/10 items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                </span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <div class="text-sm font-semibold">May 17</div>
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Completed
+                    </span>
+                  </div>
+                  <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <span><span class="tabular-nums">41</span> leases evaluated</span>
+                    <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                    <span><span class="tabular-nums">3</span> actions</span>
+                    <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                    <span class="tabular-nums">00:00 PM → 00:00 PM · 421 ms</span>
+                  </div>
+                </div>
+                <div class="hidden md:flex items-center gap-1.5">
+                  <span class="action-pill has-value"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>3</span>
+                  <span class="action-pill"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><circle cx="16" cy="16" r="6"/></svg></span>
+                  <span class="action-pill"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg></span>
+                  <span class="action-pill"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 17a5 5 0 0 0 10 0c0-2.76-2.5-5-5-3-2.5-2-5 .24-5 3Z"/><path d="M22 11h-4l-2 6.5"/></svg></span>
+                </div>
+                <button class="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-1 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+              </div>
+            </li>
+
+            <li>
+              <div class="px-6 py-4 flex items-center gap-4 hover:bg-zinc-50/40 dark:hover:bg-zinc-800/20 transition-colors cursor-pointer">
+                <span class="inline-flex w-9 h-9 rounded-full bg-emerald-50 dark:bg-emerald-500/10 items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                </span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <div class="text-sm font-semibold">May 16</div>
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Completed
+                    </span>
+                  </div>
+                  <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <span><span class="tabular-nums">41</span> leases evaluated</span>
+                    <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                    <span><span class="tabular-nums">0</span> actions</span>
+                    <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                    <span class="text-zinc-400">No leases at a trigger point</span>
+                    <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                    <span class="tabular-nums">94 ms</span>
+                  </div>
+                </div>
+                <div class="hidden md:flex items-center gap-1.5">
+                  <span class="action-pill"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg></span>
+                  <span class="action-pill"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><circle cx="16" cy="16" r="6"/></svg></span>
+                  <span class="action-pill"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg></span>
+                  <span class="action-pill"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 17a5 5 0 0 0 10 0c0-2.76-2.5-5-5-3-2.5-2-5 .24-5 3Z"/><path d="M22 11h-4l-2 6.5"/></svg></span>
+                </div>
+                <button class="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-1 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+              </div>
+            </li>
+
+            <li>
+              <div class="px-6 py-4 flex items-center gap-4 hover:bg-zinc-50/40 dark:hover:bg-zinc-800/20 transition-colors cursor-pointer">
+                <span class="inline-flex w-9 h-9 rounded-full bg-emerald-50 dark:bg-emerald-500/10 items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                </span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <div class="text-sm font-semibold">May 15</div>
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Completed
+                    </span>
+                  </div>
+                  <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <span><span class="tabular-nums">40</span> leases evaluated</span>
+                    <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                    <span><span class="tabular-nums">5</span> actions</span>
+                    <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                    <span class="tabular-nums">00:00 PM → 00:00 PM · 503 ms</span>
+                  </div>
+                </div>
+                <div class="hidden md:flex items-center gap-1.5">
+                  <span class="action-pill has-value"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>2</span>
+                  <span class="action-pill has-value"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><circle cx="16" cy="16" r="6"/></svg>1</span>
+                  <span class="action-pill has-value"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>2</span>
+                  <span class="action-pill"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 17a5 5 0 0 0 10 0c0-2.76-2.5-5-5-3-2.5-2-5 .24-5 3Z"/><path d="M22 11h-4l-2 6.5"/></svg></span>
+                </div>
+                <button class="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-1 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+              </div>
+            </li>
+
+          </ul>
+
+          <!-- Pagination footer -->
+          <footer class="px-6 py-3 border-t border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-900/40 flex items-center justify-between">
+            <div class="text-xs text-zinc-500 dark:text-zinc-400">
+              Showing <span class="tabular-nums font-medium text-zinc-700 dark:text-zinc-300">1–6</span>
+              of <span class="tabular-nums font-medium text-zinc-700 dark:text-zinc-300">30</span> runs
+            </div>
+            <div class="flex items-center gap-1">
+              <button disabled class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium text-zinc-400 dark:text-zinc-600 cursor-not-allowed">Previous</button>
+              <button class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">Next</button>
+            </div>
+          </footer>
+        </section>
+
+        <!-- Legend / footnote -->
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zinc-500 dark:text-zinc-400 px-2">
+          <span class="inline-flex items-center gap-1.5"><span class="action-pill has-value px-1.5 py-0.5"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg></span> Pre-due</span>
+          <span class="inline-flex items-center gap-1.5"><span class="action-pill has-value px-1.5 py-0.5"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><circle cx="16" cy="16" r="6"/></svg></span> Due-date</span>
+          <span class="inline-flex items-center gap-1.5"><span class="action-pill has-value px-1.5 py-0.5"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg></span> Grace</span>
+          <span class="inline-flex items-center gap-1.5"><span class="action-pill late-fee px-1.5 py-0.5"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 17a5 5 0 0 0 10 0c0-2.76-2.5-5-5-3-2.5-2-5 .24-5 3Z"/><path d="M22 11h-4l-2 6.5"/></svg></span> Late fee</span>
+          <span class="text-zinc-400 dark:text-zinc-500">·</span>
+          <span>Number is the count of actions executed by kind. Empty pill = none.</span>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+</body>
+</html>

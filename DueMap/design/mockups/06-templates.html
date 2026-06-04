@@ -1,0 +1,348 @@
+<!--
+  DueMap — Screen 6 · /templates
+  ---------------------------------------------------------------
+  Lucide icons used:
+    sparkles, sun, moon, search, command, chevron-up,
+    home, link-2, bell, file-text, building-2, users, activity,
+    bell-ring, calendar-clock, file-warning, file-x, mail, pencil,
+    rotate-ccw, plus, info, more-horizontal, check, arrow-up-right,
+    globe, map-pin
+  ---------------------------------------------------------------
+  Notes on the design:
+    - This is the library view. Per-template editing now lives on the
+      Notice preferences page; here we surface *which* templates have
+      been customized and let the PM see / restore / add state-specific
+      overrides in one glance.
+    - Two sections:
+        1) Generic templates — always 4 rows, one per notice type.
+           Status badge says "Custom" or "Default" at a glance.
+        2) State-specific overrides — a table of PM customizations
+           scoped to a particular state. Empty state included.
+    - The resolution order (state → generic PM → system) is shown as
+      a small "How resolution works" explainer at the bottom — the
+      same trust pattern as on the Connections page.
+    - Edit button on every row routes to the same template editor
+      modal (05a). Hover affordance makes the row feel actionable.
+-->
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Templates · DueMap</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { fontFamily: { sans: ['-apple-system','BlinkMacSystemFont','"SF Pro Display"','"SF Pro Text"','"Segoe UI"','system-ui','sans-serif'] } } }
+    };
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+</head>
+<body class="h-full font-sans antialiased bg-stone-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
+
+<div class="flex h-full min-h-screen">
+
+  <!-- SIDEBAR (Templates active) -->
+  <aside class="w-64 shrink-0 border-r border-zinc-200/80 bg-white dark:bg-zinc-900 dark:border-zinc-800 flex flex-col">
+    <div class="h-16 flex items-center gap-2.5 px-5 border-b border-zinc-200/80 dark:border-zinc-800">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center shadow-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
+      </div>
+      <span class="text-[15px] font-semibold tracking-tight">DueMap</span>
+    </div>
+    <nav class="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
+      <div>
+        <div class="px-2 pb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Workspace</div>
+        <ul class="space-y-0.5">
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Dashboard</a></li>
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/></svg>Accounting</a></li>
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>Notice preferences</a></li>
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm font-medium bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Templates</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="px-2 pb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Portfolio</div>
+        <ul class="space-y-0.5">
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>Leases</a></li>
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Link customers</a></li>
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.5.5 0 0 1-.96 0L9.24 3.18a.5.5 0 0 0-.96 0l-2.35 8.36A2 2 0 0 1 4 13H2"/></svg>Processing status</a></li>
+        </ul>
+      </div>
+    </nav>
+    <div class="border-t border-zinc-200/80 dark:border-zinc-800 p-3">
+      <button class="w-full flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors duration-150">
+        <div class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-semibold text-zinc-600 dark:text-zinc-300">RR</div>
+        <div class="flex-1 min-w-0 text-left">
+          <div class="text-sm font-medium truncate">Ravi Roy</div>
+          <div class="text-xs text-zinc-500 truncate">Demo Property Mgmt</div>
+        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="m18 15-6-6-6 6"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="flex-1 flex flex-col min-w-0">
+
+    <header class="sticky top-0 z-30 h-16 flex items-center justify-between px-8 border-b border-zinc-200/80 bg-white/70 backdrop-blur-md dark:bg-zinc-900/70 dark:border-zinc-800">
+      <h1 class="text-base font-semibold">Templates</h1>
+      <div class="flex items-center gap-2">
+        <button class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-zinc-500 bg-zinc-100/70 hover:bg-zinc-200/70 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors duration-150">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <span>Search…</span>
+          <span class="flex items-center gap-0.5 ml-4 text-[10px] font-medium text-zinc-400 dark:text-zinc-500"><kbd class="px-1 py-0.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700">⌘</kbd><kbd class="px-1 py-0.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700">K</kbd></span>
+        </button>
+        <button onclick="document.documentElement.classList.toggle('dark')" class="p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150" aria-label="Toggle theme">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden dark:block"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="block dark:hidden"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto">
+      <div class="max-w-5xl mx-auto px-8 py-8 space-y-6">
+
+        <!-- PAGE HEADER -->
+        <div class="flex items-end justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-semibold tracking-tight">Templates</h2>
+            <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 max-w-2xl leading-relaxed">
+              What goes in every notice DueMap sends on your behalf. Customizations layer:
+              <strong class="font-medium text-zinc-700 dark:text-zinc-300">state-specific override</strong>
+              <span class="text-zinc-400">›</span>
+              <strong class="font-medium text-zinc-700 dark:text-zinc-300">generic PM override</strong>
+              <span class="text-zinc-400">›</span>
+              <strong class="font-medium text-zinc-700 dark:text-zinc-300">system default</strong>.
+            </p>
+          </div>
+        </div>
+
+        <!-- COMPACT STATS / META BAR -->
+        <div class="flex flex-wrap items-center gap-6 px-5 py-3 rounded-xl border border-zinc-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+          <div class="flex items-center gap-2 text-sm">
+            <span class="text-zinc-500">Generic templates</span>
+            <span class="font-semibold tabular-nums">4</span>
+          </div>
+          <div class="w-px h-4 bg-zinc-200 dark:bg-zinc-700"></div>
+          <div class="flex items-center gap-2 text-sm">
+            <span class="text-zinc-500">Customized</span>
+            <span class="font-semibold tabular-nums text-indigo-600 dark:text-indigo-400">2</span>
+            <span class="text-zinc-400">of 4</span>
+          </div>
+          <div class="w-px h-4 bg-zinc-200 dark:bg-zinc-700"></div>
+          <div class="flex items-center gap-2 text-sm">
+            <span class="text-zinc-500">State-specific overrides</span>
+            <span class="font-semibold tabular-nums">1</span>
+          </div>
+        </div>
+
+        <!-- ========================================= -->
+        <!-- SECTION 1 · GENERIC TEMPLATES              -->
+        <!-- ========================================= -->
+        <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+
+          <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-start justify-between gap-4">
+            <div class="flex items-start gap-2.5">
+              <span class="inline-flex w-7 h-7 rounded-md bg-zinc-100 dark:bg-zinc-800 items-center justify-center text-zinc-500 mt-0.5">
+                <!-- Lucide: globe -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+              </span>
+              <div>
+                <div class="text-sm font-semibold">Generic templates</div>
+                <div class="text-xs text-zinc-500 mt-0.5">One per notice type. Applied to every lease unless a state-specific override exists.</div>
+              </div>
+            </div>
+          </header>
+
+          <ul class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+
+            <!-- Pre-due reminder · Customized -->
+            <li class="px-6 py-4 flex items-center gap-4 hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 transition-colors duration-100 group">
+              <div class="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 shrink-0">
+                <!-- Lucide: bell-ring -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M4 2C2.8 3.7 2 5.7 2 8"/><path d="M22 8c0-2.3-.8-4.3-2-6"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div class="text-sm font-medium">Pre-due reminder</div>
+                  <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400">
+                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>Custom
+                  </span>
+                </div>
+                <div class="text-xs text-zinc-500 mt-1 truncate font-mono">"Rent reminder: payment due on {{ due_date }}"</div>
+                <div class="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">Last edited Apr 12, 2026 · v2</div>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <button class="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Restore default">
+                  <!-- Lucide: rotate-ccw -->
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                </button>
+                <a href="05a-notice-preferences-edit-template.html" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 shadow-sm transition-colors duration-150">
+                  <!-- Lucide: pencil -->
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+                  Edit
+                </a>
+              </div>
+            </li>
+
+            <!-- Due-date reminder · Default -->
+            <li class="px-6 py-4 flex items-center gap-4 hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 transition-colors duration-100">
+              <div class="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 shrink-0">
+                <!-- Lucide: calendar-clock -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div class="text-sm font-medium">Due-date reminder</div>
+                  <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                    <span class="w-1.5 h-1.5 rounded-full bg-zinc-400"></span>Default
+                  </span>
+                </div>
+                <div class="text-xs text-zinc-500 mt-1 truncate font-mono">"Rent is due today"</div>
+                <div class="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">Using the system template</div>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <a href="05a-notice-preferences-edit-template.html" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 shadow-sm transition-colors duration-150">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+                  Customize
+                </a>
+              </div>
+            </li>
+
+            <!-- Grace-period reminder · Default -->
+            <li class="px-6 py-4 flex items-center gap-4 hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 transition-colors duration-100">
+              <div class="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 shrink-0">
+                <!-- Lucide: file-warning -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v3"/><path d="M12 18h.01"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div class="text-sm font-medium">Grace-period reminder</div>
+                  <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                    <span class="w-1.5 h-1.5 rounded-full bg-zinc-400"></span>Default
+                  </span>
+                </div>
+                <div class="text-xs text-zinc-500 mt-1 truncate font-mono">"Rent payment past due"</div>
+                <div class="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">Using the system template</div>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <a href="05a-notice-preferences-edit-template.html" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 shadow-sm transition-colors duration-150">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+                  Customize
+                </a>
+              </div>
+            </li>
+
+            <!-- Late-fee notice · Customized -->
+            <li class="px-6 py-4 flex items-center gap-4 hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 transition-colors duration-100">
+              <div class="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 shrink-0">
+                <!-- Lucide: file-x -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m9.5 12.5 5 5"/><path d="m14.5 12.5-5 5"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div class="text-sm font-medium">Late-fee notice</div>
+                  <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400">
+                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>Custom
+                  </span>
+                </div>
+                <div class="text-xs text-zinc-500 mt-1 truncate font-mono">"Late fee assessed — please contact us"</div>
+                <div class="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">Last edited Mar 28, 2026 · v3</div>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <button class="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Restore default">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                </button>
+                <a href="05a-notice-preferences-edit-template.html" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 shadow-sm transition-colors duration-150">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+                  Edit
+                </a>
+              </div>
+            </li>
+
+          </ul>
+        </section>
+
+        <!-- ========================================= -->
+        <!-- SECTION 2 · STATE-SPECIFIC OVERRIDES       -->
+        <!-- ========================================= -->
+        <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+
+          <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between gap-3">
+            <div class="flex items-start gap-2.5">
+              <span class="inline-flex w-7 h-7 rounded-md bg-zinc-100 dark:bg-zinc-800 items-center justify-center text-zinc-500 mt-0.5">
+                <!-- Lucide: map-pin -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>
+              </span>
+              <div>
+                <div class="text-sm font-semibold">State-specific overrides</div>
+                <div class="text-xs text-zinc-500 mt-0.5">Replace the generic template for leases in a particular state — useful when state law requires specific notice language.</div>
+              </div>
+            </div>
+            <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all duration-200 ease-out shrink-0">
+              <!-- Lucide: plus -->
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+              Add override
+            </button>
+          </header>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-zinc-50/60 dark:bg-zinc-900/60">
+                <tr class="text-left">
+                  <th class="px-6 py-3 text-[11px] font-medium uppercase tracking-wider text-zinc-500">State</th>
+                  <th class="px-3 py-3 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Notice type</th>
+                  <th class="px-3 py-3 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Subject preview</th>
+                  <th class="px-3 py-3 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Last edited</th>
+                  <th class="w-32 px-6 py-3"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                <tr class="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 transition-colors duration-100">
+                  <td class="px-6 py-3.5">
+                    <span class="inline-flex items-center gap-2">
+                      <span class="inline-flex w-7 h-7 items-center justify-center rounded-md bg-zinc-100 dark:bg-zinc-800 text-[11px] font-semibold tracking-tight text-zinc-700 dark:text-zinc-300">NY</span>
+                      <span class="text-sm font-medium">New York</span>
+                    </span>
+                  </td>
+                  <td class="px-3 py-3.5 text-zinc-600 dark:text-zinc-300">Late-fee notice</td>
+                  <td class="px-3 py-3.5 text-zinc-500 truncate max-w-xs font-mono text-xs">"Notice of late fee under RPL § 238-a"</td>
+                  <td class="px-3 py-3.5 text-xs text-zinc-500 tabular-nums">Mar 22, 2026</td>
+                  <td class="px-6 py-3.5 text-right">
+                    <a href="05a-notice-preferences-edit-template.html" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 shadow-sm transition-colors duration-150">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+                      Edit
+                    </a>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- HOW RESOLUTION WORKS -->
+        <section class="rounded-xl border border-indigo-200/40 dark:border-indigo-500/15 bg-indigo-50/30 dark:bg-indigo-500/[0.04] p-5 flex items-start gap-4">
+          <span class="inline-flex w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-500/15 items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+            <!-- Lucide: info -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          </span>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">How template resolution works</div>
+            <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed">
+              At send time, DueMap picks the most specific template for each notice:
+              first a state-specific override matching the lease's state, then your generic PM template,
+              then the built-in system default. Required legal placeholders (<code class="font-mono text-[11px]">tenant_name</code>, <code class="font-mono text-[11px]">amount_owed</code>, <code class="font-mono text-[11px]">due_date</code>) are enforced at every layer — you can rewrite the wording but cannot drop them.
+            </p>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+</body>
+</html>

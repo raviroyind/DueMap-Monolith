@@ -1,0 +1,793 @@
+@page "/leases"
+@using DueMap.Billing
+@using DueMap.Billing.Domain
+@using DueMap.Notices
+@using DueMap.Notices.Domain
+@using DueMap.Rules
+@using RulesState = DueMap.Rules.Domain.State
+@using DueMap.Tenancy
+@using DueMap.Tenancy.Domain
+@using DueMap.Web.Services
+@inject PmContext Pm
+@inject ILeaseReader LeaseReader
+@inject ILeaseWriter LeaseWriter
+@inject ILeaseNoticeSettingsService SettingsService
+@inject ICustomerRepository CustomerRepo
+@inject IRentInvoiceRepository InvoiceRepo
+@inject ILateFeeAssessmentRepository LateFees
+@inject INoticeDeliveryRepository Deliveries
+@inject IPmNoticePreferencesService PmPrefs
+@inject IStateReader StateReader
+@inject NavigationManager Nav
+
+<PageTitle>Leases — DueMap</PageTitle>
+
+<div class="max-w-7xl mx-auto px-8 py-8 space-y-5">
+
+    <!-- PAGE HEADER -->
+    <div class="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+            <div class="flex items-center gap-3">
+                <h2 class="text-2xl font-semibold tracking-tight">Leases</h2>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 tabular-nums">@_rows.Count active</span>
+            </div>
+            <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
+                Per-lease status, balances, and notice settings. Empty settings inherit your
+                <a href="notice-preferences" class="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">workspace defaults</a>.
+            </p>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="rent-roll/import"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 shadow-sm transition-colors duration-150">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                Import rent roll
+            </a>
+            <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all duration-200 ease-out"
+                    @onclick="OpenNewLeaseModal">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                New lease
+            </button>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <p class="text-zinc-500">Loading…</p>
+    }
+    else
+    {
+        @if (_toast is not null)
+        {
+            <div class="rounded-xl border border-emerald-200/70 dark:border-emerald-500/20 bg-emerald-50/60 dark:bg-emerald-500/5 px-4 py-3 text-sm text-emerald-900 dark:text-emerald-200">@_toast</div>
+        }
+
+        @* SEARCH + FILTER STRIP — sits on top of the table so the user can find
+           a specific lease (search) OR narrow the list by collection status
+           (filter chips). The status chip counts update live with the search. *@
+        <div class="flex flex-wrap items-center gap-3">
+            <div class="relative flex-1 min-w-[280px] max-w-md">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <input type="search" placeholder="Search tenant name or lease id"
+                       @bind="_search" @bind:event="oninput"
+                       class="w-full pl-9 pr-3 py-2 rounded-lg bg-white dark:bg-zinc-900 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150" />
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap">
+                @foreach (var f in _filters)
+                {
+                    var active = _activeFilter == f.Key;
+                    <button type="button" @onclick="@(() => _activeFilter = f.Key)"
+                            class="@(active
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                                : "bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800")
+                                inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors duration-150">
+                        @f.Label
+                        <span class="text-[11px] tabular-nums opacity-80">@CountFor(f.Key)</span>
+                    </button>
+                }
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
+            @if (_selected.Count > 0)
+            {
+                <div class="px-4 py-2.5 flex flex-wrap items-center gap-3 bg-indigo-50/60 dark:bg-indigo-500/[0.06] border-b border-indigo-100 dark:border-indigo-500/10 rounded-t-xl">
+                    <div class="flex items-center gap-2 text-sm font-medium text-indigo-900 dark:text-indigo-200">
+                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-indigo-600 text-white text-[11px] font-semibold tabular-nums">@_selected.Count</span>
+                        leases selected
+                        <button class="ml-1 text-indigo-700 dark:text-indigo-300 hover:text-indigo-900 dark:hover:text-indigo-200 transition-colors" @onclick="ClearSelection" aria-label="Clear selection">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        </button>
+                    </div>
+                    <div class="flex-1"></div>
+                    <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all duration-200 ease-out"
+                            @onclick="OpenBulkModal">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+                        Apply settings…
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="px-4 py-3 flex items-center gap-3 border-b border-zinc-200/80 dark:border-zinc-800">
+                    <button class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                            @onclick="LoadAsync">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                        Refresh
+                    </button>
+                    <span class="text-xs text-zinc-500">Select rows to apply settings in bulk.</span>
+                </div>
+            }
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-zinc-50/40 dark:bg-zinc-900/40">
+                        <tr class="text-left">
+                            <th class="w-12 px-4 py-2.5">
+                                <input type="checkbox" class="checkbox" checked="@AllSelected" @onchange="ToggleAll" aria-label="Select all" />
+                            </th>
+                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Tenant / Lease</th>
+                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Status</th>
+                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 text-right">Rent</th>
+                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 text-right">Balance</th>
+                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Last notice</th>
+                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Settings</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                        @foreach (var row in _filtered)
+                        {
+                            var isSelected = _selected.Contains(row.Lease.Id);
+                            var leaseId = row.Lease.Id;
+                            <tr class="@(isSelected ? "bg-indigo-50/30 dark:bg-indigo-500/[0.04] hover:bg-indigo-50/60 dark:hover:bg-indigo-500/[0.08]" : "hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30") transition-colors duration-100 cursor-pointer"
+                                @onclick="@(() => Nav.NavigateTo($"/leases/{leaseId}"))">
+                                <td class="px-4 py-3" @onclick:stopPropagation="true">
+                                    <input type="checkbox" class="checkbox" checked="@isSelected" @onchange="@(e => ToggleOne(row.Lease.Id, e))" />
+                                </td>
+                                <td class="px-3 py-3">
+                                    <div class="text-sm font-medium truncate max-w-xs">@row.TenantName</div>
+                                    <div class="text-[11px] text-zinc-500 tabular-nums">#@row.Lease.Id</div>
+                                </td>
+                                <td class="px-3 py-3">
+                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium @StatusPill(row.Status)">
+                                        <span class="w-1.5 h-1.5 rounded-full @StatusDot(row.Status)"></span>@StatusLabel(row)
+                                    </span>
+                                </td>
+                                <td class="px-3 py-3 text-right tabular-nums">@row.Lease.MonthlyRent.ToString("C")</td>
+                                <td class="px-3 py-3 text-right tabular-nums @(row.Balance > 0 ? "font-medium" : "text-zinc-400")">
+                                    @row.Balance.ToString("C")
+                                </td>
+                                <td class="px-3 py-3 text-xs text-zinc-500">
+                                    @if (row.LastNoticeAt is DateTime n)
+                                    {
+                                        <span class="inline-flex items-center gap-1.5">
+                                            <span class="@ChannelDotClass(row.LastNoticeChannel)"></span>
+                                            <span class="tabular-nums">@RelativeTime(n)</span>
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-zinc-400">never</span>
+                                    }
+                                </td>
+                                <td class="px-3 py-3">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="kind-pill @(row.Settings.PreDueEnabled ? "kind-on" : "kind-off")" title="Pre-due reminder">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
+                                            @if (row.Settings.PreDueDaysBefore is int d) { @($"{d}d") }
+                                        </span>
+                                        <span class="kind-pill @(row.Settings.DueDateEnabled ? "kind-on" : "kind-off")" title="Due-date reminder">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><circle cx="16" cy="16" r="6"/></svg>
+                                        </span>
+                                        <span class="kind-pill @(row.Settings.PostDueEnabled ? "kind-on" : "kind-off")" title="Post-due handling">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                                            @if (row.Settings.PostDueGraceDays is int g) { @($"{g}d") }
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (_filtered.Count == 0)
+                        {
+                            <tr><td colspan="7" class="px-6 py-12 text-center text-sm text-zinc-500">
+                                @if (_rows.Count == 0) { @("No active leases.") }
+                                else if (!string.IsNullOrEmpty(_search)) { @($"No leases match \"{_search}\".") }
+                                else { @("No leases match this filter.") }
+                            </td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@* BULK APPLY MODAL — unchanged structurally, just lifted out for readability *@
+@if (_showModal)
+{
+    <div class="fixed inset-0 z-50 bg-zinc-900/40 backdrop-blur-sm flex items-center justify-center p-6" @onclick="CloseModal">
+        <div class="w-full max-w-2xl max-h-[90vh] rounded-2xl bg-white dark:bg-zinc-900 shadow-xl border border-zinc-200/60 dark:border-zinc-800 flex flex-col overflow-hidden" @onclick:stopPropagation="true">
+
+            <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-start justify-between gap-4">
+                <div class="flex items-start gap-3">
+                    <div class="w-9 h-9 rounded-lg bg-indigo-100 dark:bg-indigo-500/15 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+                    </div>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold tracking-tight">Apply settings to <span class="tabular-nums">@_selected.Count lease@(_selected.Count == 1 ? "" : "s")</span></h2>
+                        <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                            Toggle <strong class="font-medium text-zinc-700 dark:text-zinc-300">"Set this"</strong> on any field to overwrite that value. Untouched fields keep each lease's existing setting.
+                        </p>
+                    </div>
+                </div>
+                <button class="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors -mt-1 -mr-1 p-1 shrink-0" @onclick="CloseModal" aria-label="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+            </header>
+
+            <div class="flex-1 overflow-y-auto">
+                <section class="px-6 py-5 border-b border-zinc-200/80 dark:border-zinc-800 space-y-3">
+                    <h3 class="text-sm font-semibold mb-2">Pre-due reminder</h3>
+                    <div class="set-row flex items-center gap-3 py-1" data-on="@(_patch.SetPreDueEnabled.ToString().ToLowerInvariant())">
+                        <label class="toggle-switch toggle-sm shrink-0">
+                            <input type="checkbox" @bind="_patch.SetPreDueEnabled" />
+                            <span class="toggle-track"></span>
+                        </label>
+                        <div class="flex-1 min-w-0 flex items-center justify-between gap-3 set-control">
+                            <div class="text-sm">Set <span class="font-medium">enabled</span> to</div>
+                            <label class="flex items-center gap-2 text-sm">
+                                <input type="checkbox" class="checkbox" @bind="_patch.PreDueEnabled" />
+                                <span>@(_patch.PreDueEnabled ? "On" : "Off")</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="set-row flex items-center gap-3 py-1" data-on="@(_patch.SetPreDueDays.ToString().ToLowerInvariant())">
+                        <label class="toggle-switch toggle-sm shrink-0">
+                            <input type="checkbox" @bind="_patch.SetPreDueDays" />
+                            <span class="toggle-track"></span>
+                        </label>
+                        <div class="flex-1 min-w-0 flex items-center justify-between gap-3 set-control">
+                            <div class="text-sm">Set <span class="font-medium">days before due</span> to</div>
+                            <div class="flex items-center gap-2">
+                                <input type="number" min="1" max="60" @bind="_patch.PreDueDays"
+                                       class="w-20 px-3 py-1.5 rounded-lg text-sm font-medium tabular-nums text-right bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" />
+                                <span class="text-xs text-zinc-500">days</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="px-6 py-5 border-b border-zinc-200/80 dark:border-zinc-800">
+                    <h3 class="text-sm font-semibold mb-2">Due-date reminder</h3>
+                    <div class="set-row flex items-center gap-3 py-1" data-on="@(_patch.SetDueDateEnabled.ToString().ToLowerInvariant())">
+                        <label class="toggle-switch toggle-sm shrink-0">
+                            <input type="checkbox" @bind="_patch.SetDueDateEnabled" />
+                            <span class="toggle-track"></span>
+                        </label>
+                        <div class="flex-1 min-w-0 flex items-center justify-between gap-3 set-control">
+                            <div class="text-sm">Set <span class="font-medium">enabled</span> to</div>
+                            <label class="flex items-center gap-2 text-sm">
+                                <input type="checkbox" class="checkbox" @bind="_patch.DueDateEnabled" />
+                                <span>@(_patch.DueDateEnabled ? "On" : "Off")</span>
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="px-6 py-5 space-y-3">
+                    <h3 class="text-sm font-semibold mb-2">Post-due handling</h3>
+                    <div class="set-row flex items-center gap-3 py-1" data-on="@(_patch.SetPostDueEnabled.ToString().ToLowerInvariant())">
+                        <label class="toggle-switch toggle-sm shrink-0">
+                            <input type="checkbox" @bind="_patch.SetPostDueEnabled" />
+                            <span class="toggle-track"></span>
+                        </label>
+                        <div class="flex-1 min-w-0 flex items-center justify-between gap-3 set-control">
+                            <div class="text-sm">Set <span class="font-medium">enabled</span> to</div>
+                            <label class="flex items-center gap-2 text-sm">
+                                <input type="checkbox" class="checkbox" @bind="_patch.PostDueEnabled" />
+                                <span>@(_patch.PostDueEnabled ? "On" : "Off")</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="set-row flex items-center gap-3 py-1" data-on="@(_patch.SetPostDueMode.ToString().ToLowerInvariant())">
+                        <label class="toggle-switch toggle-sm shrink-0">
+                            <input type="checkbox" @bind="_patch.SetPostDueMode" />
+                            <span class="toggle-track"></span>
+                        </label>
+                        <div class="flex-1 min-w-0 flex items-center justify-between gap-3 set-control">
+                            <div class="text-sm">Set <span class="font-medium">mode</span> to</div>
+                            <select @bind="_patch.PostDueMode"
+                                    class="px-3 py-1.5 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                                <option value="@PostDueMode.GracePeriod">Grace period</option>
+                                <option value="@PostDueMode.ImmediateLateFee">Immediate late fee</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="set-row flex items-center gap-3 py-1" data-on="@(_patch.SetPostDueGraceDays.ToString().ToLowerInvariant())">
+                        <label class="toggle-switch toggle-sm shrink-0">
+                            <input type="checkbox" @bind="_patch.SetPostDueGraceDays" />
+                            <span class="toggle-track"></span>
+                        </label>
+                        <div class="flex-1 min-w-0 flex items-center justify-between gap-3 set-control">
+                            <div class="text-sm">Set <span class="font-medium">grace days</span> to</div>
+                            <div class="flex items-center gap-2">
+                                <input type="number" min="0" max="60" @bind="_patch.PostDueGraceDays"
+                                       class="w-20 px-3 py-1.5 rounded-lg text-sm font-medium tabular-nums text-right bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" />
+                                <span class="text-xs text-zinc-500">days</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <footer class="px-6 py-3.5 border-t border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60 flex items-center justify-end gap-2">
+                <button class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors duration-150"
+                        @onclick="CloseModal">Cancel</button>
+                <button class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-colors duration-150 disabled:opacity-50"
+                        @onclick="ApplyBulk" disabled="@_applying">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                    @(_applying ? "Applying…" : $"Apply to {_selected.Count} lease(s)")
+                </button>
+            </footer>
+        </div>
+    </div>
+}
+
+@* NEW LEASE MODAL — manual creation flow.
+   QB/Xero don't carry lease records, so this is how a real lease gets into
+   DueMap until the auto-derive feature lands (task #67 below). *@
+@if (_showNewLeaseModal)
+{
+    <div class="fixed inset-0 z-50 bg-zinc-900/40 backdrop-blur-sm flex items-center justify-center p-6"
+         @onclick="CloseNewLeaseModal">
+        <div class="w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-900 shadow-xl border border-zinc-200/60 dark:border-zinc-800 max-h-[90vh] flex flex-col overflow-hidden"
+             @onclick:stopPropagation="true">
+            <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-start justify-between gap-4">
+                <div>
+                    <h3 class="text-base font-semibold">New lease</h3>
+                    <p class="text-xs text-zinc-500 mt-0.5">Pick a synced customer and confirm the lease basics. You can refine notice settings afterward.</p>
+                </div>
+                <button class="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors -mt-1 -mr-1 p-1" @onclick="CloseNewLeaseModal" aria-label="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+            </header>
+            <div class="px-6 py-5 space-y-4 overflow-y-auto">
+                @if (!string.IsNullOrEmpty(_newLeaseError))
+                {
+                    <div class="rounded-lg border border-rose-200/70 dark:border-rose-500/20 bg-rose-50/60 dark:bg-rose-500/5 px-3 py-2 text-xs text-rose-900 dark:text-rose-200">
+                        @_newLeaseError
+                    </div>
+                }
+
+                <div>
+                    <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Tenant (customer)</label>
+                    @if (_allCustomers.Count == 0)
+                    {
+                        <p class="text-xs text-zinc-500 italic">
+                            No customers synced yet —
+                            <a href="connections" class="text-indigo-600 dark:text-indigo-400 font-medium">connect QuickBooks or Xero</a>
+                            and wait for the next sync.
+                        </p>
+                    }
+                    else
+                    {
+                        <select @bind="_newLease.CustomerId"
+                                class="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                            <option value="0">— Select a customer —</option>
+                            @foreach (var c in _allCustomers)
+                            {
+                                <option value="@c.Id">@c.DisplayName</option>
+                            }
+                        </select>
+                    }
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">State</label>
+                        <select @bind="_newLease.StateId"
+                                class="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                            <option value="0">— Select —</option>
+                            @foreach (var s in _allStates)
+                            {
+                                <option value="@s.Id">@s.Code — @s.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Monthly rent</label>
+                        <input type="number" step="0.01" min="0.01" @bind="_newLease.MonthlyRent"
+                               class="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm tabular-nums border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" />
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Start date</label>
+                        <input type="date" @bind="_newLease.StartDate"
+                               class="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">End date <span class="text-zinc-400 font-normal">(optional)</span></label>
+                        <input type="date" @bind="_newLease.EndDate"
+                               class="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" />
+                    </div>
+                </div>
+            </div>
+            <footer class="px-6 py-3.5 border-t border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60 flex items-center justify-end gap-2">
+                <button class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                        @onclick="CloseNewLeaseModal">Cancel</button>
+                <button class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-colors disabled:opacity-50"
+                        @onclick="CreateLeaseAsync" disabled="@_creatingLease">
+                    @(_creatingLease ? "Creating…" : "Create lease")
+                </button>
+            </footer>
+        </div>
+    </div>
+}
+
+@code {
+    private enum LeaseStatus { Current, InGrace, Overdue, LateFeePosted }
+    private enum FilterKey { All, Current, InGrace, Overdue, LateFee }
+
+    private sealed record Row(
+        Lease Lease,
+        LeaseNoticeSettings Settings,
+        string TenantName,
+        decimal Balance,
+        int DaysPastDue,
+        LeaseStatus Status,
+        DateTime? LastNoticeAt,
+        NoticeChannel? LastNoticeChannel);
+
+    private sealed record Filter(FilterKey Key, string Label);
+    private readonly Filter[] _filters =
+    {
+        new(FilterKey.All,        "All"),
+        new(FilterKey.Current,    "Current"),
+        new(FilterKey.InGrace,    "In grace"),
+        new(FilterKey.Overdue,    "Overdue"),
+        new(FilterKey.LateFee,    "Late fee posted")
+    };
+
+    private int? _pmId;
+    private List<Row> _rows = new();
+    private readonly HashSet<int> _selected = new();
+    private bool _loading = true;
+    private bool _showModal;
+    private bool _applying;
+    private string? _toast;
+    private PatchModel _patch = new();
+    private string _search = string.Empty;
+    private FilterKey _activeFilter = FilterKey.All;
+
+    // New-lease modal state. The customers + states catalogues are loaded on
+    // page init so the dropdowns are instant; only refreshed if the data goes
+    // stale (e.g., after explicit Refresh).
+    private bool _showNewLeaseModal;
+    private bool _creatingLease;
+    private string? _newLeaseError;
+    private NewLeaseForm _newLease = new();
+    private List<Customer> _allCustomers = new();
+    private List<RulesState> _allStates = new();
+
+    private List<Row> _filtered => ApplyFilter();
+
+    private bool AllSelected => _filtered.Count > 0 && _filtered.All(r => _selected.Contains(r.Lease.Id));
+
+    protected override async Task OnInitializedAsync()
+    {
+        _pmId = await Pm.GetPmIdAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_pmId is not int id) return;
+        _loading = true;
+        _selected.Clear();
+        StateHasChanged();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var ct = CancellationToken.None;
+
+        // Cross-module queries (Notices, Billing) get their own scoped DbContexts
+        // so they can run in parallel. The Tenancy queries below share a single
+        // TenancyDbContext via DI — DbContext isn't thread-safe, so they must
+        // be awaited one at a time. (If perf ever matters here, switch the
+        // Tenancy services to IDbContextFactory.)
+        var lastNoticeTask = Deliveries.ListLatestByLeaseAsync(id, ct);
+
+        var leases    = await LeaseReader.ListActiveAsync(id, today, ct);
+        var settings  = (await SettingsService.ListForPropertyManagerAsync(id, ct)).ToDictionary(s => s.LeaseId);
+        var customerList = await CustomerRepo.ListByPropertyManagerAsync(id, ct);
+        _allCustomers = customerList.Where(c => c.IsActive).ToList();
+        var customers = customerList.ToDictionary(c => c.Id, c => c.DisplayName);
+        var invoices  = (await InvoiceRepo.ListByPropertyManagerAsync(id, ct))
+                            .Where(i => i.LeaseId is not null)
+                            .GroupBy(i => i.LeaseId!.Value)
+                            .ToDictionary(g => g.Key, g => g.ToList());
+        var prefs     = await PmPrefs.GetOrCreateAsync(id, ct);
+        if (_allStates.Count == 0)
+        {
+            // States change rarely — load once per page lifetime. Sits on a
+            // different DbContext (Rules) so doesn't conflict with the Tenancy
+            // serialization above, but cached here for the new-lease modal.
+            _allStates = (await StateReader.ListAllAsync(ct)).ToList();
+        }
+        var lastNotice = await lastNoticeTask;
+
+        // Late-fee assessments depend on the lease set — query in a second pass.
+        var leaseIds = leases.Select(l => l.Id).ToList();
+        var feesByLease = (await LateFees.ListForLeasesAsync(leaseIds, ct))
+            .Where(a => a.Status == LateFeeAssessmentStatus.Assessed)
+            .GroupBy(a => a.LeaseId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(a => a.DueDate).First());
+
+        _rows = leases.Select(l =>
+        {
+            var leaseSettings = settings.TryGetValue(l.Id, out var s) ? s : new LeaseNoticeSettings { LeaseId = l.Id };
+            var tenantName    = l.CustomerId is int cid && customers.TryGetValue(cid, out var name) ? name : $"Lease #{l.Id}";
+            var leaseInvoices = invoices.GetValueOrDefault(l.Id) ?? new List<RentInvoice>();
+            var balance       = leaseInvoices.Where(i => i.Status == RentInvoiceStatus.Open).Sum(i => i.Balance);
+            var oldestOpen    = leaseInvoices.Where(i => i.Status == RentInvoiceStatus.Open).OrderBy(i => i.DueDate).FirstOrDefault();
+            var daysPastDue   = oldestOpen is null ? 0 : Math.Max(0, today.DayNumber - oldestOpen.DueDate.DayNumber);
+            var status        = DeriveStatus(daysPastDue, oldestOpen, leaseSettings, prefs, feesByLease.GetValueOrDefault(l.Id));
+            var lastNoticeRow = lastNotice.TryGetValue(l.Id, out var nd) ? nd : null;
+
+            return new Row(
+                Lease: l,
+                Settings: leaseSettings,
+                TenantName: tenantName,
+                Balance: balance,
+                DaysPastDue: daysPastDue,
+                Status: status,
+                LastNoticeAt: lastNoticeRow?.SentAt,
+                LastNoticeChannel: lastNoticeRow?.Channel);
+        }).ToList();
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    // Status taxonomy — the order of these checks matters.
+    private static LeaseStatus DeriveStatus(
+        int daysPastDue, RentInvoice? oldestOpen,
+        LeaseNoticeSettings leaseSettings, PmNoticePreferences prefs,
+        LateFeeAssessment? assessedFee)
+    {
+        // 1. Active late fee posted for the current cycle → that wins.
+        if (assessedFee is not null && oldestOpen is not null && assessedFee.DueDate == oldestOpen.DueDate)
+        {
+            return LeaseStatus.LateFeePosted;
+        }
+        // 2. No open invoice past due → current.
+        if (daysPastDue <= 0) return LeaseStatus.Current;
+        // 3. Past due but within grace → InGrace.
+        // Effective grace = lease override → workspace default → fallback 5.
+        var grace = leaseSettings.PostDueGraceDays ?? prefs.PostDueDefaultGraceDays;
+        return daysPastDue <= grace ? LeaseStatus.InGrace : LeaseStatus.Overdue;
+    }
+
+    private List<Row> ApplyFilter()
+    {
+        var q = _rows.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(_search))
+        {
+            var needle = _search.Trim();
+            q = q.Where(r => r.TenantName.Contains(needle, StringComparison.OrdinalIgnoreCase)
+                          || r.Lease.Id.ToString().Contains(needle));
+        }
+
+        q = _activeFilter switch
+        {
+            FilterKey.Current => q.Where(r => r.Status == LeaseStatus.Current),
+            FilterKey.InGrace => q.Where(r => r.Status == LeaseStatus.InGrace),
+            FilterKey.Overdue => q.Where(r => r.Status == LeaseStatus.Overdue),
+            FilterKey.LateFee => q.Where(r => r.Status == LeaseStatus.LateFeePosted),
+            _ => q
+        };
+
+        return q.ToList();
+    }
+
+    private int CountFor(FilterKey key)
+    {
+        var pool = string.IsNullOrWhiteSpace(_search)
+            ? _rows
+            : _rows.Where(r => r.TenantName.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase)
+                             || r.Lease.Id.ToString().Contains(_search.Trim())).ToList();
+        return key switch
+        {
+            FilterKey.Current => pool.Count(r => r.Status == LeaseStatus.Current),
+            FilterKey.InGrace => pool.Count(r => r.Status == LeaseStatus.InGrace),
+            FilterKey.Overdue => pool.Count(r => r.Status == LeaseStatus.Overdue),
+            FilterKey.LateFee => pool.Count(r => r.Status == LeaseStatus.LateFeePosted),
+            _ => pool.Count
+        };
+    }
+
+    // --- status presentation ---------------------------------------------
+
+    private static string StatusPill(LeaseStatus s) => s switch
+    {
+        LeaseStatus.Current        => "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
+        LeaseStatus.InGrace        => "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
+        LeaseStatus.Overdue        => "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400",
+        LeaseStatus.LateFeePosted  => "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300 font-semibold",
+        _ => "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+    };
+
+    private static string StatusDot(LeaseStatus s) => s switch
+    {
+        LeaseStatus.Current        => "bg-emerald-500",
+        LeaseStatus.InGrace        => "bg-amber-500",
+        LeaseStatus.Overdue        => "bg-rose-500",
+        LeaseStatus.LateFeePosted  => "bg-rose-600",
+        _ => "bg-zinc-400"
+    };
+
+    private static string StatusLabel(Row r) => r.Status switch
+    {
+        LeaseStatus.Current        => "Current",
+        LeaseStatus.InGrace        => $"In grace · {r.DaysPastDue}d",
+        LeaseStatus.Overdue        => $"Overdue {r.DaysPastDue}d",
+        LeaseStatus.LateFeePosted  => "Late fee posted",
+        _ => "—"
+    };
+
+    private static string ChannelDotClass(NoticeChannel? c) => c switch
+    {
+        NoticeChannel.Email => "w-1.5 h-1.5 rounded-full bg-indigo-400",
+        NoticeChannel.Sms   => "w-1.5 h-1.5 rounded-full bg-emerald-400",
+        _                   => "w-1.5 h-1.5 rounded-full bg-zinc-300"
+    };
+
+    private static string RelativeTime(DateTime utc)
+    {
+        var delta = DateTime.UtcNow - utc;
+        if (delta.TotalMinutes < 1)  return "just now";
+        if (delta.TotalMinutes < 60) return $"{(int)delta.TotalMinutes}m ago";
+        if (delta.TotalHours   < 24) return $"{(int)delta.TotalHours}h ago";
+        if (delta.TotalDays    < 7)  return $"{(int)delta.TotalDays}d ago";
+        return utc.ToString("yyyy-MM-dd");
+    }
+
+    // --- selection + bulk modal (unchanged behavior) ---------------------
+
+    private void ToggleOne(int leaseId, ChangeEventArgs e)
+    {
+        if (e.Value is true)  _selected.Add(leaseId);
+        else                  _selected.Remove(leaseId);
+    }
+
+    private void ToggleAll(ChangeEventArgs e)
+    {
+        if (e.Value is true)
+        {
+            foreach (var r in _filtered) _selected.Add(r.Lease.Id);
+        }
+        else
+        {
+            _selected.Clear();
+        }
+    }
+
+    private void ClearSelection() => _selected.Clear();
+
+    private void OpenBulkModal()
+    {
+        _patch = new PatchModel();
+        _showModal = true;
+    }
+
+    private void CloseModal() => _showModal = false;
+
+    private async Task ApplyBulk()
+    {
+        if (_selected.Count == 0) { _showModal = false; return; }
+        _applying = true;
+        try
+        {
+            var ids = _selected.ToList();
+            var patch = _patch.ToPatch();
+            var n = await SettingsService.BulkApplyAsync(ids, patch, CancellationToken.None);
+            _toast = $"Applied to {ids.Count} lease(s), {n} row(s) written.";
+            _showModal = false;
+            await LoadAsync();
+        }
+        finally
+        {
+            _applying = false;
+        }
+    }
+
+    // --- New lease modal -------------------------------------------------
+
+    private sealed class NewLeaseForm
+    {
+        public int CustomerId { get; set; }       // 0 = no selection
+        public int StateId    { get; set; }       // 0 = no selection
+        public decimal MonthlyRent { get; set; }
+        public DateTime StartDate { get; set; } = DateTime.Today;
+        public DateTime? EndDate  { get; set; }
+    }
+
+    private void OpenNewLeaseModal()
+    {
+        _newLease = new NewLeaseForm { StartDate = DateTime.Today };
+        _newLeaseError = null;
+        _showNewLeaseModal = true;
+    }
+
+    private void CloseNewLeaseModal()
+    {
+        _showNewLeaseModal = false;
+        _newLeaseError = null;
+    }
+
+    private async Task CreateLeaseAsync()
+    {
+        if (_pmId is not int pmId) return;
+        _newLeaseError = null;
+
+        if (_newLease.StateId == 0)        { _newLeaseError = "Pick a state."; return; }
+        if (_newLease.MonthlyRent <= 0m)   { _newLeaseError = "Monthly rent must be positive."; return; }
+
+        _creatingLease = true;
+        try
+        {
+            var input = new NewLeaseInput(
+                PropertyManagerId: pmId,
+                StateId: _newLease.StateId,
+                CustomerId: _newLease.CustomerId == 0 ? null : _newLease.CustomerId,
+                MonthlyRent: _newLease.MonthlyRent,
+                StartDate: DateOnly.FromDateTime(_newLease.StartDate),
+                EndDate: _newLease.EndDate is DateTime end ? DateOnly.FromDateTime(end) : null);
+
+            var lease = await LeaseWriter.CreateAsync(input, CancellationToken.None);
+            _toast = $"Lease #{lease.Id} created.";
+            _showNewLeaseModal = false;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _newLeaseError = ex.Message;
+        }
+        finally
+        {
+            _creatingLease = false;
+        }
+    }
+
+    private sealed class PatchModel
+    {
+        public bool SetPreDueEnabled { get; set; }
+        public bool PreDueEnabled { get; set; } = true;
+
+        public bool SetPreDueDays { get; set; }
+        public int PreDueDays { get; set; } = 3;
+
+        public bool SetDueDateEnabled { get; set; }
+        public bool DueDateEnabled { get; set; } = true;
+
+        public bool SetPostDueEnabled { get; set; }
+        public bool PostDueEnabled { get; set; } = true;
+
+        public bool SetPostDueMode { get; set; }
+        public PostDueMode PostDueMode { get; set; } = DueMap.Tenancy.Domain.PostDueMode.GracePeriod;
+
+        public bool SetPostDueGraceDays { get; set; }
+        public int PostDueGraceDays { get; set; } = 5;
+
+        public LeaseNoticeSettingsPatch ToPatch() => new()
+        {
+            PreDueEnabled    = SetPreDueEnabled    ? PreDueEnabled    : null,
+            PreDueDaysBefore = SetPreDueDays       ? PreDueDays       : null,
+            DueDateEnabled   = SetDueDateEnabled   ? DueDateEnabled   : null,
+            PostDueEnabled   = SetPostDueEnabled   ? PostDueEnabled   : null,
+            PostDueMode      = SetPostDueMode      ? PostDueMode      : null,
+            PostDueGraceDays = SetPostDueGraceDays ? PostDueGraceDays : null
+        };
+    }
+}

@@ -1,0 +1,28 @@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@inject IHttpContextAccessor HttpContextAccessor
+
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <title>DueMap</title>
+    <link rel="stylesheet" href="css/app.css" />
+    <script src="js/theme.js"></script>
+    <script src="js/template-editor.js"></script>
+
+    @* driver.js — guided onboarding tour. Pinned to a specific version from
+       jsDelivr. Production deployments should self-host these two files under
+       wwwroot/lib/driver.js/ and add an SRI integrity hash — pulling unpinned
+       JS from a third-party CDN at runtime is a supply-chain risk. *@
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.css" />
+    <script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.js.iife.js"></script>
+    <script src="js/duemap-tour.js"></script>
+    <HeadOutlet @rendermode="InteractiveServer" />
+</head>
+<body class="h-full font-sans antialiased bg-stone-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
+    <Routes @rendermode="InteractiveServer" />
+    <script src="_framework/blazor.web.js"></script>
+</body>
+</html>

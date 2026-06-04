@@ -1,0 +1,126 @@
+using DueMap.Billing.Domain;
+using DueMap.Rules;
+using DueMap.Tenancy;
+using DueMap.Tenancy.Domain;
+using TenancyPostDueMode = DueMap.Tenancy.Domain.PostDueMode;
+
+namespace DueMap.Billing.Services;
+
+/// <summary>
+/// Pure decision logic. Given a lease and an assessment date, produces the list
+/// of actions the orchestrator should execute. No side effects, no I/O beyond
+/// reading the policy and the resolved rule.
+///
+/// Cadence rules (v1):
+/// <list type="bullet">
+///   <item><b>Pre-due reminder</b> fires when days_relative == -policy.PreDueDaysBefore.</item>
+///   <item><b>Due-date reminder</b> fires when days_relative == 0.</item>
+///   <item><b>Post-due, grace mode:</b> grace_period_reminder on day 1 of being late;
+///         late fee + late_fee_notice on day (EffectiveGraceDays + 1).</item>
+///   <item><b>Post-due, immediate mode:</b> late fee + late_fee_notice on day
+///         (StateMinimumGraceDays + 1) — earliest legally permitted.</item>
+/// </list>
+/// </summary>
+internal sealed class AssessmentPlanner : IAssessmentPlanner
+{
+    private readonly IEffectivePolicyService _policySvc;
+    private readonly IRentScheduleService _schedule;
+    private readonly IRentInvoiceRepository _invoices;
+    private readonly IRulesService _rules;
+
+    public AssessmentPlanner(
+        IEffectivePolicyService policySvc,
+        IRentScheduleService schedule,
+        IRentInvoiceRepository invoices,
+        IRulesService rules)
+    {
+        _policySvc = policySvc;
+        _schedule = schedule;
+        _invoices = invoices;
+        _rules = rules;
+    }
+
+    public async Task<AssessmentPlan> PlanAsync(Lease lease, DateOnly assessmentDate, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(lease);
+
+        var policy = await _policySvc.BuildAsync(lease, assessmentDate, ct);
+
+        // Prefer the synced invoice's due date; fall back to the computed
+        // schedule if no invoice is linked (no accounting sync yet, or the
+        // customer has no open invoice).
+        var dueDate = await _invoices.GetCurrentDueDateAsync(lease.Id, assessmentDate, ct)
+                   ?? _schedule.GetCurrentDueDate(lease, assessmentDate);
+        var daysRel = assessmentDate.DayNumber - dueDate.DayNumber;
+
+        var actions = new List<PlannedAction>(capacity: 2);
+
+        if (policy.PreDueEnabled && daysRel == -policy.PreDueDaysBefore)
+        {
+            actions.Add(PlannedAction.PreDueReminder());
+        }
+
+        if (policy.DueDateEnabled && daysRel == 0)
+        {
+            actions.Add(PlannedAction.DueDateReminder());
+        }
+
+        if (policy.PostDueEnabled && daysRel > 0)
+        {
+            await AppendPostDueActionsAsync(policy, daysRel, assessmentDate, actions, ct);
+        }
+
+        return new AssessmentPlan(
+            LeaseId: lease.Id,
+            CurrentDueDate: dueDate,
+            AssessmentDate: assessmentDate,
+            DaysRelativeToDue: daysRel,
+            Actions: actions);
+    }
+
+    private async Task AppendPostDueActionsAsync(
+        EffectiveLeasePolicy policy,
+        int daysRel,
+        DateOnly assessmentDate,
+        List<PlannedAction> actions,
+        CancellationToken ct)
+    {
+        switch (policy.PostDueMode)
+        {
+            case TenancyPostDueMode.GracePeriod:
+                if (daysRel == 1)
+                {
+                    actions.Add(PlannedAction.GracePeriodReminder());
+                }
+                if (daysRel == policy.EffectiveGraceDays + 1)
+                {
+                    var fee = await ResolveFeeAmountAsync(policy, assessmentDate, ct);
+                    actions.Add(PlannedAction.LateFee(fee));
+                    actions.Add(PlannedAction.LateFeeNotice());
+                }
+                break;
+
+            case TenancyPostDueMode.ImmediateLateFee:
+                if (daysRel == policy.StateMinimumGraceDays + 1)
+                {
+                    var fee = await ResolveFeeAmountAsync(policy, assessmentDate, ct);
+                    actions.Add(PlannedAction.LateFee(fee));
+                    actions.Add(PlannedAction.LateFeeNotice());
+                }
+                break;
+        }
+    }
+
+    private async Task<decimal> ResolveFeeAmountAsync(
+        EffectiveLeasePolicy policy,
+        DateOnly assessmentDate,
+        CancellationToken ct)
+    {
+        var rule = await _rules.ResolveRuleByStateIdAsync(
+            policy.StateId,
+            assessmentDate,
+            policy.JurisdictionId,
+            ct);
+        return rule?.ComputeFee(policy.MonthlyRent) ?? 0m;
+    }
+}

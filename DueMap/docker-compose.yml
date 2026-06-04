@@ -1,0 +1,108 @@
+# Local end-to-end stack: SQL Server, schema bootstrap, Web, Worker.
+#
+# Usage:
+#   export MSSQL_SA_PASSWORD='YourStrong!Passw0rd'
+#   docker compose up --build
+#
+# First boot:
+#   1. `mssql` starts; healthcheck polls until ready
+#   2. `db-bootstrap` runs once: applies every schema + seed SQL in order, exits 0
+#   3. `web` + `worker` start; the DemoSeeder fires inside web on first boot
+#   4. Browse to http://localhost:8080 and sign in as demo@duemap.dev / DemoUser1!
+#
+# Subsequent boots: bootstrap is a no-op (schemas idempotent), demo seeder is a no-op.
+
+name: duemap
+
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in env}
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    healthcheck:
+      # /opt/mssql-tools18/bin/sqlcmd is bundled with mssql/server:2022.
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -No -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  db-bootstrap:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    depends_on:
+      mssql:
+        condition: service_healthy
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+    volumes:
+      - ./db:/db:ro
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -euo pipefail
+        SQLCMD=/opt/mssql-tools18/bin/sqlcmd
+        SERVER=mssql
+
+        echo "Creating database DueMap if it doesn't exist..."
+        $$SQLCMD -S $$SERVER -U sa -P "$$MSSQL_SA_PASSWORD" -No -Q "IF DB_ID('DueMap') IS NULL CREATE DATABASE DueMap"
+
+        echo "Applying schema + seeds..."
+        for f in \
+          /db/duemap_schema.sql \
+          /db/duemap_schema_v2_lease_settings.sql \
+          /db/duemap_schema_v3_assessments.sql \
+          /db/duemap_schema_v4_pm_processing.sql \
+          /db/duemap_schema_v5_accounting.sql \
+          /db/duemap_schema_v6_customers_invoices.sql \
+          /db/duemap_schema_v7_identity.sql \
+          /db/seed_state_rules.sql \
+          /db/seed_notice_templates.sql ; do
+            echo ">>> $$f"
+            $$SQLCMD -S $$SERVER -U sa -P "$$MSSQL_SA_PASSWORD" -d DueMap -No -i "$$f"
+        done
+        echo "Bootstrap complete."
+    restart: "no"
+
+  web:
+    build:
+      context: .
+      dockerfile: src/DueMap.Web/Dockerfile
+    depends_on:
+      db-bootstrap:
+        condition: service_completed_successfully
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: "Server=mssql,1433;Database=DueMap;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=False"
+      DataProtection__KeyRingPath: /var/duemap/keys
+    ports:
+      - "8080:8080"
+    volumes:
+      - dp-keys:/var/duemap/keys
+
+  worker:
+    build:
+      context: .
+      dockerfile: src/DueMap.Worker/Dockerfile
+    depends_on:
+      db-bootstrap:
+        condition: service_completed_successfully
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      ConnectionStrings__Default: "Server=mssql,1433;Database=DueMap;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=False"
+      DataProtection__KeyRingPath: /var/duemap/keys
+    volumes:
+      - dp-keys:/var/duemap/keys
+
+volumes:
+  mssql-data:
+  dp-keys:

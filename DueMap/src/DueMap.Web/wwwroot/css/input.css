@@ -1,0 +1,263 @@
+/* DueMap — Tailwind v4 entry CSS
+ * Compiled to wwwroot/css/app.css on `dotnet build` (see DueMap.Web.csproj target).
+ *
+ * Layers, in order:
+ *   1. @import tailwindcss   — the engine
+ *   2. @source                — content roots for class scanning
+ *   3. @custom-variant dark   — class-based dark mode (not prefers-color-scheme)
+ *   4. @theme                 — font family + brand tokens
+ *   5. Component utilities    — toggle, checkbox, kind pills, etc. (the building blocks
+ *                               the design system mockups use)
+ */
+
+@import "tailwindcss";
+
+@source "../../Components/**/*.{razor,cshtml}";
+@source "../../Pages/**/*.{razor,cshtml}";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+               "Segoe UI", system-ui, sans-serif;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Apple-style sliding toggle                                                 */
+/* -------------------------------------------------------------------------- */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 26px;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  position: absolute; cursor: pointer; inset: 0;
+  background-color: rgb(228 228 231);
+  border-radius: 9999px;
+  transition: background-color .2s ease-out;
+}
+.toggle-track::before {
+  content: ''; position: absolute;
+  height: 22px; width: 22px; left: 2px; top: 2px;
+  background-color: white;
+  border-radius: 9999px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08);
+  transition: transform .2s ease-out;
+}
+.toggle-switch input:checked + .toggle-track { background-color: rgb(79 70 229); }
+.toggle-switch input:checked + .toggle-track::before { transform: translateX(18px); }
+.toggle-switch input:disabled + .toggle-track { opacity: 0.5; cursor: not-allowed; }
+.dark .toggle-track { background-color: rgb(63 63 70); }
+.dark .toggle-switch input:checked + .toggle-track { background-color: rgb(99 102 241); }
+.dark .toggle-track::before { background-color: rgb(244 244 245); }
+
+/* Compact 22px variant used in modal rows */
+.toggle-switch.toggle-sm { width: 38px; height: 22px; }
+.toggle-switch.toggle-sm .toggle-track::before { height: 18px; width: 18px; }
+.toggle-switch.toggle-sm input:checked + .toggle-track::before { transform: translateX(16px); }
+
+/* -------------------------------------------------------------------------- */
+/* Custom checkbox (rounded square, indigo when checked)                      */
+/* -------------------------------------------------------------------------- */
+.checkbox {
+  appearance: none; -webkit-appearance: none;
+  width: 16px; height: 16px; border-radius: 4px;
+  border: 1.5px solid rgb(212 212 216);
+  background-color: white;
+  cursor: pointer;
+  transition: all .15s ease-out;
+  flex-shrink: 0;
+}
+.checkbox:hover { border-color: rgb(161 161 170); }
+.checkbox:checked {
+  background-color: rgb(79 70 229); border-color: rgb(79 70 229);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  background-size: 11px; background-position: center; background-repeat: no-repeat;
+}
+.checkbox:focus-visible { outline: 2px solid rgb(99 102 241); outline-offset: 2px; }
+.dark .checkbox { background-color: rgb(24 24 27); border-color: rgb(63 63 70); }
+.dark .checkbox:hover { border-color: rgb(82 82 91); }
+.dark .checkbox:checked { background-color: rgb(99 102 241); border-color: rgb(99 102 241); }
+
+/* Larger 18px variant used in the design system reference */
+.checkbox.checkbox-lg { width: 18px; height: 18px; border-radius: 5px; }
+.checkbox.checkbox-lg:checked { background-size: 12px; }
+
+/* -------------------------------------------------------------------------- */
+/* Notice-kind icon pills (used on /leases + /processing-status)              */
+/* -------------------------------------------------------------------------- */
+.kind-pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 6px 2px 5px; border-radius: 6px;
+  font-size: 11px; font-weight: 500; line-height: 1;
+  transition: all .15s ease-out;
+}
+.kind-on  { background-color: rgb(238 242 255); color: rgb(67 56 202); }
+.kind-off { background-color: rgb(244 244 245); color: rgb(161 161 170); }
+.dark .kind-on  { background-color: rgb(67 56 202 / 0.18); color: rgb(165 180 252); }
+.dark .kind-off { background-color: rgb(39 39 42); color: rgb(82 82 91); }
+
+/* Action-kind counter pills (used on /processing-status) */
+.action-pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 6px 2px 5px; border-radius: 6px;
+  font-size: 11px; font-weight: 500; line-height: 1;
+  background-color: rgb(244 244 245); color: rgb(82 82 91);
+}
+.dark .action-pill { background-color: rgb(39 39 42); color: rgb(161 161 170); }
+.action-pill.has-value { background-color: rgb(238 242 255); color: rgb(67 56 202); }
+.dark .action-pill.has-value { background-color: rgb(67 56 202 / 0.18); color: rgb(165 180 252); }
+.action-pill.late-fee { background-color: rgb(254 226 226); color: rgb(159 18 57); }
+.dark .action-pill.late-fee { background-color: rgb(244 63 94 / 0.15); color: rgb(252 165 165); }
+
+/* -------------------------------------------------------------------------- */
+/* Portfolio tile (used on /dashboard)                                        */
+/* -------------------------------------------------------------------------- */
+.tile          { border-left-width: 3px; }
+.tile-current  { border-left-color: rgb(228 228 231); }
+.tile-pre      { border-left-color: rgb(99 102 241); }
+.tile-grace    { border-left-color: rgb(245 158 11); }
+.tile-late     { border-left-color: rgb(244 63 94); }
+.dark .tile-current { border-left-color: rgb(63 63 70); }
+
+/* -------------------------------------------------------------------------- */
+/* Rich-text editor (template-edit modal)                                     */
+/* -------------------------------------------------------------------------- */
+.rt-editor { line-height: 1.6; }
+.rt-editor:focus { outline: none; }
+.rt-editor p { margin: 0 0 0.85em 0; }
+.rt-editor p:last-child { margin-bottom: 0; }
+.rt-editor strong { font-weight: 600; color: rgb(24 24 27); }
+.dark .rt-editor strong { color: rgb(244 244 245); }
+.rt-editor ul { padding-left: 1.4em; margin: 0 0 0.85em; list-style: disc; }
+.rt-editor li { margin: 0.2em 0; }
+.rt-editor a { color: rgb(79 70 229); text-decoration: underline; text-underline-offset: 2px; }
+.dark .rt-editor a { color: rgb(129 140 248); }
+
+.var-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 8px 1px 6px; margin: 0 1px;
+  background-color: rgb(238 242 255); color: rgb(67 56 202);
+  border-radius: 6px; font-size: 0.85em; font-weight: 500;
+  vertical-align: baseline;
+}
+.var-pill::before {
+  content: ''; width: 4px; height: 4px; border-radius: 9999px;
+  background-color: rgb(99 102 241);
+}
+.dark .var-pill { background-color: rgb(67 56 202 / 0.2); color: rgb(165 180 252); }
+.dark .var-pill::before { background-color: rgb(129 140 248); }
+
+.req-star { color: rgb(244 63 94); font-weight: 600; }
+
+/* -------------------------------------------------------------------------- */
+/* Skeleton shimmer (table loading state)                                     */
+/* -------------------------------------------------------------------------- */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, rgb(244 244 245) 25%, rgb(228 228 231) 50%, rgb(244 244 245) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+.dark .skeleton {
+  background: linear-gradient(90deg, rgb(39 39 42) 25%, rgb(63 63 70) 50%, rgb(39 39 42) 75%);
+  background-size: 200% 100%;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Auth page subtle radial bg                                                 */
+/* -------------------------------------------------------------------------- */
+.auth-bg::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 50% 0%,   rgba(99,102,241,0.06), transparent 70%),
+    radial-gradient(40% 30% at 50% 100%, rgba(99,102,241,0.04), transparent 70%);
+}
+.dark .auth-bg::before {
+  background:
+    radial-gradient(60% 50% at 50% 0%,   rgba(99,102,241,0.10), transparent 70%),
+    radial-gradient(40% 30% at 50% 100%, rgba(99,102,241,0.06), transparent 70%);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Body baseline                                                              */
+/* -------------------------------------------------------------------------- */
+html, body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Card-body dim when [data-disabled="true"] on parent — used by NoticePreferences */
+[data-disabled="true"] .card-body { opacity: 0.45; pointer-events: none; }
+[data-disabled="true"] .template-row { opacity: 0.45; pointer-events: none; }
+
+/* "Set this" rows in bulk-apply modal */
+.set-row[data-on="false"] .set-control { opacity: 0.4; pointer-events: none; }
+
+/* -------------------------------------------------------------------------- */
+/* SSO brand buttons                                                          */
+/*                                                                            */
+/* Intuit: the official SVG asset is rendered VERBATIM inside a transparent   */
+/* button. Intuit's brand guidelines forbid modifying the button graphic, so  */
+/* we only swap the asset on hover (default <-> hover variants). The wrapper  */
+/* contributes no visual chrome.                                              */
+/* Xero: their published button construction is a Xero-Blue pill (#13B5EA)   */
+/* with the white wordmark + label. We build it from their official wordmark  */
+/* asset, which is the compliant path when not using their JS widget.         */
+/* -------------------------------------------------------------------------- */
+.btn-intuit-signin {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 100%; height: 44px;
+  padding: 0;
+  background: transparent; border: 0; cursor: pointer;
+  border-radius: 4px;
+  transition: transform .08s ease-out;
+}
+.btn-intuit-signin img { height: 44px; width: auto; display: block; }
+.btn-intuit-signin .hover { display: none; }
+.btn-intuit-signin:hover .default { display: none; }
+.btn-intuit-signin:hover .hover { display: block; }
+.btn-intuit-signin:active { transform: translateY(0.5px); }
+.btn-intuit-signin:focus-visible {
+  outline: 2px solid rgb(99 102 241); outline-offset: 3px;
+}
+
+.btn-xero-signin {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; height: 44px;
+  padding: 0 18px;
+  background-color: #13B5EA;   /* Xero Blue — fixed brand value */
+  color: white;
+  border: 0; border-radius: 9999px;
+  font-family: var(--font-sans);
+  font-size: 14px; font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background-color .15s ease-out, transform .08s ease-out;
+}
+.btn-xero-signin:hover { background-color: #0FA0D0; }   /* Xero Blue, 8% darker */
+.btn-xero-signin:active { transform: translateY(0.5px); }
+.btn-xero-signin:focus-visible { outline: 2px solid #13B5EA; outline-offset: 3px; }
+.btn-xero-signin .xero-mark { height: 22px; width: 22px; display: block; }
+
+/* "or" divider used between SSO buttons and email/password */
+.sso-divider {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 11px; font-weight: 500;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgb(161 161 170);
+}
+.sso-divider::before,
+.sso-divider::after {
+  content: ''; flex: 1; height: 1px;
+  background-color: rgb(228 228 231);
+}
+.dark .sso-divider { color: rgb(82 82 91); }
+.dark .sso-divider::before,
+.dark .sso-divider::after { background-color: rgb(39 39 42); }

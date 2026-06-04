@@ -1,0 +1,122 @@
+@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@using DueMap.Tenancy.Services
+@using DueMap.Web.Components.Shared
+@using DueMap.Web.Services
+@inject IOnboardingProgressService Progress
+@inject PmContext Pm
+@inject AuthenticationStateProvider AuthState
+@inject NavigationManager Nav
+
+@*
+    Layout used by every page under /onboarding/*. Three-step wizard chrome:
+    a brand-marked header, the stepper, and the body. No sidebar, no app nav —
+    the PM is in kiosk mode until all three steps are done.
+
+    We load progress here once and pass it into the stepper so the step pages
+    don't each have to make their own DB hit just to render the bar.
+*@
+
+<div class="min-h-screen flex flex-col bg-stone-50 dark:bg-zinc-950">
+
+    @* HEADER — brand + sign-out so the PM is never trapped *@
+    <header class="sticky top-0 z-30 h-16 flex items-center justify-between px-8 border-b border-zinc-200/80 bg-white/80 backdrop-blur-md dark:bg-zinc-900/70 dark:border-zinc-800">
+        <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
+            </div>
+            <span class="text-[15px] font-semibold tracking-tight">DueMap</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wider text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/10">
+                Setting up your workspace
+            </span>
+        </div>
+        <div class="flex items-center gap-2">
+            <AuthorizeView>
+                <Authorized>
+                    <span class="text-sm text-zinc-500 dark:text-zinc-400 hidden md:inline">@context.User.Identity?.Name</span>
+                    <form method="post" action="/Account/Logout">
+                        <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 shadow-sm transition-colors duration-150">
+                            Sign out
+                        </button>
+                    </form>
+                </Authorized>
+            </AuthorizeView>
+            <ThemeToggle />
+        </div>
+    </header>
+
+    @* STEPPER *@
+    @if (_progress is not null)
+    {
+        <div class="px-8 py-5 border-b border-zinc-200/80 dark:border-zinc-800 bg-white/60 dark:bg-zinc-900/60">
+            <div class="max-w-5xl mx-auto">
+                <OnboardingStepper Progress="_progress" />
+            </div>
+        </div>
+    }
+
+    <main class="flex-1 overflow-y-auto">
+        @Body
+    </main>
+</div>
+
+@code {
+    private OnboardingProgress? _progress;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Re-resolve on every navigation between step pages so the stepper
+        // tick marks update the moment a step is marked done. The cost is a
+        // single SELECT per page render, which is negligible for this surface.
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        if (auth.User.Identity?.IsAuthenticated != true) return;
+
+        var pmId = await Pm.GetPmIdAsync();
+        _progress = await Progress.GetAsync(pmId, CancellationToken.None);
+
+        // Step-ordering enforcement: if the PM has finished onboarding and
+        // landed on an /onboarding/* URL (e.g. bookmark), forward them to the
+        // dashboard. And if they tried to deep-link to a step that comes
+        // AFTER their first incomplete one, rewrite to where they belong.
+        // We deliberately allow staying on a step they've already completed
+        // (so refresh / back-button don't bounce them) — the strict gate is
+        // only against jumping forward.
+        var path = new Uri(Nav.Uri).AbsolutePath.TrimEnd('/');
+        if (_progress.IsComplete)
+        {
+            // Onboarding is done — /onboarding/* shouldn't be loadable. Send
+            // them home. /onboarding/syncing is an exception only while sync
+            // is in-flight, but by the time it stamps connect-done the PM is
+            // navigated away by the sync page itself, so we don't special-case.
+            Nav.NavigateTo("/", replace: true);
+            return;
+        }
+
+        var requested = StepFor(path);
+        var allowed   = _progress.NextStep!.Value;
+        // Allow current/back, block forward. /onboarding/syncing has no step
+        // mapping — we let it through unconditionally.
+        if (requested is not null && (int)requested > (int)allowed)
+        {
+            Nav.NavigateTo(RouteFor(allowed), replace: true);
+        }
+    }
+
+    private static OnboardingStep? StepFor(string path) => path.ToLowerInvariant() switch
+    {
+        "/onboarding/connect"            => OnboardingStep.Connect,
+        "/onboarding/close-settings"     => OnboardingStep.CloseSettings,
+        "/onboarding/notice-preferences" => OnboardingStep.NoticePreferences,
+        "/onboarding/preflight"          => OnboardingStep.Preflight,
+        _                                => null
+    };
+
+    private static string RouteFor(OnboardingStep step) => step switch
+    {
+        OnboardingStep.Connect           => "/onboarding/connect",
+        OnboardingStep.CloseSettings     => "/onboarding/close-settings",
+        OnboardingStep.NoticePreferences => "/onboarding/notice-preferences",
+        OnboardingStep.Preflight         => "/onboarding/preflight",
+        _                                => "/"
+    };
+}

@@ -1,0 +1,74 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel in-progress runs on the same ref when a newer push arrives.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build + test (.NET 8)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore DueMap.sln
+
+      - name: Build (Release, warnings-as-errors via Directory.Build.props)
+        run: dotnet build DueMap.sln --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test DueMap.sln --no-build --configuration Release --verbosity normal
+
+  docker:
+    name: docker build (Web + Worker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Only build images on push to main or when a PR explicitly opts in via a
+    # `build-images` label. Keeps PR CI fast for ordinary code changes.
+    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'build-images')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/DueMap.Web/Dockerfile
+          push: false
+          tags: duemap-web:ci
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+      - name: Build Worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/DueMap.Worker/Dockerfile
+          push: false
+          tags: duemap-worker:ci
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,scope=worker,mode=max

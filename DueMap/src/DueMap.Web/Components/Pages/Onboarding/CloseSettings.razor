@@ -1,0 +1,221 @@
+@page "/onboarding/close-settings"
+@layout DueMap.Web.Components.Layout.OnboardingShell
+@using DueMap.Integrations.Accounting.Sync
+@using DueMap.Tenancy.Domain
+@using DueMap.Tenancy.Services
+@using DueMap.Web.Services
+@inject PmContext Pm
+@inject IPmDailyCloseSettingsService Settings
+@inject IOnboardingProgressService Progress
+@inject IAccountingTimezoneSuggester TimezoneSuggester
+@inject NavigationManager Nav
+
+<PageTitle>Daily Close settings — DueMap</PageTitle>
+
+<div class="max-w-3xl mx-auto px-8 py-10 space-y-6">
+
+    <div>
+        <h2 class="text-2xl font-semibold tracking-tight">Daily Close email</h2>
+        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-2xl">
+            At the end of each business day we'll email you a summary of what DueMap did:
+            reminders sent, late fees assessed, dispatch failures.
+            Pick your timezone, when you want it in your inbox, and who else should be copied.
+        </p>
+    </div>
+
+    @if (_loading)
+    {
+        <p class="text-sm text-zinc-500">Loading…</p>
+    }
+    else
+    {
+        <EditForm Model="_form" OnValidSubmit="SaveAsync" class="space-y-6">
+            <DataAnnotationsValidator />
+
+            <section class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+
+                @* ENABLED *@
+                <div class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-start gap-4">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-semibold">Send a daily close email</div>
+                        <div class="text-xs text-zinc-500 mt-0.5">You can always turn this off later from workspace settings.</div>
+                    </div>
+                    <label class="inline-flex items-center cursor-pointer select-none">
+                        <input type="checkbox" @bind="_form.Enabled" class="sr-only peer" />
+                        <span class="w-11 h-6 rounded-full bg-zinc-200 dark:bg-zinc-700 relative
+                                     peer-checked:bg-indigo-600 transition-colors duration-150
+                                     after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5
+                                     after:rounded-full after:bg-white after:shadow
+                                     peer-checked:after:translate-x-5 after:transition-transform after:duration-150"></span>
+                    </label>
+                </div>
+
+                @* TIMEZONE + HOUR *@
+                <div class="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-5 border-b border-zinc-200/80 dark:border-zinc-800">
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-2">
+                            <span>Your timezone</span>
+                            @if (_tzSuggestion is not null)
+                            {
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                    Auto-detected from @_tzSuggestion.Source
+                                </span>
+                            }
+                        </label>
+                        <select @bind="_form.TimeZoneId"
+                                disabled="@(!_form.Enabled)"
+                                class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 disabled:opacity-50">
+                            @foreach (var tz in _commonTimezones)
+                            {
+                                <option value="@tz.Id">@tz.Label</option>
+                            }
+                        </select>
+                        <p class="mt-1 text-[11px] text-zinc-400">
+                            @if (_tzSuggestion is not null)
+                            {
+                                <span>Picked from your @_tzSuggestion.Source company profile — override if needed.</span>
+                            }
+                            else
+                            {
+                                <span>The nightly worker also uses this for late-fee day boundaries.</span>
+                            }
+                        </p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-500 mb-1.5">Send at (local time)</label>
+                        <select @bind="_form.SendHourLocal"
+                                disabled="@(!_form.Enabled)"
+                                class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 disabled:opacity-50">
+                            @for (var h = 0; h < 24; h++)
+                            {
+                                <option value="@h">@FormatHour(h)</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                @* RECIPIENTS *@
+                <div class="px-6 py-5 space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-500 mb-1.5">Send to (override)</label>
+                        <input type="email" @bind="_form.RecipientOverride"
+                               disabled="@(!_form.Enabled)"
+                               placeholder="leave blank to use your account email"
+                               class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 disabled:opacity-50" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-500 mb-1.5">CC (comma-separated)</label>
+                        <input type="text" @bind="_form.CcList"
+                               disabled="@(!_form.Enabled)"
+                               placeholder="bookkeeper@example.com, partner@example.com"
+                               class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 disabled:opacity-50" />
+                    </div>
+                </div>
+            </section>
+
+            <div class="flex items-center justify-end gap-3">
+                @if (_error is not null)
+                {
+                    <span class="text-sm text-rose-600 dark:text-rose-400">@_error</span>
+                }
+                <button type="submit" disabled="@_saving"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-colors duration-150 disabled:opacity-50">
+                    @(_saving ? "Saving…" : "Save and continue →")
+                </button>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private string? _error;
+    private int _pmId;
+
+    private PmDailyCloseSettings _form = new();
+    private TimezoneSuggestion? _tzSuggestion;
+
+    // Curated short list — the IANA db has ~600 zones; this covers North
+    // America + a couple of common ex-US slots and keeps the dropdown sane.
+    // Workspace-level "all timezones" picker is a later enhancement.
+    private readonly (string Id, string Label)[] _commonTimezones =
+    {
+        ("UTC",                       "UTC"),
+        ("America/Los_Angeles",       "America / Los Angeles (PT)"),
+        ("America/Denver",            "America / Denver (MT)"),
+        ("America/Chicago",           "America / Chicago (CT)"),
+        ("America/New_York",          "America / New York (ET)"),
+        ("America/Phoenix",           "America / Phoenix (no DST)"),
+        ("America/Anchorage",         "America / Anchorage"),
+        ("Pacific/Honolulu",          "Pacific / Honolulu"),
+        ("America/Toronto",           "America / Toronto"),
+        ("Europe/London",             "Europe / London"),
+        ("Europe/Berlin",             "Europe / Berlin"),
+        ("Asia/Kolkata",              "Asia / Kolkata"),
+        ("Australia/Sydney",          "Australia / Sydney")
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var ct = CancellationToken.None;
+        _pmId = await Pm.GetPmIdAsync();
+        _form = await Settings.GetOrDefaultAsync(_pmId, ct);
+
+        // First-time onboarding: nothing saved yet AND tz is still the bare
+        // default. Probe the accounting system for a smarter pre-fill so the
+        // PM doesn't have to hunt for their own zone in the dropdown.
+        // Only fires when the PM hasn't already picked a non-UTC zone — never
+        // overwrite an explicit choice.
+        if (_form.TimeZoneId is "UTC" or "")
+        {
+            _tzSuggestion = await TimezoneSuggester.SuggestForPmAsync(_pmId, ct);
+            if (_tzSuggestion is not null)
+            {
+                // The suggester might propose a zone our dropdown doesn't list —
+                // honour it only when present, otherwise stay on UTC and let
+                // the badge still indicate where the hint came from.
+                if (_commonTimezones.Any(t => t.Id == _tzSuggestion.IanaTimeZoneId))
+                {
+                    _form.TimeZoneId = _tzSuggestion.IanaTimeZoneId;
+                }
+            }
+        }
+
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            // Make sure the row binds back to the PM in this scope — the
+            // service trusts the id on the entity (the page is gated by auth
+            // and the kiosk router already ensured this is the caller's row).
+            _form.PropertyManagerId = _pmId;
+            await Settings.UpsertAsync(_form, CancellationToken.None);
+            await Progress.MarkCloseDoneAsync(_pmId, CancellationToken.None);
+            // Next step is Notice Preferences (v13). Preflight follows it.
+            Nav.NavigateTo("/onboarding/notice-preferences");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    // 0 → "12:00 AM", 13 → "1:00 PM", etc. Invariant culture so the label is
+    // stable regardless of the server's locale.
+    private static string FormatHour(int h)
+    {
+        var dt = new DateTime(2000, 1, 1, h, 0, 0);
+        return dt.ToString("h:mm tt", System.Globalization.CultureInfo.InvariantCulture);
+    }
+}

@@ -1,0 +1,18 @@
+@page
+@model DueMap.Web.Pages.Account.ExternalLoginCallbackModel
+@{
+    ViewData["Title"] = "Signing you in";
+    ViewData["Subtitle"] = "One moment…";
+    Layout = "/Pages/Shared/_Layout.cshtml";
+}
+
+@*
+    The OIDC middleware lands here after a successful provider callback. The
+    page model runs provision-or-link in OnGet, then issues a redirect, so
+    rendered output is only seen on transient failures.
+*@
+
+<p class="text-sm text-zinc-600 dark:text-zinc-400 text-center">
+    If you aren't redirected automatically,
+    <a asp-page="/Account/Login" class="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300">return to sign in</a>.
+</p>

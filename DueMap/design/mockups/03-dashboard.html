@@ -1,0 +1,521 @@
+<!--
+  DueMap — Screen 3 · / (Dashboard)
+  ---------------------------------------------------------------
+  Lucide icons used:
+    sparkles, sun, moon, search, command, chevron-up, chevron-right,
+    home, link-2, bell, file-text, building-2, users, activity,
+    refresh-cw, settings, trending-up, trending-down, dollar-sign,
+    clock, file-warning, check-circle-2, alert-triangle, send,
+    plug-zap, arrow-up-right, more-horizontal, plus
+  ---------------------------------------------------------------
+  Notes on the design:
+    - "The map is the headline feature" (per the original brief).
+      That literal portfolio status grid is the visual anchor below
+      the KPI row — every lease as a small tile, status by color.
+    - KPI row is *exactly four* cards. Five feels random; three feels
+      thin. Sparkline arrows + tabular numerals are the only visual
+      flourish; otherwise these stay monochrome.
+    - Avoided "Good morning, Ravi" greetings — too consumer-app for
+      a tool a PM logs into 100+ times a year.
+    - "Last sync" is in the page subtitle (subtle, persistent) rather
+      than a banner — it's metadata, not an event.
+    - Filter chips sit above the portfolio grid; the grid itself is
+      packed (~30 tiles visible) but each tile breathes via padding,
+      not size.
+    - Recent activity uses a left-rail timeline pattern. Mixed event
+      types (assessment, notice sent, sync, late fee) read clearly
+      thanks to monochrome icons + a single accent stripe.
+    - Empty-state for the "no data yet" case is a separate mockup.
+      This file shows the populated dashboard.
+-->
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard · DueMap</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { fontFamily: { sans: ['-apple-system','BlinkMacSystemFont','"SF Pro Display"','"SF Pro Text"','"Segoe UI"','system-ui','sans-serif'] } } }
+    };
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+  <style>
+    .checkbox {
+      appearance: none; -webkit-appearance: none;
+      width: 16px; height: 16px; border-radius: 4px;
+      border: 1.5px solid rgb(212 212 216);
+      background-color: white;
+      cursor: pointer; transition: all .15s ease-out; flex-shrink: 0;
+    }
+    .checkbox:checked {
+      background-color: rgb(79 70 229); border-color: rgb(79 70 229);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+      background-size: 11px; background-position: center; background-repeat: no-repeat;
+    }
+    .dark .checkbox { background-color: rgb(24 24 27); border-color: rgb(63 63 70); }
+    .dark .checkbox:checked { background-color: rgb(99 102 241); border-color: rgb(99 102 241); }
+
+    /* Each portfolio tile is a status-colored rounded square.
+       The status accent lives in a thin left border + status dot. */
+    .tile          { border-left-width: 3px; }
+    .tile-current  { border-left-color: rgb(228 228 231); }
+    .tile-pre      { border-left-color: rgb(99 102 241); }
+    .tile-due      { border-left-color: rgb(99 102 241); }
+    .tile-grace    { border-left-color: rgb(245 158 11); }
+    .tile-late     { border-left-color: rgb(244 63 94); }
+    .dark .tile-current { border-left-color: rgb(63 63 70); }
+  </style>
+</head>
+<body class="h-full font-sans antialiased bg-stone-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
+
+<div class="flex h-full min-h-screen">
+
+  <!-- =========================== SIDEBAR =========================== -->
+  <aside class="w-64 shrink-0 border-r border-zinc-200/80 bg-white dark:bg-zinc-900 dark:border-zinc-800 flex flex-col">
+    <div class="h-16 flex items-center gap-2.5 px-5 border-b border-zinc-200/80 dark:border-zinc-800">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center shadow-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
+      </div>
+      <span class="text-[15px] font-semibold tracking-tight">DueMap</span>
+    </div>
+    <nav class="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
+      <div>
+        <div class="px-2 pb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Workspace</div>
+        <ul class="space-y-0.5">
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm font-medium bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Dashboard</a></li>
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/></svg>Accounting</a></li>
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>Notice preferences</a></li>
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Templates</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="px-2 pb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Portfolio</div>
+        <ul class="space-y-0.5">
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>Leases</a></li>
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Link customers</a></li>
+          <li><a href="#" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.5.5 0 0 1-.96 0L9.24 3.18a.5.5 0 0 0-.96 0l-2.35 8.36A2 2 0 0 1 4 13H2"/></svg>Processing status</a></li>
+        </ul>
+      </div>
+    </nav>
+    <div class="border-t border-zinc-200/80 dark:border-zinc-800 p-3">
+      <button class="w-full flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors duration-150">
+        <div class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-semibold text-zinc-600 dark:text-zinc-300">RR</div>
+        <div class="flex-1 min-w-0 text-left">
+          <div class="text-sm font-medium truncate">Ravi Roy</div>
+          <div class="text-xs text-zinc-500 truncate">Demo Property Mgmt</div>
+        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="m18 15-6-6-6 6"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- =========================== MAIN =========================== -->
+  <div class="flex-1 flex flex-col min-w-0">
+
+    <!-- TOPBAR -->
+    <header class="sticky top-0 z-30 h-16 flex items-center justify-between px-8 border-b border-zinc-200/80 bg-white/70 backdrop-blur-md dark:bg-zinc-900/70 dark:border-zinc-800">
+      <div class="flex items-center gap-3">
+        <h1 class="text-base font-semibold">Dashboard</h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-zinc-500 bg-zinc-100/70 hover:bg-zinc-200/70 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors duration-150">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <span>Search…</span>
+          <span class="flex items-center gap-0.5 ml-4 text-[10px] font-medium text-zinc-400 dark:text-zinc-500"><kbd class="px-1 py-0.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700">⌘</kbd><kbd class="px-1 py-0.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700">K</kbd></span>
+        </button>
+        <button onclick="document.documentElement.classList.toggle('dark')" class="p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors duration-150" aria-label="Toggle theme">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden dark:block"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="block dark:hidden"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <main class="flex-1 overflow-y-auto">
+      <div class="max-w-7xl mx-auto px-8 py-8 space-y-8">
+
+        <!-- PAGE HEADER -->
+        <div class="flex items-end justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-semibold tracking-tight">Portfolio overview</h2>
+            <div class="mt-1.5 flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+              <span>Demo Property Mgmt</span>
+              <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="relative flex w-2 h-2">
+                  <span class="absolute inset-0 rounded-full bg-emerald-500 opacity-60 animate-ping"></span>
+                  <span class="relative w-2 h-2 rounded-full bg-emerald-500"></span>
+                </span>
+                Synced 2 minutes ago
+              </span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 shadow-sm transition-colors duration-150">
+              <!-- Lucide: refresh-cw -->
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+              Sync now
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI ROW -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+          <!-- Active leases -->
+          <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="flex items-center justify-between mb-3">
+              <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Active leases</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/></svg>
+            </div>
+            <div class="text-3xl font-semibold tracking-tight tabular-nums">42</div>
+            <div class="mt-2 text-xs text-zinc-500">across 7 properties</div>
+          </div>
+
+          <!-- Overdue -->
+          <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="flex items-center justify-between mb-3">
+              <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Overdue</div>
+              <span class="inline-flex items-center gap-0.5 text-xs font-medium text-rose-600 dark:text-rose-400">
+                <!-- Lucide: trending-up -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                2
+              </span>
+            </div>
+            <div class="text-3xl font-semibold tracking-tight tabular-nums">3</div>
+            <div class="mt-2 text-xs text-zinc-500">vs 1 last week</div>
+          </div>
+
+          <!-- Recovered this month -->
+          <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="flex items-center justify-between mb-3">
+              <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Recovered MTD</div>
+              <span class="inline-flex items-center gap-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                18%
+              </span>
+            </div>
+            <div class="text-3xl font-semibold tracking-tight tabular-nums">$1,247</div>
+            <div class="mt-2 text-xs text-zinc-500">late fees assessed + collected</div>
+          </div>
+
+          <!-- Next run -->
+          <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="flex items-center justify-between mb-3">
+              <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Next sync</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="text-3xl font-semibold tracking-tight tabular-nums">8m</div>
+            <div class="mt-2 text-xs text-zinc-500">3 leases queued for evaluation</div>
+          </div>
+
+        </div>
+
+        <!-- PORTFOLIO MAP -->
+        <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+
+          <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-sm font-semibold">Portfolio status</div>
+              <div class="text-xs text-zinc-500 mt-0.5">Every active lease, color-coded by where it sits in the rent cycle today.</div>
+            </div>
+            <!-- Filter chips -->
+            <div class="flex items-center gap-1.5">
+              <button class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900 transition-colors">
+                All <span class="text-zinc-400 dark:text-zinc-500">42</span>
+              </button>
+              <button class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors">
+                <span class="w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                Current <span class="text-zinc-400">36</span>
+              </button>
+              <button class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors">
+                <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                Pre-due <span class="text-zinc-400">3</span>
+              </button>
+              <button class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                Grace <span class="text-zinc-400">2</span>
+              </button>
+              <button class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                Late fee <span class="text-zinc-400">1</span>
+              </button>
+            </div>
+          </header>
+
+          <div class="p-6 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5">
+
+            <!-- Current tiles (gray) -->
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group">
+              <div class="text-xs font-medium tabular-nums">#1024</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$2,100</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1018</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$1,750</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1031</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$3,100</div>
+            </a>
+            <!-- Pre-due (indigo) -->
+            <a href="#" class="tile tile-pre rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-indigo-50/40 dark:bg-indigo-500/5 px-2.5 py-2 hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1052</div>
+              <div class="text-[11px] text-indigo-700/70 dark:text-indigo-400 tabular-nums mt-0.5">$2,400</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1009</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$1,890</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1041</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$2,250</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1003</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$1,650</div>
+            </a>
+            <!-- Grace (amber) -->
+            <a href="#" class="tile tile-grace rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-amber-50/40 dark:bg-amber-500/5 px-2.5 py-2 hover:shadow-md hover:border-amber-200 dark:hover:border-amber-500/30 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1025</div>
+              <div class="text-[11px] text-amber-700/70 dark:text-amber-400 tabular-nums mt-0.5">$1,450</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1019</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$2,800</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1037</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$2,000</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1014</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$1,925</div>
+            </a>
+            <!-- Late fee (rose) -->
+            <a href="#" class="tile tile-late rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-rose-50/40 dark:bg-rose-500/5 px-2.5 py-2 hover:shadow-md hover:border-rose-200 dark:hover:border-rose-500/30 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1026</div>
+              <div class="text-[11px] text-rose-700/70 dark:text-rose-400 tabular-nums mt-0.5">$2,950</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1002</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$1,400</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1047</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$2,675</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1011</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$1,500</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1056</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$3,200</div>
+            </a>
+            <a href="#" class="tile tile-pre rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-indigo-50/40 dark:bg-indigo-500/5 px-2.5 py-2 hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1029</div>
+              <div class="text-[11px] text-indigo-700/70 dark:text-indigo-400 tabular-nums mt-0.5">$1,795</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1006</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$2,100</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1033</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$2,250</div>
+            </a>
+            <a href="#" class="tile tile-grace rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-amber-50/40 dark:bg-amber-500/5 px-2.5 py-2 hover:shadow-md hover:border-amber-200 dark:hover:border-amber-500/30 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1044</div>
+              <div class="text-[11px] text-amber-700/70 dark:text-amber-400 tabular-nums mt-0.5">$2,500</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1023</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$1,950</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1058</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$2,800</div>
+            </a>
+            <a href="#" class="tile tile-current rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-2 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1015</div>
+              <div class="text-[11px] text-zinc-500 tabular-nums mt-0.5">$1,825</div>
+            </a>
+            <a href="#" class="tile tile-pre rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-indigo-50/40 dark:bg-indigo-500/5 px-2.5 py-2 hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-all duration-150">
+              <div class="text-xs font-medium tabular-nums">#1062</div>
+              <div class="text-[11px] text-indigo-700/70 dark:text-indigo-400 tabular-nums mt-0.5">$2,150</div>
+            </a>
+
+          </div>
+
+          <footer class="px-6 py-3 border-t border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60 flex items-center justify-between">
+            <div class="text-xs text-zinc-500">Showing 24 of 42 active leases</div>
+            <a href="#" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors inline-flex items-center gap-1">
+              View all leases
+              <!-- Lucide: arrow-up-right -->
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+            </a>
+          </footer>
+        </section>
+
+        <!-- LOWER GRID -->
+        <div class="grid lg:grid-cols-3 gap-6">
+
+          <!-- Recent activity -->
+          <section class="lg:col-span-2 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
+            <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between">
+              <div>
+                <div class="text-sm font-semibold">Recent activity</div>
+                <div class="text-xs text-zinc-500 mt-0.5">From the daily orchestrator</div>
+              </div>
+              <a href="#" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">View all</a>
+            </header>
+            <ol class="px-6 py-2">
+              <!-- timeline item -->
+              <li class="relative flex gap-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800/60 last:border-0">
+                <div class="shrink-0 w-8 h-8 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                  <!-- Lucide: file-warning -->
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v3"/><path d="M12 18h.01"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm">
+                    Late fee <span class="font-medium tabular-nums">$147.50</span> assessed on lease
+                    <a href="#" class="font-medium text-zinc-900 dark:text-zinc-50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">#1026</a>
+                    <span class="text-zinc-500">— Carla Occupant</span>
+                  </div>
+                  <div class="text-xs text-zinc-500 mt-0.5 tabular-nums">12 minutes ago · 5% of $2,950 · NY § 238-a</div>
+                </div>
+              </li>
+              <li class="relative flex gap-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800/60 last:border-0">
+                <div class="shrink-0 w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                  <!-- Lucide: send -->
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm">
+                    Late-fee notice sent to <span class="font-medium">Carla Occupant</span> via email
+                  </div>
+                  <div class="text-xs text-zinc-500 mt-0.5">12 minutes ago · SendGrid msg <code class="font-mono text-[11px] text-zinc-600 dark:text-zinc-400">SG.kf-3a91</code></div>
+                </div>
+              </li>
+              <li class="relative flex gap-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800/60 last:border-0">
+                <div class="shrink-0 w-8 h-8 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                  <!-- Lucide: alert-triangle -->
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm">
+                    Grace-period reminder sent on lease
+                    <a href="#" class="font-medium text-zinc-900 dark:text-zinc-50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">#1025</a>
+                  </div>
+                  <div class="text-xs text-zinc-500 mt-0.5">1 hour ago · Day 1 of 5-day grace · Bob Tenant</div>
+                </div>
+              </li>
+              <li class="relative flex gap-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800/60 last:border-0">
+                <div class="shrink-0 w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                  <!-- Lucide: check-circle-2 -->
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm">
+                    Daily processing completed — <span class="font-medium tabular-nums">42</span> leases evaluated
+                  </div>
+                  <div class="text-xs text-zinc-500 mt-0.5">2 hours ago · 4 actions executed, 0 failed</div>
+                </div>
+              </li>
+              <li class="relative flex gap-4 py-3.5">
+                <div class="shrink-0 w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500">
+                  <!-- Lucide: refresh-cw -->
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm">
+                    QuickBooks sync — <span class="font-medium tabular-nums">2</span> customer updates, <span class="font-medium tabular-nums">5</span> new invoices
+                  </div>
+                  <div class="text-xs text-zinc-500 mt-0.5">2 hours ago</div>
+                </div>
+              </li>
+            </ol>
+          </section>
+
+          <!-- Right column -->
+          <div class="space-y-4">
+
+            <!-- Connection card -->
+            <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-6">
+              <div class="flex items-center justify-between mb-3">
+                <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Accounting</div>
+                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Connected
+                </span>
+              </div>
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-700 dark:text-zinc-300">
+                  <!-- Lucide: plug-zap -->
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m13 2-2 2.5h3L12 7"/><path d="M10 14v-3"/><path d="M14 14v-3"/><path d="M11 19c-1.7 0-3-1.3-3-3v-2h8v2c0 1.7-1.3 3-3 3Z"/><path d="M12 22v-3"/></svg>
+                </div>
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold">QuickBooks Online</div>
+                  <div class="text-xs text-zinc-500 truncate">Realm 9341204528691234</div>
+                </div>
+              </div>
+              <dl class="space-y-1.5 text-xs">
+                <div class="flex justify-between"><dt class="text-zinc-500">Last sync</dt><dd class="tabular-nums">2 min ago</dd></div>
+                <div class="flex justify-between"><dt class="text-zinc-500">Token expires</dt><dd class="tabular-nums">in 54 min</dd></div>
+                <div class="flex justify-between"><dt class="text-zinc-500">Customers</dt><dd class="tabular-nums">42</dd></div>
+              </dl>
+              <a href="#" class="mt-4 inline-flex items-center gap-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">
+                Manage connection
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+              </a>
+            </section>
+
+            <!-- Quick links -->
+            <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-6">
+              <div class="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-3">Setup</div>
+              <ul class="space-y-1">
+                <li>
+                  <a href="#" class="group flex items-center justify-between gap-2 -mx-2 px-2 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">
+                    <span class="flex items-center gap-2.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-500"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
+                      <span class="text-sm">Notice preferences</span>
+                    </span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors"><path d="m9 18 6-6-6-6"/></svg>
+                  </a>
+                </li>
+                <li>
+                  <a href="#" class="group flex items-center justify-between gap-2 -mx-2 px-2 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">
+                    <span class="flex items-center gap-2.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-500"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                      <span class="text-sm">Customize templates</span>
+                    </span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors"><path d="m9 18 6-6-6-6"/></svg>
+                  </a>
+                </li>
+                <li>
+                  <a href="#" class="group flex items-center justify-between gap-2 -mx-2 px-2 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">
+                    <span class="flex items-center gap-2.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-500"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+                      <span class="text-sm">Link customers to leases</span>
+                    </span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors"><path d="m9 18 6-6-6-6"/></svg>
+                  </a>
+                </li>
+              </ul>
+            </section>
+
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+</body>
+</html>

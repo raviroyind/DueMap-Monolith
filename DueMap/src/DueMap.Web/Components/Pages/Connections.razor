@@ -1,0 +1,220 @@
+@page "/connections"
+@using DueMap.Integrations.Accounting
+@using DueMap.Web.Services
+@using Microsoft.AspNetCore.WebUtilities
+@inject PmContext Pm
+@inject IAccountingConnectionService ConnectionSvc
+@inject NavigationManager Nav
+
+<PageTitle>Accounting connection — DueMap</PageTitle>
+
+<div class="max-w-4xl mx-auto px-8 py-8 space-y-6">
+
+    <!-- PAGE HEADER -->
+    <div>
+        <h2 class="text-2xl font-semibold tracking-tight">Accounting connection</h2>
+        <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 max-w-2xl leading-relaxed">
+            Sync customers and invoices from your accounting system. DueMap reads each day before processing late fees, so notices go to the right tenants for the right amounts.
+        </p>
+    </div>
+
+    @if (_pmId is null)
+    {
+        <p class="text-zinc-500">Loading…</p>
+    }
+    else if (_conn is null)
+    {
+        @* Onboarding banner — only shown when redirected from the dashboard
+           gate. Explains why the user is here so they don't feel lost. *@
+        @if (_onboarding)
+        {
+            <div class="rounded-xl border border-indigo-200/70 dark:border-indigo-500/20 bg-indigo-50/60 dark:bg-indigo-500/5 px-5 py-4 flex items-start gap-3">
+                <span class="mt-0.5 inline-flex w-7 h-7 items-center justify-center rounded-full bg-indigo-600 text-white shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7 9 18l-5-5"/></svg>
+                </span>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-semibold text-indigo-900 dark:text-indigo-200">One more step before you can use DueMap</div>
+                    <div class="text-xs text-indigo-800/80 dark:text-indigo-300/80 mt-0.5 leading-relaxed">
+                        DueMap reads customers, invoices and payments from QuickBooks or Xero each day to decide which tenants need a reminder. Pick a provider to finish setup — your dashboard unlocks immediately.
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- NOT CONNECTED — official brand buttons -->
+        <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+            <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800">
+                <div class="text-sm font-semibold">Choose a provider</div>
+                <div class="text-xs text-zinc-500 mt-0.5">One active connection per workspace. You can switch providers later.</div>
+            </header>
+            <div class="p-6 space-y-3">
+                @* Connect to QuickBooks — Intuit's official green-button SVG, used verbatim.
+                   Wrapping anchor handles the click; we never touch the asset. *@
+                <a href="@($"/oauth/quickbooks/connect/{_pmId}")"
+                   class="block group rounded-xl border border-zinc-200/60 dark:border-zinc-800 p-5 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md transition-all duration-200">
+                    <div class="flex items-center gap-5">
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-medium">QuickBooks Online</div>
+                            <div class="text-xs text-zinc-500 mt-0.5">Sync customers + invoices · OAuth 2.0, tokens encrypted at rest</div>
+                        </div>
+                        @* Root-relative — Razor's ~/ resolver doesn't fire in
+                           interactive Blazor renders, so the literal tilde
+                           would reach the browser. *@
+                        <img src="/img/intuit/Connect_to_QuickBooks_buttons/Connect_to_QuickBooks_English/Connect_to_QuickBooks_SVG/C2QB_green_btn_med_default.svg"
+                             alt="Connect to QuickBooks"
+                             class="block h-11 w-auto shrink-0" />
+                    </div>
+                </a>
+
+                @* Sign In with Xero — pill constructed per Xero brand spec (Xero Blue
+                   #13B5EA + official white logomark + label). *@
+                <a href="@($"/oauth/xero/connect/{_pmId}")"
+                   class="block group rounded-xl border border-zinc-200/60 dark:border-zinc-800 p-5 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md transition-all duration-200">
+                    <div class="flex items-center gap-5">
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-medium">Xero</div>
+                            <div class="text-xs text-zinc-500 mt-0.5">Sync contacts + invoices · OAuth 2.0, tokens encrypted at rest</div>
+                        </div>
+                        <span class="btn-xero-signin h-11 w-auto shrink-0" style="width:auto;padding:0 22px;">
+                            <img src="/img/xero/Xero white logo 1x1.png" alt="" aria-hidden="true" class="xero-mark" />
+                            <span>Connect to Xero</span>
+                        </span>
+                    </div>
+                </a>
+            </div>
+            <footer class="px-6 py-3 border-t border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60">
+                <p class="text-[11px] text-zinc-500 leading-relaxed">
+                    DueMap never sees your bank credentials. We exchange a short-lived OAuth code for tokens with @("QuickBooks") or Xero; tokens are encrypted with Data Protection before storage.
+                </p>
+            </footer>
+        </section>
+    }
+    else
+    {
+        <!-- CONNECTED — hero card -->
+        <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+
+            <div class="px-6 py-5 flex items-start justify-between gap-4 border-b border-zinc-200/80 dark:border-zinc-800">
+                <div class="flex items-start gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-lg font-semibold text-zinc-700 dark:text-zinc-200 shrink-0 select-none">
+                        @(_conn.Provider == AccountingProvider.QuickBooks ? "Q" : "X")
+                    </div>
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="text-base font-semibold">@(_conn.Provider == AccountingProvider.QuickBooks ? "QuickBooks Online" : "Xero")</h3>
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium @StatusPillClass(_conn.Status)">
+                                <span class="w-1.5 h-1.5 rounded-full @StatusDotClass(_conn.Status)"></span>@_conn.Status
+                            </span>
+                        </div>
+                        <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400 flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <span class="inline-flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+                                Tokens encrypted at rest
+                            </span>
+                            <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
+                            <span>Realm <code class="font-mono text-[11px] text-zinc-600 dark:text-zinc-300">@_conn.RealmId</code></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-6 py-5 grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-5">
+                <div>
+                    <div class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-1.5">Last sync</div>
+                    <div class="text-lg font-semibold tracking-tight tabular-nums">@(_conn.LastSyncAt?.ToString("u") ?? "never")</div>
+                </div>
+                <div>
+                    <div class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-1.5">Access token expires</div>
+                    <div class="text-lg font-semibold tracking-tight tabular-nums">@_conn.AccessTokenExpiresAt.ToString("u")</div>
+                </div>
+                <div>
+                    <div class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-1.5">Connected on</div>
+                    <div class="text-lg font-semibold tracking-tight tabular-nums">@_conn.ConnectedAt.ToString("u")</div>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(_conn.LastSyncError))
+            {
+                <div class="px-6 pb-5">
+                    <div class="rounded-xl border border-rose-200/70 dark:border-rose-500/20 bg-rose-50/60 dark:bg-rose-500/5 px-4 py-3 flex items-start gap-3">
+                        <span class="mt-0.5 inline-flex w-5 h-5 items-center justify-center rounded-full bg-rose-500 text-white shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                        </span>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-medium text-rose-900 dark:text-rose-200">Last sync error</div>
+                            <div class="text-xs text-rose-800/80 dark:text-rose-300/70 mt-0.5">@_conn.LastSyncError</div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <div class="px-6 py-4 bg-zinc-50/60 dark:bg-zinc-900/60 border-t border-zinc-200/80 dark:border-zinc-800 flex items-center justify-end gap-2">
+                <a class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 shadow-sm transition-colors duration-150"
+                   href="@($"/oauth/{ProviderSlug(_conn.Provider)}/connect/{_pmId}")">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                    Reconnect
+                </a>
+                <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors duration-150"
+                        @onclick="Disconnect">
+                    Disconnect
+                </button>
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    private int? _pmId;
+    private PmAccountingConnection? _conn;
+    private bool _onboarding;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // ?onboarding=1 means we got here from the dashboard gate. Surface the
+        // welcome banner; without the param the page renders quietly (e.g. a
+        // user who navigated here directly to manage an existing connection).
+        var uri = new Uri(Nav.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        _onboarding = query.TryGetValue("onboarding", out var v) && v == "1";
+
+        _pmId = await Pm.GetPmIdAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_pmId is not int id) return;
+        _conn = await ConnectionSvc.GetActiveAsync(id, CancellationToken.None);
+        StateHasChanged();
+    }
+
+    private async Task Disconnect()
+    {
+        if (_pmId is not int id) return;
+        await ConnectionSvc.DisconnectAsync(id, CancellationToken.None);
+        await LoadAsync();
+    }
+
+    private static string StatusPillClass(ConnectionStatus s) => s switch
+    {
+        ConnectionStatus.Connected     => "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
+        ConnectionStatus.TokenExpired  => "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
+        ConnectionStatus.Disconnected  => "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400",
+        _ => "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+    };
+
+    private static string StatusDotClass(ConnectionStatus s) => s switch
+    {
+        ConnectionStatus.Connected     => "bg-emerald-500",
+        ConnectionStatus.TokenExpired  => "bg-amber-500",
+        ConnectionStatus.Disconnected  => "bg-rose-500",
+        _ => "bg-zinc-400"
+    };
+
+    private static string ProviderSlug(AccountingProvider p) => p switch
+    {
+        AccountingProvider.QuickBooks => "quickbooks",
+        AccountingProvider.Xero       => "xero",
+        _ => "unknown"
+    };
+}

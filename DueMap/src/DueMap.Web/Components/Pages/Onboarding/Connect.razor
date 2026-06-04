@@ -1,0 +1,78 @@
+@page "/onboarding/connect"
+@layout DueMap.Web.Components.Layout.OnboardingShell
+@using DueMap.Web.Services
+@inject PmContext Pm
+
+<PageTitle>Connect your accounting — DueMap</PageTitle>
+
+<div class="max-w-3xl mx-auto px-8 py-10 space-y-6">
+
+    <div class="text-center">
+        <h2 class="text-2xl font-semibold tracking-tight">Connect your accounting system</h2>
+        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-2xl mx-auto">
+            DueMap reads your tenants, invoices and payments from QuickBooks or Xero each day to decide
+            who needs a reminder. Pick a provider to get started — your data stays in your accounting system,
+            we never store payment details.
+        </p>
+    </div>
+
+    @if (_pmId is null)
+    {
+        <p class="text-center text-sm text-zinc-500">Loading…</p>
+    }
+    else
+    {
+        <section class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+            <div class="p-6 space-y-3">
+
+                @* QuickBooks Online — Intuit's official "Connect to QuickBooks" green button *@
+                <a href="@($"/oauth/quickbooks/connect/{_pmId}")"
+                   class="block group rounded-xl border border-zinc-200/60 dark:border-zinc-800 p-5 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md transition-all duration-200">
+                    <div class="flex items-center gap-5">
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-semibold">QuickBooks Online</div>
+                            <div class="text-xs text-zinc-500 mt-0.5">Customers + invoices · OAuth 2.0, tokens encrypted at rest</div>
+                        </div>
+                        @* Root-relative path (no ~/) — Razor's tilde resolver
+                           doesn't run inside interactive Blazor renders. *@
+                        <img src="/img/intuit/Connect_to_QuickBooks_buttons/Connect_to_QuickBooks_English/Connect_to_QuickBooks_SVG/C2QB_green_btn_med_default.svg"
+                             alt="Connect to QuickBooks"
+                             class="block h-11 w-auto shrink-0" />
+                    </div>
+                </a>
+
+                @* Xero — official brand pill, white logomark on Xero Blue *@
+                <a href="@($"/oauth/xero/connect/{_pmId}")"
+                   class="block group rounded-xl border border-zinc-200/60 dark:border-zinc-800 p-5 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md transition-all duration-200">
+                    <div class="flex items-center gap-5">
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-semibold">Xero</div>
+                            <div class="text-xs text-zinc-500 mt-0.5">Contacts + invoices · OAuth 2.0, tokens encrypted at rest</div>
+                        </div>
+                        <span class="btn-xero-signin h-11 w-auto shrink-0" style="width:auto;padding:0 22px;">
+                            <img src="/img/xero/Xero white logo 1x1.png" alt="" aria-hidden="true" class="xero-mark" />
+                            <span>Connect to Xero</span>
+                        </span>
+                    </div>
+                </a>
+            </div>
+            <footer class="px-6 py-3 border-t border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60">
+                <p class="text-[11px] text-zinc-500 leading-relaxed">
+                    DueMap never sees your bank credentials. We exchange a short-lived OAuth code for tokens; tokens are encrypted with Data Protection before storage.
+                </p>
+            </footer>
+        </section>
+    }
+</div>
+
+@code {
+    // We only need the PM id here so we can build the per-PM OAuth init URL.
+    // Step completion is stamped later, when /onboarding/syncing finishes the
+    // first successful sync — that's the real signal that "connect" worked.
+    private int? _pmId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _pmId = await Pm.GetPmIdAsync();
+    }
+}

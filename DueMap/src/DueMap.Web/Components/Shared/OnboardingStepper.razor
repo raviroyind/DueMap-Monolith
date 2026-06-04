@@ -1,0 +1,72 @@
+@using DueMap.Tenancy.Services
+
+@*
+    Three-pill stepper. Each pill renders in one of three states:
+      done    — green tick, muted text
+      current — indigo accent, bold text
+      future  — zinc, muted text
+    The connecting bars between pills shade based on whether the LEFT pill
+    is done (so the line "fills" left-to-right as the user progresses).
+*@
+
+@if (Progress is not null)
+{
+    <ol class="flex items-center gap-2 sm:gap-4 select-none">
+        @for (var i = 0; i < _steps.Length; i++)
+        {
+            var s = _steps[i];
+            var done = Progress.IsDone(s.Step);
+            var current = !done && Progress.NextStep == s.Step;
+
+            <li class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+
+                @* Pill *@
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <span class="@PillCircleClass(done, current)">
+                        @if (done)
+                        {
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        }
+                        else
+                        {
+                            <span class="text-xs font-semibold tabular-nums">@((int)s.Step)</span>
+                        }
+                    </span>
+                    <div class="min-w-0">
+                        <div class="@PillLabelClass(done, current) text-xs sm:text-sm font-medium truncate">@s.Label</div>
+                        <div class="hidden sm:block text-[11px] text-zinc-400 dark:text-zinc-500 truncate">@s.Hint</div>
+                    </div>
+                </div>
+
+                @* Connector to next pill (not after the last one) *@
+                @if (i < _steps.Length - 1)
+                {
+                    <div class="flex-1 h-[2px] rounded-full @(done ? "bg-emerald-400 dark:bg-emerald-500" : "bg-zinc-200 dark:bg-zinc-700")"></div>
+                }
+            </li>
+        }
+    </ol>
+}
+
+@code {
+    [Parameter, EditorRequired] public OnboardingProgress? Progress { get; set; }
+
+    private readonly (OnboardingStep Step, string Label, string Hint)[] _steps =
+    {
+        (OnboardingStep.Connect,           "Connect Accounting",   "QuickBooks or Xero"),
+        (OnboardingStep.CloseSettings,     "Daily Close Settings", "When + where to send"),
+        (OnboardingStep.NoticePreferences, "Notice Preferences",   "Reminders + late fees"),
+        (OnboardingStep.Preflight,         "Notify Tenants",       "One-time intro email")
+    };
+
+    private static string PillCircleClass(bool done, bool current) =>
+        "w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-full flex items-center justify-center transition-colors duration-150 " +
+        (done    ? "bg-emerald-500 text-white shadow-sm"
+       : current ? "bg-indigo-600 text-white shadow-sm ring-4 ring-indigo-500/15"
+                 : "bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400");
+
+    private static string PillLabelClass(bool done, bool current) =>
+        done    ? "text-emerald-700 dark:text-emerald-400"
+      : current ? "text-indigo-700 dark:text-indigo-300"
+                : "text-zinc-500 dark:text-zinc-400";
+}

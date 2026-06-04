@@ -1,0 +1,258 @@
+@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Routing
+@using DueMap.Integrations.Accounting
+@using DueMap.Tenancy.Services
+@using DueMap.Web.Components.Shared
+@using DueMap.Web.Services
+@inject IAccountingConnectionService ConnectionSvc
+@inject IOnboardingProgressService OnboardingProgress
+@inject PmContext Pm
+@inject AuthenticationStateProvider AuthState
+@inject NavigationManager Nav
+@implements IDisposable
+
+@*
+    Two-mode shell.
+
+    Fully onboarded PM (all three onboarding steps complete):
+        Full sidebar + topbar + page body. Everything you'd expect.
+
+    Mid-onboarding PM (any of the three step timestamps is NULL):
+        Kiosk mode. No sidebar, no nav, no escape hatch. The PM is
+        bounced to the FIRST INCOMPLETE step's route. The OnboardingShell
+        layout takes over for the actual step pages — this layout only
+        renders for routes that AREN'T under /onboarding/*. The kiosk
+        branch below is now mostly a safety net for users who try to
+        deep-link past their progress.
+*@
+
+@if (!_initialized)
+{
+    <div class="flex h-full min-h-screen items-center justify-center text-zinc-500">
+        Loading workspace…
+    </div>
+}
+else if (_connected)
+{
+    <div class="flex h-full min-h-screen">
+
+        <!-- SIDEBAR -->
+        <aside class="w-64 shrink-0 border-r border-zinc-200/80 bg-white dark:bg-zinc-900 dark:border-zinc-800 flex flex-col">
+            <div class="h-16 flex items-center gap-2.5 px-5 border-b border-zinc-200/80 dark:border-zinc-800">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
+                </div>
+                <span class="text-[15px] font-semibold tracking-tight">DueMap</span>
+            </div>
+
+            <NavMenu />
+
+            <!-- User card -->
+            <AuthorizeView>
+                <Authorized>
+                    <div class="border-t border-zinc-200/80 dark:border-zinc-800 p-3">
+                        <div class="w-full flex items-center gap-3 px-2 py-1.5 rounded-lg">
+                            <div class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+                                @Initials(context.User.Identity?.Name)
+                            </div>
+                            <div class="flex-1 min-w-0 text-left">
+                                <div class="text-sm font-medium truncate">@(context.User.Identity?.Name ?? "User")</div>
+                            </div>
+                        </div>
+                    </div>
+                </Authorized>
+            </AuthorizeView>
+        </aside>
+
+        <!-- MAIN -->
+        <div class="flex-1 flex flex-col min-w-0">
+
+            <!-- TOPBAR -->
+            <header class="sticky top-0 z-30 h-16 flex items-center justify-between px-8 border-b border-zinc-200/80 bg-white/70 backdrop-blur-md dark:bg-zinc-900/70 dark:border-zinc-800">
+                <div class="flex items-center gap-3">
+                    <h1 class="text-base font-semibold">Property manager admin</h1>
+                </div>
+                <div class="flex items-center gap-2">
+                    <AuthorizeView>
+                        <Authorized>
+                            <span class="text-sm text-zinc-500 dark:text-zinc-400 hidden md:inline">@context.User.Identity?.Name</span>
+                            <form method="post" action="/Account/Logout">
+                                <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 shadow-sm transition-colors duration-150">
+                                    Sign out
+                                </button>
+                            </form>
+                        </Authorized>
+                    </AuthorizeView>
+                    <ThemeToggle />
+                </div>
+            </header>
+
+            <main class="flex-1 overflow-y-auto">
+                @Body
+            </main>
+        </div>
+    </div>
+}
+else
+{
+    @* KIOSK MODE — no sidebar, no app nav. Only the brand mark and a sign-out
+       affordance live in the header so the user isn't trapped. *@
+    <div class="min-h-screen flex flex-col bg-stone-50 dark:bg-zinc-950">
+        <header class="sticky top-0 z-30 h-16 flex items-center justify-between px-8 border-b border-zinc-200/80 bg-white/70 backdrop-blur-md dark:bg-zinc-900/70 dark:border-zinc-800">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
+                </div>
+                <span class="text-[15px] font-semibold tracking-tight">DueMap</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <AuthorizeView>
+                    <Authorized>
+                        <span class="text-sm text-zinc-500 dark:text-zinc-400 hidden md:inline">@context.User.Identity?.Name</span>
+                        <form method="post" action="/Account/Logout">
+                            <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 shadow-sm transition-colors duration-150">
+                                Sign out
+                            </button>
+                        </form>
+                    </Authorized>
+                </AuthorizeView>
+                <ThemeToggle />
+            </div>
+        </header>
+        <main class="flex-1 overflow-y-auto">
+            @Body
+        </main>
+    </div>
+}
+
+@code {
+    private bool _initialized;
+    private bool _connected;
+
+    // Serialises EvaluateAsync — rapid navigation fires multiple
+    // OnLocationChanged events, and each calls into IAccountingConnectionService
+    // which uses a scoped IntegrationsDbContext. DbContext isn't thread-safe;
+    // running two evaluations concurrently throws "A second operation was
+    // started on this context instance." Latest nav still wins because each
+    // event awaits its turn rather than being dropped.
+    private readonly SemaphoreSlim _evaluateLock = new(1, 1);
+
+    // Routes that the onboarding flow itself owns. If the PM is mid-onboarding
+    // and ALREADY navigating to one of these, leave them alone — the
+    // OnboardingShell layout (not us) renders those pages, and the kiosk
+    // router below will redirect them to the right step if they picked the
+    // wrong one for their current progress.
+    private static readonly string[] OnboardingPaths =
+    {
+        "/onboarding/connect",
+        "/onboarding/syncing",
+        "/onboarding/close-settings",
+        "/onboarding/notice-preferences",
+        "/onboarding/preflight"
+    };
+
+    // Legacy /connections is still reachable post-onboarding for "manage
+    // connection" — but during kiosk we send users to /onboarding/connect.
+
+    protected override async Task OnInitializedAsync()
+    {
+        Nav.LocationChanged += OnLocationChanged;
+        await EvaluateAsync();
+    }
+
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        // Serialise via the semaphore so rapid clicks don't fire two
+        // EvaluateAsync calls onto the same scoped IntegrationsDbContext.
+        await _evaluateLock.WaitAsync();
+        try
+        {
+            await InvokeAsync(EvaluateAsync);
+        }
+        finally
+        {
+            _evaluateLock.Release();
+        }
+    }
+
+    private async Task EvaluateAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        if (auth.User.Identity?.IsAuthenticated != true)
+        {
+            // Anonymous — auth middleware will redirect to /Account/Login.
+            _initialized = true;
+            StateHasChanged();
+            return;
+        }
+
+        var pmId = await Pm.GetPmIdAsync();
+
+        // Single source of truth for routing: the three onboarding step
+        // timestamps. Done == let them into the full app. Not done == bounce
+        // to whichever step is still pending.
+        var progress = await OnboardingProgress.GetAsync(pmId, CancellationToken.None);
+        _connected = progress.IsComplete;
+
+        if (!_connected)
+        {
+            var path = new Uri(Nav.Uri).AbsolutePath.TrimEnd('/');
+            if (path.Length == 0) path = "/";
+
+            // Already heading somewhere under /onboarding/* — the OnboardingShell
+            // layout will render the page. We additionally enforce ordering so
+            // a PM can't deep-link to step 3 without finishing step 2: if their
+            // current URL is FURTHER than their first incomplete step, rewrite
+            // back to that step.
+            var nextRoute = RouteFor(progress.NextStep);
+            var isOnboardingPath = OnboardingPaths.Any(p =>
+                string.Equals(path, p, StringComparison.OrdinalIgnoreCase));
+
+            if (!isOnboardingPath)
+            {
+                Nav.NavigateTo(nextRoute, replace: true);
+                return;
+            }
+
+            // They're on /onboarding/* but it's not the step they should be on.
+            // /onboarding/syncing is exempt — it's a transient page that runs
+            // between Connect and CloseSettings and may legitimately be loaded
+            // before its predecessor step is stamped done.
+            if (!string.Equals(path, "/onboarding/syncing", StringComparison.OrdinalIgnoreCase)
+             && !string.Equals(path, nextRoute,             StringComparison.OrdinalIgnoreCase))
+            {
+                Nav.NavigateTo(nextRoute, replace: true);
+                return;
+            }
+        }
+
+        _initialized = true;
+        StateHasChanged();
+    }
+
+    private static string RouteFor(OnboardingStep? step) => step switch
+    {
+        OnboardingStep.Connect           => "/onboarding/connect",
+        OnboardingStep.CloseSettings     => "/onboarding/close-settings",
+        OnboardingStep.NoticePreferences => "/onboarding/notice-preferences",
+        OnboardingStep.Preflight         => "/onboarding/preflight",
+        _                                => "/"     // shouldn't happen — defensive
+    };
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+        _evaluateLock.Dispose();
+    }
+
+    private static string Initials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "·";
+        var local = name.Split('@')[0];
+        var parts = local.Split(new[] { '.', '_', '-', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0) return char.ToUpperInvariant(local[0]).ToString();
+        if (parts.Length == 1) return char.ToUpperInvariant(parts[0][0]).ToString();
+        return string.Concat(char.ToUpperInvariant(parts[0][0]), char.ToUpperInvariant(parts[1][0]));
+    }
+}

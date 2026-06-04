@@ -1,0 +1,313 @@
+@page "/invoices"
+@using DueMap.Tenancy
+@using DueMap.Tenancy.Domain
+@using DueMap.Web.Services
+@inject PmContext Pm
+@inject IRentInvoiceRepository InvoiceRepo
+@inject ICustomerRepository Customers
+
+<PageTitle>Invoices — DueMap</PageTitle>
+
+<div class="max-w-7xl mx-auto px-8 py-8 space-y-5">
+
+    <div>
+        <h2 class="text-2xl font-semibold tracking-tight">Invoices</h2>
+        <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-2xl">
+            Synced from your accounting provider on the daily sweep. Open rows drive the next reminder; overdue rows are candidates for late-fee assessment per your <a href="notice-preferences" class="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300">notice preferences</a>.
+        </p>
+    </div>
+
+    @if (_loading)
+    {
+        <p class="text-zinc-500">Loading…</p>
+    }
+    else
+    {
+        @* Search + filter strip. Search runs on every keystroke; filter chips
+           swap categories. Both inputs participate in the same derivation
+           pipeline so counts update live as the user types. *@
+        <div class="flex flex-wrap items-center gap-3">
+            <div class="relative flex-1 min-w-[280px] max-w-md">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <input type="search" placeholder="Search customer name or invoice #"
+                       @bind="_search" @bind:event="oninput"
+                       class="w-full pl-9 pr-3 py-2 rounded-lg bg-white dark:bg-zinc-900 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150" />
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap">
+                @foreach (var f in _filters)
+                {
+                    var active = _activeFilter == f.Key;
+                    <button type="button" @onclick="@(() => SelectFilter(f.Key))"
+                            class="@(active
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                                : "bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800")
+                                inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors duration-150">
+                        @f.Label
+                        <span class="text-[11px] tabular-nums opacity-80">@CountFor(f.Key)</span>
+                    </button>
+                }
+            </div>
+        </div>
+
+        @if (_displayed.Count == 0)
+        {
+            <div class="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-white/40 dark:bg-zinc-900/40 p-12 text-center">
+                <p class="text-sm font-medium mb-1">
+                    @if (!string.IsNullOrEmpty(_search)) { @($"No invoices match \"{_search}\".") }
+                    else { @("No invoices match this filter.") }
+                </p>
+                <p class="text-sm text-zinc-500">Clear the filter or wait for the next sync to pull fresh data.</p>
+            </div>
+        }
+        else
+        {
+            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-zinc-50/60 dark:bg-zinc-900/60">
+                            <tr class="text-left">
+                                @SortTh("Invoice #",  SortColumn.InvoiceNumber, "px-6 py-3", false)
+                                @SortTh("Customer",   SortColumn.Customer,      "px-3 py-3", false)
+                                @SortTh("Due",        SortColumn.DueDate,       "px-3 py-3", false)
+                                @SortTh("Amount",     SortColumn.Amount,        "px-3 py-3", true)
+                                @SortTh("Balance",    SortColumn.Balance,       "px-3 py-3", true)
+                                @SortTh("Status",     SortColumn.Status,        "px-3 py-3", false)
+                                @SortTh("Lease",      SortColumn.Lease,         "px-6 py-3", false)
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                            @foreach (var inv in _displayed)
+                            {
+                                <tr class="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 transition-colors duration-100">
+                                    <td class="px-6 py-3 font-mono text-xs">@(inv.ExternalDocNumber ?? $"#{inv.Id}")</td>
+                                    <td class="px-3 py-3">
+                                        <div class="text-sm font-medium">@CustomerName(inv.CustomerId)</div>
+                                    </td>
+                                    <td class="px-3 py-3 text-xs text-zinc-500 tabular-nums">@inv.DueDate.ToString("yyyy-MM-dd")</td>
+                                    <td class="px-3 py-3 text-right tabular-nums">@inv.TotalAmount.ToString("C")</td>
+                                    <td class="px-3 py-3 text-right tabular-nums font-medium">@inv.Balance.ToString("C")</td>
+                                    <td class="px-3 py-3">
+                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium @StatusPill(inv)">
+                                            <span class="w-1.5 h-1.5 rounded-full @StatusDot(inv)"></span>@StatusLabel(inv)
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-3 text-xs text-zinc-500">
+                                        @if (inv.LeaseId is int leaseId)
+                                        {
+                                            <a href="@($"/leases/{leaseId}")" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 tabular-nums">L-@leaseId</a>
+                                        }
+                                        else
+                                        {
+                                            <a href="link-customers" class="text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300">unlinked</a>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@* Inline render fragment for sortable column headers. Cleaner than a nested
+   component (Razor doesn't support those) and keeps the table head readable. *@
+@code {
+    private enum SortColumn { InvoiceNumber, Customer, DueDate, Amount, Balance, Status, Lease }
+    private enum SortDirection { Asc, Desc }
+
+    private RenderFragment SortTh(string label, SortColumn col, string padding, bool alignRight) => builder =>
+    {
+        var active = _sortColumn == col;
+        var alignClass = alignRight ? "text-right" : "text-left";
+        var span = alignRight ? "inline-flex items-center gap-1 justify-end w-full" : "inline-flex items-center gap-1";
+
+        builder.OpenElement(0, "th");
+        builder.AddAttribute(1, "class",
+            $"{padding} text-[11px] font-medium uppercase tracking-wider text-zinc-500 cursor-pointer select-none hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors {alignClass}");
+        builder.AddAttribute(2, "onclick",
+            Microsoft.AspNetCore.Components.EventCallback.Factory.Create(this, () => ToggleSort(col)));
+
+        builder.OpenElement(3, "span");
+        builder.AddAttribute(4, "class", span);
+        builder.AddContent(5, label);
+
+        if (active)
+        {
+            builder.OpenElement(6, "svg");
+            builder.AddAttribute(7, "xmlns", "http://www.w3.org/2000/svg");
+            builder.AddAttribute(8, "width", "10");
+            builder.AddAttribute(9, "height", "10");
+            builder.AddAttribute(10, "viewBox", "0 0 24 24");
+            builder.AddAttribute(11, "fill", "none");
+            builder.AddAttribute(12, "stroke", "currentColor");
+            builder.AddAttribute(13, "stroke-width", "3");
+            builder.AddAttribute(14, "stroke-linecap", "round");
+            builder.AddAttribute(15, "stroke-linejoin", "round");
+            builder.AddAttribute(16, "class", "text-indigo-500");
+            builder.OpenElement(17, "path");
+            builder.AddAttribute(18, "d", _sortDirection == SortDirection.Asc ? "m18 15-6-6-6 6" : "m6 9 6 6 6-6");
+            builder.CloseElement();
+            builder.CloseElement();
+        }
+
+        builder.CloseElement(); // span
+        builder.CloseElement(); // th
+    };
+}
+
+@code {
+    private int? _pmId;
+    private bool _loading = true;
+    private IReadOnlyList<RentInvoice> _all = Array.Empty<RentInvoice>();
+    private Dictionary<int, string> _customerNames = new();
+
+    private enum FilterKey { All, Open, Overdue, Paid, Unlinked }
+    private FilterKey _activeFilter = FilterKey.All;
+    private string _search = string.Empty;
+    private SortColumn _sortColumn = SortColumn.DueDate;
+    private SortDirection _sortDirection = SortDirection.Desc;
+
+    private sealed record Filter(FilterKey Key, string Label);
+    private readonly Filter[] _filters =
+    {
+        new(FilterKey.All,      "All"),
+        new(FilterKey.Open,     "Open"),
+        new(FilterKey.Overdue,  "Overdue"),
+        new(FilterKey.Paid,     "Paid"),
+        new(FilterKey.Unlinked, "Unlinked")
+    };
+
+    // Derivation pipeline: filter → search → sort. Recomputed every render
+    // (cheap for hundreds of rows; revisit if PMs cross 10k invoices).
+    private List<RentInvoice> _displayed => SortRows(SearchRows(FilterRows(_all)));
+
+    protected override async Task OnInitializedAsync()
+    {
+        _pmId = await Pm.GetPmIdAsync();
+        var ct = CancellationToken.None;
+
+        _all = await InvoiceRepo.ListByPropertyManagerAsync(_pmId.Value, ct);
+        var customers = await Customers.ListByPropertyManagerAsync(_pmId.Value, ct);
+        _customerNames = customers.ToDictionary(c => c.Id, c => c.DisplayName);
+
+        _loading = false;
+    }
+
+    private void SelectFilter(FilterKey key)
+    {
+        _activeFilter = key;
+        // No explicit StateHasChanged needed — @onclick re-renders the component.
+    }
+
+    private void ToggleSort(SortColumn col)
+    {
+        if (_sortColumn == col)
+        {
+            _sortDirection = _sortDirection == SortDirection.Asc ? SortDirection.Desc : SortDirection.Asc;
+        }
+        else
+        {
+            _sortColumn = col;
+            _sortDirection = SortDirection.Asc;
+        }
+    }
+
+    private IEnumerable<RentInvoice> FilterRows(IEnumerable<RentInvoice> rows)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        return _activeFilter switch
+        {
+            FilterKey.Open     => rows.Where(i => i.Status == RentInvoiceStatus.Open),
+            FilterKey.Overdue  => rows.Where(i => i.Status == RentInvoiceStatus.Open && i.DueDate < today),
+            FilterKey.Paid     => rows.Where(i => i.Status == RentInvoiceStatus.Paid),
+            FilterKey.Unlinked => rows.Where(i => i.LeaseId is null),
+            _                  => rows
+        };
+    }
+
+    private IEnumerable<RentInvoice> SearchRows(IEnumerable<RentInvoice> rows)
+    {
+        if (string.IsNullOrWhiteSpace(_search)) return rows;
+        var needle = _search.Trim();
+        return rows.Where(i =>
+            CustomerName(i.CustomerId).Contains(needle, StringComparison.OrdinalIgnoreCase)
+         || (i.ExternalDocNumber ?? i.Id.ToString()).Contains(needle, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private List<RentInvoice> SortRows(IEnumerable<RentInvoice> rows)
+    {
+        Func<RentInvoice, IComparable> key = _sortColumn switch
+        {
+            SortColumn.InvoiceNumber => i => i.ExternalDocNumber ?? i.Id.ToString("D10"),
+            SortColumn.Customer      => i => CustomerName(i.CustomerId),
+            SortColumn.Amount        => i => i.TotalAmount,
+            SortColumn.Balance       => i => i.Balance,
+            SortColumn.Status        => i => StatusRank(i),
+            SortColumn.Lease         => i => i.LeaseId ?? int.MaxValue,
+            _                        => i => i.DueDate.DayNumber
+        };
+        return _sortDirection == SortDirection.Asc
+            ? rows.OrderBy(key).ToList()
+            : rows.OrderByDescending(key).ToList();
+    }
+
+    // Stable sort ordering for the Status pill: overdue first (loudest signal),
+    // then open, then paid, then voided.
+    private int StatusRank(RentInvoice i)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (i.Status == RentInvoiceStatus.Open && i.DueDate < today) return 0;
+        if (i.Status == RentInvoiceStatus.Open)                      return 1;
+        if (i.Status == RentInvoiceStatus.Paid)                      return 2;
+        return 3;
+    }
+
+    private int CountFor(FilterKey key)
+    {
+        // Counts respect the search box but ignore the filter — so the chips
+        // show "Paid 11" no matter which filter is active. That way the user
+        // can see at a glance what's behind each chip without clicking.
+        var pool = string.IsNullOrWhiteSpace(_search) ? _all : SearchRows(_all).ToList();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        return key switch
+        {
+            FilterKey.Open     => pool.Count(i => i.Status == RentInvoiceStatus.Open),
+            FilterKey.Overdue  => pool.Count(i => i.Status == RentInvoiceStatus.Open && i.DueDate < today),
+            FilterKey.Paid     => pool.Count(i => i.Status == RentInvoiceStatus.Paid),
+            FilterKey.Unlinked => pool.Count(i => i.LeaseId is null),
+            _                  => pool.Count()
+        };
+    }
+
+    private string CustomerName(int id) =>
+        _customerNames.TryGetValue(id, out var n) ? n : $"Customer #{id}";
+
+    private string StatusPill(RentInvoice i)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (i.Status == RentInvoiceStatus.Paid)   return "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400";
+        if (i.Status == RentInvoiceStatus.Voided) return "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
+        if (i.DueDate < today)                    return "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400";
+        return "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400";
+    }
+
+    private string StatusDot(RentInvoice i)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (i.Status == RentInvoiceStatus.Paid)   return "bg-emerald-500";
+        if (i.Status == RentInvoiceStatus.Voided) return "bg-zinc-400";
+        if (i.DueDate < today)                    return "bg-rose-500";
+        return "bg-amber-500";
+    }
+
+    private string StatusLabel(RentInvoice i)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (i.Status == RentInvoiceStatus.Paid)   return "Paid";
+        if (i.Status == RentInvoiceStatus.Voided) return "Voided";
+        if (i.DueDate < today)                    return "Overdue";
+        return "Open";
+    }
+}

@@ -1,0 +1,342 @@
+@page "/"
+@using DueMap.Integrations.Accounting
+@using DueMap.Tenancy
+@using DueMap.Tenancy.Domain
+@using DueMap.Web.Services
+@using Microsoft.JSInterop
+@inject PmContext Pm
+@inject IAccountingConnectionService ConnectionSvc
+@inject ICustomerRepository Customers
+@inject IRentInvoiceRepository InvoiceRepo
+@inject ILeaseReader Leases
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>DueMap — Dashboard</PageTitle>
+
+<div class="max-w-7xl mx-auto px-8 py-8 space-y-6">
+
+    @if (_loading)
+    {
+        <p class="text-zinc-500">Loading…</p>
+    }
+    else if (_conn is null)
+    {
+        @* The gate normally redirects, but render a fallback in case the redirect
+           is suppressed (e.g., user has the page open in a second tab). *@
+        <p class="text-zinc-500">No accounting connection on file.
+            <a href="connections?onboarding=1" class="text-indigo-600 dark:text-indigo-400 font-medium">Connect QuickBooks or Xero →</a>
+        </p>
+    }
+    else
+    {
+        <!-- PAGE HEADER -->
+        <div class="flex items-end justify-between gap-4 flex-wrap">
+            <div class="min-w-0">
+                <h2 class="text-2xl font-semibold tracking-tight">Portfolio overview</h2>
+                <div class="mt-2 flex items-center gap-2 flex-wrap">
+
+                    @* Brand-coloured connection chip — QuickBooks green or Xero blue.
+                       Carries the realm ID; once we fetch the QB CompanyName from
+                       /companyinfo the workspace name takes its place. *@
+                    @if (_conn.Provider == AccountingProvider.QuickBooks)
+                    {
+                        <a href="connections" data-tour="connection-pill"
+                           class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-medium text-white shadow-sm transition-opacity hover:opacity-90"
+                           style="background:#2CA01C">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10"/>
+                            </svg>
+                            <span>Connected to QuickBooks</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <a href="connections" data-tour="connection-pill"
+                           class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-medium text-white shadow-sm transition-opacity hover:opacity-90"
+                           style="background:#13B5EA">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10"/>
+                            </svg>
+                            <span>Connected to Xero</span>
+                        </a>
+                    }
+
+                    <span class="text-sm text-zinc-500 dark:text-zinc-400">
+                        @* TODO: replace with conn.CompanyName once fetched from /companyinfo (task #61). *@
+                        <span class="font-medium text-zinc-700 dark:text-zinc-300">@WorkspaceLabel(_conn)</span>
+                        <span class="mx-1.5 text-zinc-300 dark:text-zinc-600">·</span>
+                        last sync @(_conn.LastSyncAt?.ToString("u") ?? "pending")
+                    </span>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" @onclick="StartTourAsync"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 shadow-sm transition-colors duration-150">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+                    Take a tour
+                </button>
+                <a href="connections" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 shadow-sm transition-colors duration-150">
+                    Manage connection
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                </a>
+            </div>
+        </div>
+
+        <!-- KPI ROW — each tile drills into the matching detail page -->
+        <div data-tour="kpi-tiles" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+            <a href="link-customers" class="block group rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-sm hover:shadow-md hover:border-indigo-300/60 dark:hover:border-indigo-500/30 transition-all duration-200">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Customers</div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400 group-hover:text-indigo-500 transition-colors"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+                </div>
+                <div class="text-3xl font-semibold tracking-tight tabular-nums">@_customerCount</div>
+                <div class="mt-2 text-xs text-zinc-500">@CustomerCaption(_customerCount, _unlinkedCount)</div>
+            </a>
+
+            <a href="invoices" class="block group rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-sm hover:shadow-md hover:border-indigo-300/60 dark:hover:border-indigo-500/30 transition-all duration-200">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Open invoices</div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400 group-hover:text-indigo-500 transition-colors"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                </div>
+                <div class="text-3xl font-semibold tracking-tight tabular-nums">@_openCount</div>
+                <div class="mt-2 text-xs text-zinc-500">@_openSumLabel outstanding</div>
+            </a>
+
+            <a href="invoices" class="block group rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-sm hover:shadow-md hover:border-rose-300/60 dark:hover:border-rose-500/30 transition-all duration-200">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Overdue</div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400 group-hover:text-rose-500 transition-colors"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                </div>
+                <div class="text-3xl font-semibold tracking-tight tabular-nums @(_overdueCount > 0 ? "text-rose-700 dark:text-rose-400" : "")">@_overdueCount</div>
+                <div class="mt-2 text-xs text-zinc-500">@(_overdueCount == 0 ? "all caught up" : "candidates for late fee")</div>
+            </a>
+
+            <a href="leases" class="block group rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-sm hover:shadow-md hover:border-indigo-300/60 dark:hover:border-indigo-500/30 transition-all duration-200">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Active leases</div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400 group-hover:text-indigo-500 transition-colors"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/></svg>
+                </div>
+                <div class="text-3xl font-semibold tracking-tight tabular-nums">@_leaseCount</div>
+                <div class="mt-2 text-xs text-zinc-500">in your portfolio</div>
+            </a>
+        </div>
+
+        @* RECENT INVOICES — top 6 most recent, with a "View all" link.
+           Doubles as a sanity check that data is actually flowing. *@
+        <section data-tour="recent-invoices" class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+            <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between gap-3">
+                <div>
+                    <div class="text-sm font-semibold">Recent invoices</div>
+                    <div class="text-xs text-zinc-500 mt-0.5">Latest @Math.Min(6, _recentInvoices.Count) of @_allInvoices.Count synced</div>
+                </div>
+                <a href="invoices" class="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">View all →</a>
+            </header>
+
+            @if (_recentInvoices.Count == 0)
+            {
+                <div class="px-6 py-10 text-center">
+                    <p class="text-sm text-zinc-500">No invoices yet. They'll appear here as soon as the next sync runs.</p>
+                </div>
+            }
+            else
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-zinc-50/40 dark:bg-zinc-900/40">
+                            <tr class="text-left">
+                                <th class="px-6 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Invoice #</th>
+                                <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Customer</th>
+                                <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Due</th>
+                                <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 text-right">Balance</th>
+                                <th class="px-6 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                            @foreach (var inv in _recentInvoices)
+                            {
+                                <tr class="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 transition-colors duration-100">
+                                    <td class="px-6 py-3 font-mono text-xs">@(inv.ExternalDocNumber ?? $"#{inv.Id}")</td>
+                                    <td class="px-3 py-3 text-sm">@CustomerName(inv.CustomerId)</td>
+                                    <td class="px-3 py-3 text-xs text-zinc-500 tabular-nums">@inv.DueDate.ToString("yyyy-MM-dd")</td>
+                                    <td class="px-3 py-3 text-right tabular-nums font-medium">@inv.Balance.ToString("C")</td>
+                                    <td class="px-6 py-3">
+                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium @StatusPill(inv)">
+                                            <span class="w-1.5 h-1.5 rounded-full @StatusDot(inv)"></span>@StatusLabel(inv)
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <!-- QUICK LINKS — secondary navigation -->
+        <div class="grid lg:grid-cols-2 gap-4">
+            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-6">
+                <h3 class="text-sm font-semibold mb-3">Setup</h3>
+                <ul class="space-y-1">
+                    <li>
+                        <a href="notice-preferences" class="group flex items-center justify-between gap-2 -mx-2 px-2 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">
+                            <span class="flex items-center gap-2.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-500"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
+                                <span class="text-sm">Notice preferences</span>
+                            </span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="m9 18 6-6-6-6"/></svg>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="templates" class="group flex items-center justify-between gap-2 -mx-2 px-2 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">
+                            <span class="flex items-center gap-2.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-500"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                                <span class="text-sm">Templates</span>
+                            </span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="m9 18 6-6-6-6"/></svg>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-6">
+                <h3 class="text-sm font-semibold mb-3">Portfolio</h3>
+                <ul class="space-y-1">
+                    <li>
+                        <a href="link-customers" class="group flex items-center justify-between gap-2 -mx-2 px-2 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">
+                            <span class="flex items-center gap-2.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-500"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+                                <span class="text-sm">Link customers to leases</span>
+                            </span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="m9 18 6-6-6-6"/></svg>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="processing-status" class="group flex items-center justify-between gap-2 -mx-2 px-2 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">
+                            <span class="flex items-center gap-2.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-500"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.5.5 0 0 1-.96 0L9.24 3.18a.5.5 0 0 0-.96 0l-2.35 8.36A2 2 0 0 1 4 13H2"/></svg>
+                                <span class="text-sm">Processing status — daily runs</span>
+                            </span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="m9 18 6-6-6-6"/></svg>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private PmAccountingConnection? _conn;
+    private int _customerCount, _unlinkedCount, _openCount, _overdueCount, _leaseCount;
+    private string _openSumLabel = "$0.00";
+    private IReadOnlyList<RentInvoice> _allInvoices = Array.Empty<RentInvoice>();
+    private List<RentInvoice> _recentInvoices = new();
+    private Dictionary<int, string> _customerNames = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Tour only auto-fires when the URL says we just finished onboarding
+        // (OnboardingSyncing redirects with ?tour=onboarding). Plain dashboard
+        // visits — refresh, sidebar nav, etc. — never trigger the tour. Use
+        // "Take a tour" to replay manually.
+        if (!firstRender || _loading || _conn is null) return;
+
+        var uri = new Uri(Nav.Uri);
+        if (uri.Query.Contains("tour=onboarding"))
+        {
+            // duemap-tour.js still gates on localStorage so a paranoid reload
+            // (e.g. user bookmarked the URL with the param) can't re-fire.
+            await JS.InvokeVoidAsync("dueMapTour.start");
+
+            // Strip the param so a refresh after the tour doesn't try to fire
+            // it again, and so the URL isn't a confusing artifact for the user.
+            var clean = Nav.GetUriWithQueryParameter("tour", (string?)null);
+            Nav.NavigateTo(clean, forceLoad: false, replace: true);
+        }
+    }
+
+    private async Task StartTourAsync()
+    {
+        // "Take a tour" button — force replay regardless of localStorage flag.
+        await JS.InvokeVoidAsync("dueMapTour.start", new { force = true });
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var pmId = await Pm.GetPmIdAsync();
+        var ct = CancellationToken.None;
+
+        _conn = await ConnectionSvc.GetActiveAsync(pmId, ct);
+        if (_conn is null)
+        {
+            // Gate the dashboard — see Connections page for onboarding context.
+            Nav.NavigateTo("/connections?onboarding=1", replace: true);
+            return;
+        }
+
+        var customers = await Customers.ListByPropertyManagerAsync(pmId, ct);
+        _customerNames = customers.ToDictionary(c => c.Id, c => c.DisplayName);
+        _customerCount = customers.Count;
+
+        _allInvoices = await InvoiceRepo.ListByPropertyManagerAsync(pmId, ct);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        _openCount      = _allInvoices.Count(i => i.Status == RentInvoiceStatus.Open);
+        _overdueCount   = _allInvoices.Count(i => i.Status == RentInvoiceStatus.Open && i.DueDate < today);
+        _unlinkedCount  = _allInvoices.Count(i => i.LeaseId is null);
+        _openSumLabel   = _allInvoices.Where(i => i.Status == RentInvoiceStatus.Open).Sum(i => i.Balance).ToString("C");
+        _recentInvoices = _allInvoices.Take(6).ToList();
+
+        var leases = await Leases.ListActiveAsync(pmId, today, ct);
+        _leaseCount = leases.Count;
+
+        _loading = false;
+    }
+
+    private string CustomerName(int id) =>
+        _customerNames.TryGetValue(id, out var n) ? n : $"Customer #{id}";
+
+    // Until we fetch the QB CompanyName during sync, the realm id is the
+    // best identifier we have. Truncate to a readable chunk.
+    private static string WorkspaceLabel(PmAccountingConnection conn)
+    {
+        var raw = conn.RealmId ?? "";
+        return raw.Length > 24 ? $"realm {raw[..8]}…{raw[^4..]}" : $"realm {raw}";
+    }
+
+    private static string CustomerCaption(int customers, int unlinkedInvoices)
+    {
+        if (customers == 0) return "no customers synced yet";
+        if (unlinkedInvoices == 0) return "all linked to leases";
+        return $"{unlinkedInvoices} invoice{(unlinkedInvoices == 1 ? "" : "s")} awaiting link";
+    }
+
+    private static string StatusPill(RentInvoice i)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (i.Status == RentInvoiceStatus.Paid)   return "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400";
+        if (i.Status == RentInvoiceStatus.Voided) return "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
+        if (i.DueDate < today)                    return "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400";
+        return "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400";
+    }
+
+    private static string StatusDot(RentInvoice i)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (i.Status == RentInvoiceStatus.Paid)   return "bg-emerald-500";
+        if (i.Status == RentInvoiceStatus.Voided) return "bg-zinc-400";
+        if (i.DueDate < today)                    return "bg-rose-500";
+        return "bg-amber-500";
+    }
+
+    private static string StatusLabel(RentInvoice i)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (i.Status == RentInvoiceStatus.Paid)   return "Paid";
+        if (i.Status == RentInvoiceStatus.Voided) return "Voided";
+        if (i.DueDate < today)                    return "Overdue";
+        return "Open";
+    }
+}

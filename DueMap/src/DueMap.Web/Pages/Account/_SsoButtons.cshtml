@@ -1,0 +1,46 @@
+@*
+    Brand-compliant SSO buttons. One source of truth, used by Login + Register.
+
+    Model: a string — "signin" or "signup". Drives only OUR label copy and the
+    page-handler the form posts to. The Intuit button graphic itself never
+    changes (Intuit's brand guide forbids modifying it), so it always reads
+    "Sign in with Intuit" even on the Register page — that's the documented
+    Intuit pattern (the same button drives both new-account and returning-user
+    flows; Intuit's consent screen handles the branch).
+*@
+@model string
+
+@{
+    var mode = string.IsNullOrEmpty(Model) ? "signin" : Model;
+    var handler = mode == "signup" ? "ExternalSignUp" : "ExternalSignIn";
+    var xeroLabel = mode == "signup" ? "Sign up with Xero" : "Sign in with Xero";
+}
+
+<div class="space-y-2.5">
+    <form method="post" asp-page-handler="@handler" class="block">
+        <input type="hidden" name="provider" value="intuit" />
+        <button type="submit" class="btn-intuit-signin" aria-label="Sign in with Intuit">
+            <img class="default"
+                 src="~/img/intuit/Sign_in_with_Intuit_buttons/Sign_in_with_Intuit_SVG/Sign_in_blue_btn_med_default.svg"
+                 alt="Sign in with Intuit" />
+            <img class="hover"
+                 src="~/img/intuit/Sign_in_with_Intuit_buttons/Sign_in_with_Intuit_SVG/Sign_in_blue_btn_med_hover.svg"
+                 alt="" aria-hidden="true" />
+        </button>
+    </form>
+
+    <form method="post" asp-page-handler="@handler" class="block">
+        <input type="hidden" name="provider" value="xero" />
+        <button type="submit" class="btn-xero-signin" aria-label="@xeroLabel">
+            @* Xero's official white logomark (unmodified) — required for brand compliance. *@
+            <img class="xero-mark"
+                 src="~/img/xero/Xero white logo 1x1.png"
+                 alt="" aria-hidden="true" />
+            <span>@xeroLabel</span>
+        </button>
+    </form>
+</div>
+
+<div class="sso-divider my-5">
+    <span>or @(mode == "signup" ? "use your email" : "sign in with email")</span>
+</div>

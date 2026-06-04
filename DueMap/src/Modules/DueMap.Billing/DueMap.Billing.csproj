@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>DueMap.Billing</RootNamespace>
+    <Description>Billing module (orchestrator): assessment planner, late-fee scheduler.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DueMap.Common\DueMap.Common.csproj" />
+    <ProjectReference Include="..\DueMap.Rules\DueMap.Rules.csproj" />
+    <ProjectReference Include="..\DueMap.Tenancy\DueMap.Tenancy.csproj" />
+    <ProjectReference Include="..\DueMap.Notices\DueMap.Notices.csproj" />
+    <ProjectReference Include="..\DueMap.Integrations\DueMap.Integrations.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+  </ItemGroup>
+
+</Project>

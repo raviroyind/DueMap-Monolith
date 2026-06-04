@@ -1,0 +1,276 @@
+<!--
+  DueMap — Screen 7a · Bulk apply modal (on /leases)
+  ---------------------------------------------------------------
+  Lucide icons used:
+    sparkles, sun, moon, x, check, bell-ring, calendar-clock,
+    file-warning, info, settings-2
+  ---------------------------------------------------------------
+  Notes on the modal design:
+    - The bulk-apply modal mirrors the three cards from
+      /notice-preferences (pre-due / due-date / post-due). PMs
+      already know that shape; reusing it here avoids re-teaching.
+    - Every field has a "Set this" toggle (left). When off, the
+      field is dimmed and ignored on save. When on, the field is
+      live and writes to every selected lease.
+    - The summary line at the top counts what *will be* applied
+      vs. left alone. Reads back the intent in plain English.
+    - The footer Apply button shows the live count ("Apply to 2
+      leases") and lights up indigo only when at least one field
+      is set. Refuses an empty submit visually.
+    - Modal size: max-w-2xl. Smaller than the template editor
+      (4xl), bigger than the standard modal — three sections of
+      controls fits comfortably without scrolling for most cases.
+-->
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apply settings · DueMap</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { fontFamily: { sans: ['-apple-system','BlinkMacSystemFont','"SF Pro Display"','"SF Pro Text"','"Segoe UI"','system-ui','sans-serif'] } } }
+    };
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+  <style>
+    /* Apple-style toggle */
+    .toggle-switch { position: relative; display: inline-block; width: 38px; height: 22px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute; cursor: pointer; inset: 0;
+      background-color: rgb(228 228 231); border-radius: 9999px;
+      transition: background-color .2s ease-out;
+    }
+    .toggle-track::before {
+      content: ''; position: absolute; height: 18px; width: 18px; left: 2px; top: 2px;
+      background-color: white; border-radius: 9999px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08);
+      transition: transform .2s ease-out;
+    }
+    .toggle-switch input:checked + .toggle-track { background-color: rgb(79 70 229); }
+    .toggle-switch input:checked + .toggle-track::before { transform: translateX(16px); }
+    .dark .toggle-track { background-color: rgb(63 63 70); }
+    .dark .toggle-switch input:checked + .toggle-track { background-color: rgb(99 102 241); }
+    .dark .toggle-track::before { background-color: rgb(244 244 245); }
+
+    .checkbox {
+      appearance: none; -webkit-appearance: none;
+      width: 16px; height: 16px; border-radius: 4px;
+      border: 1.5px solid rgb(212 212 216);
+      background-color: white;
+      cursor: pointer; transition: all .15s ease-out; flex-shrink: 0;
+    }
+    .checkbox:checked {
+      background-color: rgb(79 70 229); border-color: rgb(79 70 229);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+      background-size: 11px; background-position: center; background-repeat: no-repeat;
+    }
+    .dark .checkbox { background-color: rgb(24 24 27); border-color: rgb(63 63 70); }
+    .dark .checkbox:checked { background-color: rgb(99 102 241); border-color: rgb(99 102 241); }
+
+    /* "Set this" row treatment — when the toggle is off, dim the row */
+    .set-row[data-on="false"] .set-control { opacity: 0.4; pointer-events: none; }
+  </style>
+</head>
+<body class="h-full font-sans antialiased bg-stone-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50 overflow-hidden">
+
+<!-- Background page (faded so the user remembers where they are) -->
+<div class="flex h-full min-h-screen pointer-events-none select-none">
+  <aside class="w-64 shrink-0 border-r border-zinc-200/80 bg-white dark:bg-zinc-900 dark:border-zinc-800"></aside>
+  <div class="flex-1 bg-stone-50 dark:bg-zinc-950 opacity-25 px-12 py-12 space-y-4">
+    <div class="h-6 w-32 bg-zinc-200 dark:bg-zinc-800 rounded"></div>
+    <div class="h-3 w-2/3 bg-zinc-200 dark:bg-zinc-800 rounded"></div>
+    <div class="h-64 bg-zinc-200 dark:bg-zinc-800 rounded-xl mt-8"></div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="fixed inset-0 z-50 bg-zinc-900/40 backdrop-blur-sm flex items-center justify-center p-6">
+  <div class="w-full max-w-2xl max-h-[90vh] rounded-2xl bg-white dark:bg-zinc-900 shadow-xl border border-zinc-200/60 dark:border-zinc-800 flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-start justify-between gap-4">
+      <div class="flex items-start gap-3 min-w-0">
+        <div class="w-9 h-9 rounded-lg bg-indigo-100 dark:bg-indigo-500/15 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+          <!-- Lucide: settings-2 -->
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+        </div>
+        <div class="min-w-0">
+          <h2 class="text-lg font-semibold tracking-tight">Apply settings to <span class="tabular-nums">2 leases</span></h2>
+          <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+            Toggle <strong class="font-medium text-zinc-700 dark:text-zinc-300">"Set this"</strong> on any field to overwrite that value across the selected leases. Untouched fields keep each lease's existing setting.
+          </p>
+        </div>
+      </div>
+      <button class="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors -mt-1 -mr-1 p-1 shrink-0" aria-label="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </header>
+
+    <!-- Body (scrollable) -->
+    <div class="flex-1 overflow-y-auto">
+
+      <!-- PRE-DUE -->
+      <section class="px-6 py-5 border-b border-zinc-200/80 dark:border-zinc-800">
+        <div class="flex items-center gap-2.5 mb-4">
+          <div class="w-7 h-7 rounded-md bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 shrink-0">
+            <!-- Lucide: bell-ring -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M4 2C2.8 3.7 2 5.7 2 8"/><path d="M22 8c0-2.3-.8-4.3-2-6"/></svg>
+          </div>
+          <h3 class="text-sm font-semibold">Pre-due reminder</h3>
+        </div>
+
+        <div class="space-y-2.5">
+          <!-- Set enabled to -->
+          <div class="set-row flex items-center gap-3 py-1" data-on="true">
+            <label class="toggle-switch shrink-0">
+              <input type="checkbox" checked aria-label="Set this" />
+              <span class="toggle-track"></span>
+            </label>
+            <div class="flex-1 min-w-0 flex items-center justify-between gap-3 set-control">
+              <div class="text-sm">Set <span class="font-medium">enabled</span> to</div>
+              <div class="inline-flex p-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 gap-0.5">
+                <button type="button" class="px-2.5 py-0.5 rounded text-xs font-medium bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-50 shadow-sm">On</button>
+                <button type="button" class="px-2.5 py-0.5 rounded text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Off</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Set days-before to -->
+          <div class="set-row flex items-center gap-3 py-1" data-on="true">
+            <label class="toggle-switch shrink-0">
+              <input type="checkbox" checked aria-label="Set this" />
+              <span class="toggle-track"></span>
+            </label>
+            <div class="flex-1 min-w-0 flex items-center justify-between gap-3 set-control">
+              <div class="text-sm">Set <span class="font-medium">days before due</span> to</div>
+              <div class="flex items-center gap-2">
+                <input type="number" min="1" max="60" value="5"
+                       class="w-20 px-3 py-1.5 rounded-lg text-sm font-medium tabular-nums text-right bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150" />
+                <span class="text-xs text-zinc-500">days</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DUE-DATE -->
+      <section class="px-6 py-5 border-b border-zinc-200/80 dark:border-zinc-800">
+        <div class="flex items-center gap-2.5 mb-4">
+          <div class="w-7 h-7 rounded-md bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/></svg>
+          </div>
+          <h3 class="text-sm font-semibold">Due-date reminder</h3>
+        </div>
+
+        <div class="set-row flex items-center gap-3 py-1" data-on="false">
+          <label class="toggle-switch shrink-0">
+            <input type="checkbox" aria-label="Set this" />
+            <span class="toggle-track"></span>
+          </label>
+          <div class="flex-1 min-w-0 flex items-center justify-between gap-3 set-control">
+            <div class="text-sm">Set <span class="font-medium">enabled</span> to</div>
+            <div class="inline-flex p-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 gap-0.5">
+              <button type="button" class="px-2.5 py-0.5 rounded text-xs font-medium bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-50 shadow-sm">On</button>
+              <button type="button" class="px-2.5 py-0.5 rounded text-xs font-medium text-zinc-500">Off</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- POST-DUE -->
+      <section class="px-6 py-5">
+        <div class="flex items-center gap-2.5 mb-4">
+          <div class="w-7 h-7 rounded-md bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v3"/><path d="M12 18h.01"/></svg>
+          </div>
+          <h3 class="text-sm font-semibold">Post-due handling</h3>
+        </div>
+
+        <div class="space-y-2.5">
+          <div class="set-row flex items-center gap-3 py-1" data-on="false">
+            <label class="toggle-switch shrink-0">
+              <input type="checkbox" aria-label="Set this" />
+              <span class="toggle-track"></span>
+            </label>
+            <div class="flex-1 min-w-0 flex items-center justify-between gap-3 set-control">
+              <div class="text-sm">Set <span class="font-medium">enabled</span> to</div>
+              <div class="inline-flex p-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 gap-0.5">
+                <button type="button" class="px-2.5 py-0.5 rounded text-xs font-medium bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-50 shadow-sm">On</button>
+                <button type="button" class="px-2.5 py-0.5 rounded text-xs font-medium text-zinc-500">Off</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="set-row flex items-center gap-3 py-1" data-on="true">
+            <label class="toggle-switch shrink-0">
+              <input type="checkbox" checked aria-label="Set this" />
+              <span class="toggle-track"></span>
+            </label>
+            <div class="flex-1 min-w-0 flex items-center justify-between gap-3 set-control">
+              <div class="text-sm">Set <span class="font-medium">mode</span> to</div>
+              <div class="inline-flex p-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 gap-0.5">
+                <button type="button" class="px-2.5 py-0.5 rounded text-xs font-medium bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-50 shadow-sm">Grace</button>
+                <button type="button" class="px-2.5 py-0.5 rounded text-xs font-medium text-zinc-500">Immediate</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="set-row flex items-center gap-3 py-1" data-on="true">
+            <label class="toggle-switch shrink-0">
+              <input type="checkbox" checked aria-label="Set this" />
+              <span class="toggle-track"></span>
+            </label>
+            <div class="flex-1 min-w-0 flex items-center justify-between gap-3 set-control">
+              <div class="text-sm">Set <span class="font-medium">grace days</span> to</div>
+              <div class="flex items-center gap-2">
+                <input type="number" min="0" max="60" value="5"
+                       class="w-20 px-3 py-1.5 rounded-lg text-sm font-medium tabular-nums text-right bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150" />
+                <span class="text-xs text-zinc-500">days</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Summary line -->
+      <div class="px-6 pb-5">
+        <div class="rounded-lg border border-zinc-200/60 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60 px-3.5 py-2.5 flex items-start gap-2.5">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400 mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          <div class="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+            Will write <strong class="text-zinc-900 dark:text-zinc-100 tabular-nums">4 changes</strong> to each of
+            <strong class="text-zinc-900 dark:text-zinc-100 tabular-nums">2 leases</strong>:
+            pre-due enabled = on, pre-due days = 5, post-due mode = grace, grace days = 5.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="px-6 py-3.5 border-t border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60 flex items-center justify-end gap-2">
+      <button class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors duration-150">
+        Cancel
+      </button>
+      <button class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-colors duration-150">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        Apply to <span class="tabular-nums">2 leases</span>
+      </button>
+    </footer>
+  </div>
+</div>
+
+<!-- Theme toggle -->
+<button onclick="document.documentElement.classList.toggle('dark')"
+        class="fixed top-4 right-4 z-[60] p-2 rounded-lg text-zinc-500 hover:bg-white/70 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 backdrop-blur-sm transition-colors duration-150"
+        aria-label="Toggle theme">
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden dark:block"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="block dark:hidden"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+</button>
+
+</body>
+</html>

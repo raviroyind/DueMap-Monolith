@@ -1,0 +1,50 @@
+## .NET / Visual Studio
+bin/
+obj/
+out/
+[Dd]ebug/
+[Rr]elease/
+[Bb]uild/
+*.user
+*.suo
+.vs/
+.vscode/
+*.pdb
+*.userprefs
+
+## Rider
+.idea/
+
+## Logs and temp files
+*.log
+logs/
+*.tmp
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Secrets
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+.env
+.env.*
+secrets.json
+
+## Local SQL Server
+*.mdf
+*.ldf
+
+## Node / Tailwind build
+node_modules/
+
+## ASP.NET Core Data Protection keyring (contains real encryption keys —
+## OAuth tokens decrypt against these; never commit).
+.dataprotection-keys/
+
+## Test coverage
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
