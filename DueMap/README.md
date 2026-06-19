@@ -1,5 +1,4 @@
 ﻿# DueMap aka Rentdrate
-# Paddle: pdl_live_apikey_01ks8m1qknn3zzq21vwt46nmmv_q8nGYwBrEsQye3tXrvjv6S_A1H
 
 The portfolio dashboard that maps every overdue rent â€” and handles the late fees, notices, and accounting posts so you don't have to.
 
