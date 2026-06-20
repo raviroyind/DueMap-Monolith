@@ -103,5 +103,24 @@ public sealed class IntegrationsModule : IModule
         // the connected accounting system. Doesn't persist anything itself —
         // pure read + map.
         services.AddScoped<IAccountingTimezoneSuggester, AccountingTimezoneSuggester>();
+
+        // ---- Ops alerting sinks (P0-4) ----
+        // The Common module registered NullAlertSink as the default; we
+        // OVERRIDE it here based on Ops:Alerts:Channel so the call chain
+        // is just one resolve regardless of which sink is active. Sinks
+        // are singletons — they hold one HttpClient or one IEmailSender
+        // reference and are stateless beyond that.
+        var alertChannel = configuration["Ops:Alerts:Channel"]?.Trim().ToLowerInvariant();
+        if (alertChannel == "email")
+        {
+            services.AddSingleton<DueMap.Common.Ops.IAlertSink, DueMap.Integrations.Ops.EmailAlertSink>();
+        }
+        else if (alertChannel == "webhook")
+        {
+            services.AddHttpClient<DueMap.Integrations.Ops.WebhookAlertSink>();
+            services.AddSingleton<DueMap.Common.Ops.IAlertSink>(sp =>
+                sp.GetRequiredService<DueMap.Integrations.Ops.WebhookAlertSink>());
+        }
+        // else: leave NullAlertSink in place (Common's default).
     }
 }

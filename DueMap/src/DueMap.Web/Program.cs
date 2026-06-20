@@ -3,6 +3,8 @@ using Hangfire;
 using Hangfire.SqlServer;
 using DueMap.Billing;
 using DueMap.Common.Modularity;
+using DueMap.Common.FeatureFlags;
+using DueMap.Common.Ops;
 using DueMap.Identity;
 using DueMap.Integrations;
 using DueMap.Integrations.Accounting;
@@ -80,6 +82,25 @@ builder.Services.AddScoped<DueMap.Web.Services.WorkerLogReader>();
 // Tenant-portal session resolver. Reads the dm_tenant cookie and joins
 // against tenant_sessions on every authenticated /t/* render.
 builder.Services.AddScoped<DueMap.Web.Services.TenantContext>();
+
+// Feature flags (P0-1): "ship dark, enable per-PM." Web and Worker share
+// the same ops.feature_flags table so a toggle takes effect in both
+// processes within ~60s. Default is OFF for unknown keys — fail-safe.
+builder.Services.AddFeatureFlags(
+    builder.Configuration.GetConnectionString("Default")
+        ?? throw new InvalidOperationException("Missing ConnectionStrings:Default for feature flags."));
+
+// P0-4: operator alerting (dedupe-by-key, fail-soft). Sink choice (email /
+// webhook / null) is configured by Ops:Alerts:Channel and bound inside
+// IntegrationsModule. Common's AddAlerting registers NullAlertSink as the
+// default so resolves always succeed.
+builder.Services.AddAlerting(builder.Configuration);
+
+// P0-4: admin Basic-Auth credentials are read from config/secrets, not
+// hardcoded. Middleware returns 503 if either Username or Password is
+// missing — explicit fail-closed rather than silent dev fallback.
+builder.Services.AddOptions<DueMap.Web.Security.AdminBasicAuthOptions>()
+    .Bind(builder.Configuration.GetSection(DueMap.Web.Security.AdminBasicAuthOptions.SectionName));
 
 // "Sign in with Intuit" via the QBO OAuth flow. The OIDC handler stays
 // registered (further down) for the day Intuit approves the sandbox app
@@ -374,6 +395,46 @@ app.MapGet("/samples/duemap-rent-roll-sample.xlsx", () =>
         contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         fileDownloadName: "duemap-rent-roll-sample.xlsx");
 }).AllowAnonymous();
+
+// -------------------------------------------------------------------------
+// P0-2: dry-run simulation endpoint. Returns the plan a PM's day WOULD
+// produce without writing or dispatching anything. Gated by the
+// ops.dry_run feature flag (503 when off) and by AdminBasicAuthMiddleware.
+// -------------------------------------------------------------------------
+app.MapGet("/admin/dry-run/{pmId:int}", async (
+    int pmId,
+    string? date,
+    DueMap.Common.FeatureFlags.IFeatureFlags flags,
+    DueMap.Billing.IPmDailyOrchestrator orchestrator,
+    CancellationToken ct) =>
+{
+    if (!await flags.IsEnabledAsync("ops.dry_run", ct: ct))
+    {
+        return Results.Json(new { error = "Feature 'ops.dry_run' is disabled. Toggle it in ops.feature_flags." },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+
+    var businessDate = string.IsNullOrWhiteSpace(date)
+        ? DateOnly.FromDateTime(DateTime.UtcNow)
+        : (DateOnly.TryParse(date, System.Globalization.CultureInfo.InvariantCulture,
+                             System.Globalization.DateTimeStyles.None, out var parsed)
+            ? parsed
+            : DateOnly.FromDateTime(DateTime.UtcNow));
+
+    var outcome = await orchestrator.ProcessAsync(
+        pmId, businessDate, DueMap.Billing.Domain.ExecutionMode.DryRun, ct);
+
+    return Results.Ok(new
+    {
+        propertyManagerId = pmId,
+        businessDate = businessDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+        outcome.LeasesPlanned,
+        outcome.ActionsExecuted,
+        outcome.ActionsSkipped,
+        outcome.ActionsFailed,
+        preview = outcome.DryRunPreview
+    });
+}).AllowAnonymous();   // AdminBasicAuthMiddleware does the actual auth gate.
 
 // -------------------------------------------------------------------------
 // Tenant portal: invoice PDF download. Gated by the dm_tenant session cookie.

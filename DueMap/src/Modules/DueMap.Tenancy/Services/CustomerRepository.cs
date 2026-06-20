@@ -67,6 +67,14 @@ internal sealed class CustomerRepository : ICustomerRepository
         existing.IsActive     = customer.IsActive;
         existing.LastSyncedAt = customer.LastSyncedAt == default ? now : customer.LastSyncedAt;
         existing.UpdatedAt    = now;
+        // v18 (P1-1) — only overwrite billing_state when the sync surfaced a
+        // value. Provider clients return null when the address has no usable
+        // region; we keep the prior value in that case so a one-time good
+        // sync doesn't get clobbered by a later delta with no address.
+        if (customer.BillingState is not null)
+        {
+            existing.BillingState = customer.BillingState;
+        }
         await db.SaveChangesAsync(ct);
         return existing;
     }

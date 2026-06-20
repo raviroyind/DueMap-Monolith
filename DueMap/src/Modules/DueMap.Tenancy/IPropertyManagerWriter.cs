@@ -26,4 +26,10 @@ public interface IPropertyManagerWriter
     /// Synced + Active on first sync) without worrying about ordering.
     /// </summary>
     Task SetMinimumStatusAsync(int propertyManagerId, Domain.OnboardingStatus status, CancellationToken ct);
+
+    /// <summary>
+    /// Persist the AutoSetup summary (JSON) and stamp <c>AutoSetupDoneAt</c>
+    /// to UtcNow. Idempotent — re-running AutoSetup overwrites.
+    /// </summary>
+    Task RecordAutoSetupSummaryAsync(int propertyManagerId, string summaryJson, CancellationToken ct);
 }

@@ -36,7 +36,16 @@ internal sealed class EffectivePolicyService : IEffectivePolicyService
             jurisdictionId: lease.JurisdictionId,
             ct: ct);
 
-        var stateMinGrace = stateRule?.GracePeriodDays ?? 0;
+        // §6.1 (P1-2): take the STRICTER of `GracePeriodDays` (legacy
+        // recommended grace) and `StateMinGraceDays` (new explicit floor).
+        // Backfill in v19 set the floor to the existing grace where the
+        // floor was 0, so for existing seeds these are identical; new
+        // seeds can set them independently (e.g. NY's "5 days mandatory"
+        // floor with a 0-day recommended grace if a PM wants to charge
+        // immediately at day-6).
+        var stateMinGrace = Math.Max(
+            stateRule?.GracePeriodDays  ?? 0,
+            stateRule?.StateMinGraceDays ?? 0);
         var requestedGrace = leaseSettings?.PostDueGraceDays ?? pmPrefs.PostDueDefaultGraceDays;
         var effectiveGrace = Math.Max(requestedGrace, stateMinGrace);
 

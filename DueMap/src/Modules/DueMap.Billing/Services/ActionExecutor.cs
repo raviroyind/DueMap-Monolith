@@ -62,28 +62,35 @@ internal sealed partial class ActionExecutor : IActionExecutor
         DateOnly currentDueDate,
         DateOnly businessDate,
         PlannedAction action,
-        CancellationToken ct)
+        ExecutionMode mode = ExecutionMode.Live,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(lease);
         ArgumentNullException.ThrowIfNull(action);
 
-        if (await _runs.HasRunAsync(lease.Id, currentDueDate, action.Kind, ct))
+        // Idempotency check is a Live-mode concern — DryRun deliberately shows
+        // "what would happen if not yet done" so the reviewer sees the day's
+        // intent against a clean slate.
+        if (mode == ExecutionMode.Live
+            && await _runs.HasRunAsync(lease.Id, currentDueDate, action.Kind, ct))
         {
             return new ActionExecutionResult(ActionOutcome.SkippedAlreadyDone, null);
         }
 
         return action.Kind switch
         {
-            ActionKind.AssessLateFee => await ExecuteLateFeeAsync(lease, currentDueDate, businessDate, action, ct),
-            _                        => await ExecuteSendAsync(lease, currentDueDate, businessDate, action, ct)
+            ActionKind.AssessLateFee => await ExecuteLateFeeAsync(lease, currentDueDate, businessDate, action, mode, ct),
+            _                        => await ExecuteSendAsync(lease, currentDueDate, businessDate, action, mode, ct)
         };
     }
 
     private async Task<ActionExecutionResult> ExecuteLateFeeAsync(
-        Lease lease, DateOnly currentDueDate, DateOnly businessDate, PlannedAction action, CancellationToken ct)
+        Lease lease, DateOnly currentDueDate, DateOnly businessDate, PlannedAction action,
+        ExecutionMode mode, CancellationToken ct)
     {
         // Resolve the rule again here to capture provenance (version + override ids)
         // for the assessment row. The Rules cache makes this a memory hit.
+        // Read-only — safe to do in DryRun too.
         var rule = await _rules.ResolveRuleByStateIdAsync(lease.StateId, businessDate, lease.JurisdictionId, ct);
         if (rule is null)
         {
@@ -91,12 +98,33 @@ internal sealed partial class ActionExecutor : IActionExecutor
                 $"No active state rule for lease {lease.Id} on {businessDate:yyyy-MM-dd}");
         }
 
+        var feeAmount = action.FeeAmount ?? rule.ComputeFee(lease.MonthlyRent);
+
+        // ---- DryRun: build a preview row, no writes -----------------------
+        if (mode == ExecutionMode.DryRun)
+        {
+            var preview = new PlannedActionPreview(
+                LeaseId:            lease.Id,
+                TenantDisplayName:  null,                                 // not resolved on fee path
+                ActionKindCode:     "assess_late_fee",
+                Channel:            "",
+                ToAddress:          null,
+                Amount:             feeAmount,
+                DueDate:            currentDueDate,
+                Provenance:         $"state rule v={rule.StateRuleVersionId}"
+                                    + (rule.LocalRuleOverrideId is int oid ? $" override={oid}" : ""),
+                RenderedSubject:    null,
+                RenderedFirstLine:  null);
+            return new ActionExecutionResult(ActionOutcome.Executed, $"fee={feeAmount.ToString(CultureInfo.InvariantCulture)}", preview);
+        }
+
+        // ---- Live: write the assessment + run row -------------------------
         var fee = await _fees.RecordAsync(new LateFeeAssessment
         {
             LeaseId = lease.Id,
             DueDate = currentDueDate,
             AssessmentDate = businessDate,
-            FeeAmount = action.FeeAmount ?? rule.ComputeFee(lease.MonthlyRent),
+            FeeAmount = feeAmount,
             MonthlyRentSnapshot = lease.MonthlyRent,
             StateRuleVersionId = rule.StateRuleVersionId,
             LocalRuleOverrideId = rule.LocalRuleOverrideId,
@@ -118,7 +146,8 @@ internal sealed partial class ActionExecutor : IActionExecutor
     }
 
     private async Task<ActionExecutionResult> ExecuteSendAsync(
-        Lease lease, DateOnly currentDueDate, DateOnly businessDate, PlannedAction action, CancellationToken ct)
+        Lease lease, DateOnly currentDueDate, DateOnly businessDate, PlannedAction action,
+        ExecutionMode mode, CancellationToken ct)
     {
         var contact = await _contacts.ResolveAsync(lease.Id, ct);
         if (contact is null || (string.IsNullOrWhiteSpace(contact.Email) && string.IsNullOrWhiteSpace(contact.Phone)))
@@ -167,6 +196,25 @@ internal sealed partial class ActionExecutor : IActionExecutor
         }
 
         var (channel, to) = ChooseChannel(contact);
+
+        // ---- DryRun: build a preview row, no dispatch, no writes ----------
+        if (mode == ExecutionMode.DryRun)
+        {
+            var firstLine = FirstLine(rendered.BodyText);
+            var preview = new PlannedActionPreview(
+                LeaseId:            lease.Id,
+                TenantDisplayName:  contact.DisplayName,
+                ActionKindCode:     action.NoticeTypeCode,
+                Channel:            channel.ToString(),
+                ToAddress:          to,
+                Amount:             null,
+                DueDate:            currentDueDate,
+                Provenance:         $"template v={renderable.SystemTemplateVersionId}"
+                                    + (renderable.PmTemplateOverrideId is int oid ? $" override={oid}" : ""),
+                RenderedSubject:    rendered.Subject,
+                RenderedFirstLine:  firstLine);
+            return new ActionExecutionResult(ActionOutcome.Executed, $"preview channel={channel}", preview);
+        }
 
         // Late-fee notices get the QBO/Xero-rendered invoice PDF attached so
         // the tenant has the authoritative document with the updated balance.
@@ -224,6 +272,21 @@ internal sealed partial class ActionExecutor : IActionExecutor
             ? new ActionExecutionResult(ActionOutcome.SkippedAlreadyDone, "race: run row already exists")
             : new ActionExecutionResult(ActionOutcome.Executed,
                 $"channel={channel} provider_id={dispatchResult.ProviderMessageId}");
+    }
+
+    /// <summary>
+    /// Short excerpt of a rendered plain-text body for the DryRun preview.
+    /// We want enough to verify the body is sane in the admin view without
+    /// dumping the whole 2 KB notice into JSON. ~140 chars matches an SMS
+    /// for visual parity with that channel.
+    /// </summary>
+    private static string FirstLine(string body)
+    {
+        if (string.IsNullOrEmpty(body)) return string.Empty;
+        var firstBreak = body.IndexOf('\n');
+        var line = firstBreak < 0 ? body : body[..firstBreak];
+        line = line.Trim();
+        return line.Length > 140 ? line[..140] + "…" : line;
     }
 
     private static (DispatchChannel Channel, string To) ChooseChannel(TenantContact contact) =>

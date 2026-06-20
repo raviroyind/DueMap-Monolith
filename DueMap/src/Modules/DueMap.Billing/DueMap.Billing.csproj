@@ -6,6 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="DueMap.Billing.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\DueMap.Common\DueMap.Common.csproj" />
     <ProjectReference Include="..\DueMap.Rules\DueMap.Rules.csproj" />
     <ProjectReference Include="..\DueMap.Tenancy\DueMap.Tenancy.csproj" />

@@ -4,6 +4,7 @@ using DueMap.Common.Modularity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DueMap.Billing;
 
@@ -42,5 +43,12 @@ public sealed class BillingModule : IModule
 
         // Reports — daily close email per PM (Hangfire-triggered in Worker).
         services.AddScoped<Reports.IDailyCloseReportService, Reports.DailyCloseReportService>();
+
+        // ---- AutoSetup (P1-3) -------------------------------------------
+        services.AddScoped<AutoSetup.IComplianceScanService, AutoSetup.ComplianceScanService>();
+        services.AddScoped<AutoSetup.IAutoSetupService, AutoSetup.AutoSetupService>();
+        // Optional LLM seam — default is the no-op enhancer. Hosts can
+        // override BEFORE calling AddModules to plug in a real impl.
+        services.TryAddScoped<AutoSetup.IAutoSetupCopyEnhancer, AutoSetup.NullAutoSetupCopyEnhancer>();
     }
 }

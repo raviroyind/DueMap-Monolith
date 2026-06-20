@@ -82,7 +82,11 @@ internal sealed partial class PmAccountingSyncService : IPmAccountingSync
                     Email = sc.Email,
                     Phone = sc.Phone,
                     IsActive = sc.IsActive,
-                    LastSyncedAt = DateTime.UtcNow
+                    LastSyncedAt = DateTime.UtcNow,
+                    // v18 (P1-1) — surface billing state for DiscoveryService.
+                    // Provider clients already normalise to 2-letter upper or
+                    // null; we just pass through.
+                    BillingState = sc.BillingState
                 }, ct);
             }
 
@@ -138,10 +142,34 @@ internal sealed partial class PmAccountingSyncService : IPmAccountingSync
         catch (Exception ex)
         {
             await UpdateLastSyncAsync(propertyManagerId, success: false, error: ex.Message, ct);
+
+            // P0-3 self-heal: when the failure is *authentication* (refresh
+            // token revoked, app uninstalled, scopes downgraded) rather than
+            // transient (5xx, network blip, rate limit), mark the connection
+            // Broken so the orchestrator skips this PM until they reconnect.
+            // Other failure modes stay transient and don't pause processing —
+            // tomorrow's sweep will retry naturally.
+            //
+            // We detect by substring on the client's exception message, which
+            // is formatted "QuickBooks API returned 401: …" / "Xero API
+            // returned 403: …". If we ever standardise on a typed
+            // AccountingAuthFailedException, switch to a pattern-match here.
+            if (IsAuthFailure(ex))
+            {
+                await _connections.MarkBrokenAsync(
+                    propertyManagerId,
+                    $"Sync auth failure: {ex.Message}",
+                    ct);
+            }
+
             LogSyncFailed(_logger, ex, propertyManagerId, conn.Provider);
             return new PmSyncResult(false, 0, 0, ex.Message);
         }
     }
+
+    private static bool IsAuthFailure(Exception ex) =>
+        ex.Message.Contains("401", StringComparison.Ordinal) ||
+        ex.Message.Contains("403", StringComparison.Ordinal);
 
     private async Task<int?> TryAutoLinkLeaseAsync(int propertyManagerId, int customerId, CancellationToken ct)
     {

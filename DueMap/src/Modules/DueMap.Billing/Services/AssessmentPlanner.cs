@@ -44,6 +44,26 @@ internal sealed class AssessmentPlanner : IAssessmentPlanner
     {
         ArgumentNullException.ThrowIfNull(lease);
 
+        // P1-3: AutoSetup writes a staged late-fee profile and flips
+        // FeesStaged=true. The lease is held in review limbo until the PM
+        // clicks "Go live" (P1-4); the planner emits NO actions for it —
+        // no reminders, no fees. Returning an empty plan early keeps the
+        // upstream orchestrator + scheduler unchanged.
+        if (lease.FeesStaged)
+        {
+            // We don't even need to look up the policy or due date — the
+            // lease is paused. The current due date in the plan is still
+            // useful for diagnostics, so compute it cheaply.
+            var stagedDueDate = await _invoices.GetCurrentDueDateAsync(lease.Id, assessmentDate, ct)
+                              ?? _schedule.GetCurrentDueDate(lease, assessmentDate);
+            return new AssessmentPlan(
+                LeaseId:           lease.Id,
+                CurrentDueDate:    stagedDueDate,
+                AssessmentDate:    assessmentDate,
+                DaysRelativeToDue: assessmentDate.DayNumber - stagedDueDate.DayNumber,
+                Actions:           Array.Empty<PlannedAction>());
+        }
+
         var policy = await _policySvc.BuildAsync(lease, assessmentDate, ct);
 
         // Prefer the synced invoice's due date; fall back to the computed

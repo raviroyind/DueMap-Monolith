@@ -39,6 +39,9 @@ public sealed class TenancyDbContext : DbContext
             e.Property(x => x.StepCloseDoneAt).HasColumnName("step_close_done_at");
             e.Property(x => x.StepNoticePrefsDoneAt).HasColumnName("step_notice_prefs_done_at"); // v13
             e.Property(x => x.StepPreflightDoneAt).HasColumnName("step_preflight_done_at");
+            // v20 (P1-3) — AutoSetup output.
+            e.Property(x => x.AutoSetupSummary).HasColumnName("auto_setup_summary");
+            e.Property(x => x.AutoSetupDoneAt).HasColumnName("auto_setup_done_at");
             e.Ignore(x => x.OnboardingComplete);   // computed in code, not persisted
         });
 
@@ -56,6 +59,19 @@ public sealed class TenancyDbContext : DbContext
             e.Property(x => x.EndDate).HasColumnName("end_date");
             e.Property(x => x.UnitLabel).HasColumnName("unit_label").HasMaxLength(50);
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            // v18 (P1-1) — auto-discovery columns.
+            e.Property(x => x.InferredRentAmount).HasColumnName("inferred_rent_amount").HasColumnType("decimal(18,2)");
+            e.Property(x => x.InferredDueDay).HasColumnName("inferred_due_day");
+            e.Property(x => x.InferredState).HasColumnName("inferred_state").HasMaxLength(2).IsFixedLength();
+            e.Property(x => x.InferredAt).HasColumnName("inferred_at");
+            e.Property(x => x.DiscoveryConfirmedAt).HasColumnName("discovery_confirmed_at");
+            // v20 (P1-3) — AutoSetup-written late-fee profile + staging gate.
+            e.Property(x => x.LateFeeType).HasColumnName("late_fee_type");
+            e.Property(x => x.LateFeePercent).HasColumnName("late_fee_percent").HasColumnType("decimal(5,2)");
+            e.Property(x => x.LateFeeFlatAmount).HasColumnName("late_fee_flat_amount").HasColumnType("decimal(10,2)");
+            e.Property(x => x.LateFeeGraceDays).HasColumnName("late_fee_grace_days");
+            e.Property(x => x.LateFeeDailyAccrual).HasColumnName("late_fee_daily_accrual");
+            e.Property(x => x.FeesStaged).HasColumnName("fees_staged");
         });
 
         modelBuilder.Entity<PmNoticePreferences>(e =>
@@ -126,6 +142,8 @@ public sealed class TenancyDbContext : DbContext
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             e.Property(x => x.PreflightNotifiedAt).HasColumnName("preflight_notified_at");
+            // v18 (P1-1) — billing-state from QBO BillAddr / Xero Address.Region.
+            e.Property(x => x.BillingState).HasColumnName("billing_state").HasMaxLength(2).IsFixedLength();
             e.HasIndex(x => new { x.PropertyManagerId, x.ExternalProvider, x.ExternalId }).IsUnique();
         });
 
