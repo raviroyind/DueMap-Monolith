@@ -1,0 +1,146 @@
+@page "/onboarding/review"
+@layout DueMap.Web.Components.Layout.OnboardingShell
+@using System.Text.Json
+@using DueMap.Billing.AutoSetup
+@using DueMap.Common.FeatureFlags
+@using DueMap.Tenancy
+@using DueMap.Web.Services
+@inject PmContext Pm
+@inject IPropertyManagerReader PmReader
+@inject IFeatureFlags Flags
+@inject NavigationManager Nav
+
+<PageTitle>Review your setup — DueMap</PageTitle>
+
+<div class="max-w-4xl mx-auto px-8 py-10 space-y-6">
+
+    <div>
+        <h2 class="text-2xl font-semibold tracking-tight">Here's everything we set up</h2>
+        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-2xl">
+            We configured your late fees, reminders, templates, and daily close automatically —
+            staying inside your state's legal limits. Nothing is charged yet. Review below, then
+            send your tenants a heads-up and go live.
+        </p>
+    </div>
+
+    @if (_loading)
+    {
+        <p class="text-sm text-zinc-500">Loading your setup…</p>
+    }
+    else if (_disabled)
+    {
+        <div class="rounded-xl border border-amber-200/70 dark:border-amber-500/20 bg-amber-50/60 dark:bg-amber-500/5 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+            The guided review flow is currently disabled. Set the
+            <code class="font-mono text-xs">onboarding.v2</code> feature flag on to use it,
+            or continue with the classic step-by-step setup.
+        </div>
+    }
+    else if (_summary is null)
+    {
+        <div class="rounded-xl border border-zinc-300 dark:border-zinc-700 border-dashed bg-white/40 dark:bg-zinc-900/40 p-10 text-center">
+            <p class="text-sm font-medium mb-1">We haven't auto-configured your account yet.</p>
+            <p class="text-sm text-zinc-500">
+                Connect your accounting system and finish the sync — auto-setup runs right after,
+                then this page will show what we prepared.
+            </p>
+        </div>
+    }
+    else
+    {
+        @* ---- "What we set up" cards ---- *@
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
+                <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Late fees</div>
+                <div class="mt-1.5 text-2xl font-semibold tabular-nums">@_summary.LeasesProcessed</div>
+                <p class="mt-1 text-xs text-zinc-500">
+                    lease@(_summary.LeasesProcessed == 1 ? "" : "s") staged with a compliant late-fee profile.
+                    @if (_summary.LeasesSkipped > 0) { <span>@_summary.LeasesSkipped need a closer look (below).</span> }
+                </p>
+            </div>
+            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
+                <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Reminders &amp; templates</div>
+                <div class="mt-1.5 text-2xl font-semibold">On</div>
+                <p class="mt-1 text-xs text-zinc-500">
+                    Pre-due, due-date, and past-due reminders are enabled with branded email templates.
+                </p>
+            </div>
+        </div>
+
+        @* ---- "What needs you" findings ---- *@
+        @if (_summary.Findings.Count > 0)
+        {
+            <div class="rounded-xl border border-amber-200/70 dark:border-amber-500/20 bg-amber-50/40 dark:bg-amber-500/5 overflow-hidden">
+                <div class="px-4 py-2.5 border-b border-amber-200/70 dark:border-amber-500/20 text-sm font-semibold text-amber-900 dark:text-amber-200">
+                    A few things to confirm (@_summary.Findings.Count)
+                </div>
+                <ul class="divide-y divide-amber-200/50 dark:divide-amber-500/10">
+                    @foreach (var f in _summary.Findings)
+                    {
+                        <li class="px-4 py-3 text-sm">
+                            <div class="text-zinc-800 dark:text-zinc-100">@f.Message</div>
+                            @if (!string.IsNullOrWhiteSpace(f.CompliantFix))
+                            {
+                                <div class="mt-0.5 text-xs text-zinc-500">Suggested: @f.CompliantFix (lease #@f.LeaseId)</div>
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+        else
+        {
+            <div class="rounded-xl border border-emerald-200/70 dark:border-emerald-500/20 bg-emerald-50/40 dark:bg-emerald-500/5 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-300">
+                Everything looks compliant — no items need your attention.
+            </div>
+        }
+
+        @* ---- Actions ---- *@
+        <div class="flex flex-wrap items-center gap-3 pt-2">
+            <button @onclick="LooksGood"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm">
+                Looks good — notify my tenants →
+            </button>
+            <button @onclick="ToggleEdit"
+                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                Edit a step
+            </button>
+        </div>
+
+        @if (_editOpen)
+        {
+            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <a href="/leases" class="px-3 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200/70 dark:border-zinc-700">Late fees &amp; tenants →</a>
+                <a href="/onboarding/notice-preferences" class="px-3 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200/70 dark:border-zinc-700">Reminders →</a>
+                <a href="/templates" class="px-3 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200/70 dark:border-zinc-700">Templates →</a>
+                <a href="/onboarding/close-settings" class="px-3 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200/70 dark:border-zinc-700">Daily close →</a>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private bool _disabled;
+    private bool _editOpen;
+    private AutoSetupSummary? _summary;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var pmId = await Pm.GetPmIdAsync();
+        _disabled = !await Flags.IsEnabledAsync("onboarding.v2", pmId, CancellationToken.None);
+        if (!_disabled)
+        {
+            var json = await PmReader.GetAutoSetupSummaryJsonAsync(pmId, CancellationToken.None);
+            if (!string.IsNullOrWhiteSpace(json))
+            {
+                try { _summary = JsonSerializer.Deserialize<AutoSetupSummary>(json); }
+                catch { _summary = null; }   // malformed summary → treat as "not run"
+            }
+        }
+        _loading = false;
+    }
+
+    private void ToggleEdit() => _editOpen = !_editOpen;
+
+    private void LooksGood() => Nav.NavigateTo("/onboarding/preflight");
+}

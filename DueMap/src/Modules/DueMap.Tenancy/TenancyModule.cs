@@ -53,5 +53,7 @@ public sealed class TenancyModule : IModule
         // P1-1 — auto-discovery. Scoped because it uses a DbContextFactory
         // for per-call contexts but holds no per-call state itself.
         services.AddScoped<Discovery.IDiscoveryService, Discovery.DiscoveryService>();
+        // P1-4 — explicit "Go live" transition (staged fees → live + Active).
+        services.AddScoped<IGoLiveService, Services.GoLiveService>();
     }
 }

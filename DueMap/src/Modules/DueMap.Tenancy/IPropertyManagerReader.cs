@@ -12,4 +12,12 @@ public interface IPropertyManagerReader
     Task<IReadOnlyList<PropertyManager>> ListAllAsync(CancellationToken ct);
 
     Task<PropertyManager?> GetAsync(int id, CancellationToken ct);
+
+    /// <summary>
+    /// Raw <c>auto_setup_summary</c> JSON for the P1-4 review screen, or null
+    /// if AutoSetup hasn't run for this PM. The caller deserializes to
+    /// <c>DueMap.Billing.AutoSetup.AutoSetupSummary</c> (Tenancy can't
+    /// reference Billing, so this stays a string here).
+    /// </summary>
+    Task<string?> GetAutoSetupSummaryJsonAsync(int propertyManagerId, CancellationToken ct);
 }

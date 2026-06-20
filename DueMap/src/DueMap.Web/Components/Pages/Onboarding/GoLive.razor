@@ -1,0 +1,156 @@
+@page "/onboarding/golive"
+@layout DueMap.Web.Components.Layout.OnboardingShell
+@using System.Globalization
+@using DueMap.Common.FeatureFlags
+@using DueMap.Tenancy
+@using DueMap.Tenancy.Domain
+@using DueMap.Web.Services
+@inject PmContext Pm
+@inject ILeaseReader Leases
+@inject IGoLiveService GoLiveSvc
+@inject IFeatureFlags Flags
+@inject NavigationManager Nav
+
+<PageTitle>Go live — DueMap</PageTitle>
+
+<div class="max-w-3xl mx-auto px-8 py-10 space-y-6">
+
+    <div>
+        <h2 class="text-2xl font-semibold tracking-tight">Ready to go live</h2>
+        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-2xl">
+            This is the switch. Until now your late-fee profiles have been <strong>staged</strong> —
+            recorded but never charged. When you go live, DueMap starts sending reminders and
+            assessing late fees on the schedule below, beginning with the next daily run.
+        </p>
+    </div>
+
+    @if (_loading)
+    {
+        <p class="text-sm text-zinc-500">Loading…</p>
+    }
+    else if (_disabled)
+    {
+        <div class="rounded-xl border border-amber-200/70 dark:border-amber-500/20 bg-amber-50/60 dark:bg-amber-500/5 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+            The guided review flow is disabled. Set <code class="font-mono text-xs">onboarding.v2</code> on to use it.
+        </div>
+    }
+    else if (_wentLive)
+    {
+        <div class="rounded-xl border border-emerald-200/70 dark:border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/5 p-6 text-center">
+            <div class="text-lg font-semibold text-emerald-800 dark:text-emerald-300">You're live 🎉</div>
+            <p class="mt-1 text-sm text-emerald-700 dark:text-emerald-400">
+                @_activatedCount lease@(_activatedCount == 1 ? "" : "s") activated. Reminders and late
+                fees will run automatically from the next daily update.
+            </p>
+            <button @onclick="@(() => Nav.NavigateTo("/"))"
+                    class="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700">
+                Go to dashboard →
+            </button>
+        </div>
+    }
+    else
+    {
+        @if (_staged.Count == 0)
+        {
+            <div class="rounded-xl border border-zinc-300 dark:border-zinc-700 border-dashed bg-white/40 dark:bg-zinc-900/40 p-8 text-center text-sm text-zinc-500">
+                No staged leases found. Either you're already live, or auto-setup hasn't run yet.
+            </div>
+        }
+        else
+        {
+            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+                <div class="px-4 py-2.5 border-b border-zinc-200/80 dark:border-zinc-800 text-sm font-semibold">
+                    What goes live (@_staged.Count lease@(_staged.Count == 1 ? "" : "s"))
+                </div>
+                <table class="w-full text-sm">
+                    <thead class="bg-zinc-50/60 dark:bg-zinc-900/60 text-left">
+                        <tr>
+                            <th class="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Lease</th>
+                            <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Rent</th>
+                            <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Late fee</th>
+                            <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Grace</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                        @foreach (var l in _staged)
+                        {
+                            <tr>
+                                <td class="px-4 py-2">#@l.Id @(string.IsNullOrWhiteSpace(l.UnitLabel) ? "" : $"· {l.UnitLabel}")</td>
+                                <td class="px-3 py-2 tabular-nums">@l.MonthlyRent.ToString("C0", CultureInfo.GetCultureInfo("en-US"))</td>
+                                <td class="px-3 py-2 tabular-nums">
+                                    @(l.LateFeePercent is decimal p
+                                        ? $"{p.ToString("0.##", CultureInfo.InvariantCulture)}%"
+                                        : l.LateFeeFlatAmount is decimal f
+                                            ? f.ToString("C0", CultureInfo.GetCultureInfo("en-US"))
+                                            : "—")
+                                </td>
+                                <td class="px-3 py-2 tabular-nums">@(l.LateFeeGraceDays is byte g ? $"{g} day{(g == 1 ? "" : "s")}" : "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="rounded-lg bg-zinc-50 dark:bg-zinc-800/40 px-4 py-3 text-xs text-zinc-500">
+                After you go live you can preview any PM's exact daily plan from the admin dry-run, and
+                watch every action on the activity timeline. Fees only ever assess within your state's
+                legal limits.
+            </div>
+
+            <div class="flex items-center gap-3 pt-1">
+                <button @onclick="GoLiveAsync" disabled="@_busy"
+                        class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm disabled:opacity-50">
+                    @(_busy ? "Going live…" : "Go live")
+                </button>
+                <a href="/onboarding/review" class="text-sm text-zinc-500 hover:underline">Back to review</a>
+                @if (_error is not null)
+                {
+                    <span class="text-xs text-rose-600 dark:text-rose-400">@_error</span>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private int _pmId;
+    private bool _loading = true;
+    private bool _disabled;
+    private bool _busy;
+    private bool _wentLive;
+    private int _activatedCount;
+    private string? _error;
+    private List<Lease> _staged = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _pmId = await Pm.GetPmIdAsync();
+        _disabled = !await Flags.IsEnabledAsync("onboarding.v2", _pmId, CancellationToken.None);
+        if (!_disabled)
+        {
+            var active = await Leases.ListActiveAsync(_pmId, DateOnly.FromDateTime(DateTime.UtcNow), CancellationToken.None);
+            _staged = active.Where(l => l.FeesStaged).ToList();
+        }
+        _loading = false;
+    }
+
+    private async Task GoLiveAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var result = await GoLiveSvc.GoLiveAsync(_pmId, CancellationToken.None);
+            _activatedCount = result.LeasesActivated;
+            _wentLive = true;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
