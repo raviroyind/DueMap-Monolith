@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.WebUtilities
 @inject PmContext Pm
 @inject IAccountingConnectionService ConnectionSvc
+@inject IPmAccountingSync Sync
 @inject NavigationManager Nav
 
 <PageTitle>Accounting connection — DueMap</PageTitle>
@@ -149,6 +150,22 @@
             }
 
             <div class="px-6 py-4 bg-zinc-50/60 dark:bg-zinc-900/60 border-t border-zinc-200/80 dark:border-zinc-800 flex items-center justify-end gap-2">
+                @* Sync now — on-demand pull. Also the recovery path for an
+                   account stuck at "Last sync: never" (e.g. the syncing wizard
+                   was never completed). Disabled while a sync is in flight. *@
+                <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 shadow-sm transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                        @onclick="SyncNow" disabled="@_syncing">
+                    @if (_syncing)
+                    {
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                        <span>Syncing…</span>
+                    }
+                    else
+                    {
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                        <span>Sync now</span>
+                    }
+                </button>
                 <a class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 shadow-sm transition-colors duration-150"
                    href="@($"/oauth/{ProviderSlug(_conn.Provider)}/connect/{_pmId}")">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
@@ -159,6 +176,13 @@
                     Disconnect
                 </button>
             </div>
+
+            @if (_syncMessage is not null)
+            {
+                <div class="px-6 pb-4 text-xs @(_syncOk ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")">
+                    @_syncMessage
+                </div>
+            }
         </section>
     }
 </div>
@@ -167,6 +191,9 @@
     private int? _pmId;
     private PmAccountingConnection? _conn;
     private bool _onboarding;
+    private bool _syncing;
+    private bool _syncOk;
+    private string? _syncMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -193,6 +220,32 @@
         if (_pmId is not int id) return;
         await ConnectionSvc.DisconnectAsync(id, CancellationToken.None);
         await LoadAsync();
+    }
+
+    private async Task SyncNow()
+    {
+        if (_pmId is not int id) return;
+        _syncing = true;
+        _syncMessage = null;
+        StateHasChanged();
+        try
+        {
+            var result = await Sync.SyncForAsync(id, CancellationToken.None);
+            _syncOk = result.Success;
+            _syncMessage = result.Success
+                ? $"Synced {result.CustomersSynced} customer(s) and {result.InvoicesSynced} invoice(s)."
+                : $"Sync failed: {result.FailureReason}";
+        }
+        catch (Exception ex)
+        {
+            _syncOk = false;
+            _syncMessage = $"Sync failed: {ex.Message}";
+        }
+        finally
+        {
+            _syncing = false;
+            await LoadAsync();   // refresh LastSyncAt / LastSyncError
+        }
     }
 
     private static string StatusPillClass(ConnectionStatus s) => s switch

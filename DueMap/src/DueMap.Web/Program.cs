@@ -533,7 +533,8 @@ oauthGroup.MapGet("/{provider}/connect/{pmId:int}", async (
 });
 
 oauthGroup.MapGet("/{provider}/callback", async (
-    string provider, HttpRequest req, IAccountingConnectionService svc, CancellationToken ct) =>
+    string provider, HttpRequest req, IAccountingConnectionService svc,
+    Hangfire.IBackgroundJobClient jobs, CancellationToken ct) =>
 {
     if (!TryParseProvider(provider, out var parsed))
     {
@@ -553,6 +554,16 @@ oauthGroup.MapGet("/{provider}/callback", async (
         Code: code,
         State: state,
         RealmId: string.IsNullOrEmpty(realmId) ? null : realmId), ct);
+
+    // Guarantee a first sync server-side the moment the connection is
+    // persisted — independent of any UI page. This is what keeps a freshly
+    // connected account from sitting at "Last sync: never": the daily sweep
+    // skips PMs with no active leases (chicken-and-egg — leases come from the
+    // sync), so without this nothing would ever pull the first batch unless
+    // the user happened to complete the syncing wizard. The Worker runs it;
+    // SyncForAsync is idempotent so overlap with the wizard's own sync is safe.
+    jobs.Enqueue<DueMap.Integrations.Accounting.Jobs.IInitialSyncJob>(
+        j => j.RunAsync(conn.PropertyManagerId, CancellationToken.None));
 
     // Land on the onboarding sync page so the user sees real progress for
     // their first customer/invoice pull instead of staring at a stale dashboard.

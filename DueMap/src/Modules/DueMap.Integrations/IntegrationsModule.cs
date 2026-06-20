@@ -99,6 +99,12 @@ public sealed class IntegrationsModule : IModule
 
         services.AddScoped<IPmAccountingSync, PmAccountingSyncService>();
 
+        // "First sync on connect" job — enqueued by the Web OAuth callback so
+        // a connection always pulls data server-side, even if the user never
+        // completes the syncing wizard. Executed by the Worker's Hangfire
+        // server; the Web host only enqueues it.
+        services.AddScoped<Accounting.Jobs.IInitialSyncJob, Accounting.Jobs.InitialSyncJob>();
+
         // Used by the onboarding Daily Close form to pre-fill timezone from
         // the connected accounting system. Doesn't persist anything itself —
         // pure read + map.
