@@ -17,6 +17,13 @@ public interface ILeaseWriter
     /// is gated until the PM clicks "Go live" (P1-4).
     /// </summary>
     Task UpdateLateFeeProfileAsync(int leaseId, LateFeeProfileInput profile, CancellationToken ct);
+
+    /// <summary>
+    /// Inline edit of a lease's core fields from the unified Tenants screen
+    /// (P1-5): monthly rent and state. Does NOT touch the fee profile or the
+    /// staging flag. Rent must be positive; state must exist.
+    /// </summary>
+    Task UpdateCoreFieldsAsync(int leaseId, decimal monthlyRent, int stateId, CancellationToken ct);
 }
 
 /// <summary>

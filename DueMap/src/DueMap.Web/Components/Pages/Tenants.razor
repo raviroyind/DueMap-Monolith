@@ -1,0 +1,410 @@
+@page "/tenants"
+@using System.Globalization
+@using DueMap.Billing.Tenants
+@using DueMap.Common.FeatureFlags
+@using DueMap.Web.Services
+@inject PmContext Pm
+@inject ITenantsGridService Grid
+@inject IFeatureFlags Flags
+
+<PageTitle>Tenants — DueMap</PageTitle>
+
+<div class="max-w-7xl mx-auto px-8 py-8 space-y-5">
+
+    <div>
+        <h2 class="text-2xl font-semibold tracking-tight">Tenants</h2>
+        <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 max-w-3xl leading-relaxed">
+            Every synced customer in one place. Set rent and state inline, link a customer to a lease,
+            and see at a glance whether each fee is within state limits. This replaces the separate
+            Leases and Link Customers screens.
+        </p>
+    </div>
+
+    @if (_loading)
+    {
+        <p class="text-sm text-zinc-500">Loading tenants…</p>
+    }
+    else if (_disabled)
+    {
+        <div class="rounded-xl border border-amber-200/70 dark:border-amber-500/20 bg-amber-50/60 dark:bg-amber-500/5 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+            The unified Tenants screen is currently off. Set the
+            <code class="font-mono text-xs">tenancy.tenants_screen</code> feature flag on to use it.
+            In the meantime, use <a href="/leases" class="underline">Leases</a> and
+            <a href="/link-customers" class="underline">Link customers</a>.
+        </div>
+    }
+    else
+    {
+        @* ---- filters + bulk bar ---- *@
+        <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4 space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-medium text-zinc-500 mb-1.5">Search name or email</label>
+                    <input type="search" placeholder="e.g. Cool Cars, jane@@example.com"
+                           @bind="_search" @bind:event="oninput" @bind:after="OnFilterChanged"
+                           class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-500 mb-1.5">Show</label>
+                    <select @bind="_filter" @bind:after="OnFilterChanged"
+                            class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                        <option value="all">All tenants</option>
+                        <option value="linked">Linked to a lease</option>
+                        <option value="unlinked">Not linked</option>
+                        <option value="review">Needs review (fee risk)</option>
+                    </select>
+                </div>
+            </div>
+
+            @* bulk apply state across selected linked rows *@
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+                <span class="text-zinc-400 dark:text-zinc-500">@_selected.Count selected</span>
+                <span class="text-zinc-300 dark:text-zinc-600">·</span>
+                <span class="text-zinc-500">Set state for selected:</span>
+                <select @bind="_bulkStateId"
+                        class="px-2 py-1 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                    <option value="0">— choose —</option>
+                    @foreach (var s in _states)
+                    {
+                        <option value="@s.Id">@s.Code</option>
+                    }
+                </select>
+                <button @onclick="ApplyBulkStateAsync" disabled="@(_selected.Count == 0 || _bulkStateId == 0 || _busy)"
+                        class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                    Apply to @_selected.Count
+                </button>
+                <span class="text-zinc-400 dark:text-zinc-500 ml-auto">@_rows.Count tenants · @LinkedCount linked</span>
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+            <table class="w-full text-sm">
+                <thead class="bg-zinc-50/60 dark:bg-zinc-900/60 text-left">
+                    <tr>
+                        <th class="px-4 py-2.5 w-10"></th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Customer</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-20">State</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-32">Rent</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-24">Late fee</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-28">Fee risk</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-24">Reminders</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-24">Autopay</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-40 text-right">Lease</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                    @if (_pageRows.Count == 0)
+                    {
+                        <tr><td colspan="9" class="px-4 py-10 text-center text-sm text-zinc-500">No tenants match these filters.</td></tr>
+                    }
+                    @foreach (var r in _pageRows)
+                    {
+                        var editing = _editingCustomerId == r.CustomerId;
+                        <tr class="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 align-top">
+                            <td class="px-4 py-2.5">
+                                <input type="checkbox" disabled="@(r.LeaseId is null)"
+                                       checked="@_selected.Contains(r.CustomerId)"
+                                       @onchange="@(e => ToggleOne(r.CustomerId, (bool)e.Value!))" />
+                            </td>
+                            <td class="px-3 py-2.5">
+                                <div class="font-medium">@r.CustomerName</div>
+                                <div class="text-xs text-zinc-500">@(string.IsNullOrWhiteSpace(r.Email) ? "no email" : r.Email)</div>
+                            </td>
+
+                            @if (editing)
+                            {
+                                <td class="px-3 py-2.5">
+                                    <select @bind="_editStateId" class="w-full px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm">
+                                        @foreach (var s in _states)
+                                        {
+                                            <option value="@s.Id">@s.Code</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td class="px-3 py-2.5">
+                                    <input type="number" step="0.01" min="0" @bind="_editRent"
+                                           class="w-full px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm" />
+                                </td>
+                                <td class="px-3 py-2.5 text-xs text-zinc-400" colspan="4">
+                                    Editing — save to update rent &amp; state.
+                                </td>
+                                <td class="px-3 py-2.5 text-right whitespace-nowrap">
+                                    <button @onclick="SaveEditAsync" disabled="@_busy"
+                                            class="px-2.5 py-1 rounded text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">Save</button>
+                                    <button @onclick="CancelEdit"
+                                            class="px-2 py-1 rounded text-xs text-zinc-500 hover:underline">Cancel</button>
+                                </td>
+                            }
+                            else
+                            {
+                                <td class="px-3 py-2.5">
+                                    @if (r.StateCode is not null)
+                                    {
+                                        <span class="inline-flex px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">@r.StateCode</span>
+                                    }
+                                    else { <span class="text-zinc-400 text-xs">—</span> }
+                                </td>
+                                <td class="px-3 py-2.5 tabular-nums">
+                                    @(r.MonthlyRent is decimal rent ? rent.ToString("C0", Usd) : "—")
+                                </td>
+                                <td class="px-3 py-2.5 tabular-nums">
+                                    @(r.LateFeePercent is decimal p ? $"{p.ToString("0.##", CultureInfo.InvariantCulture)}%" : "—")
+                                </td>
+                                <td class="px-3 py-2.5">
+                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium @RiskClass(r.FeeRisk)">@RiskLabel(r.FeeRisk)</span>
+                                </td>
+                                <td class="px-3 py-2.5 text-xs">@(r.RemindersEnabled ? "On" : "—")</td>
+                                <td class="px-3 py-2.5 text-xs text-zinc-400">@r.AutopayStatus</td>
+                                <td class="px-3 py-2.5 text-right whitespace-nowrap">
+                                    @if (r.LeaseId is not null)
+                                    {
+                                        @if (r.FeesStaged)
+                                        {
+                                            <span class="inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 mr-1">staged</span>
+                                        }
+                                        <button @onclick="@(() => BeginEdit(r))" class="text-indigo-600 dark:text-indigo-400 text-xs hover:underline">Edit</button>
+                                    }
+                                    else
+                                    {
+                                        <button @onclick="@(() => BeginCreate(r))" class="text-amber-600 dark:text-amber-400 text-xs hover:underline">Create lease</button>
+                                    }
+                                </td>
+                            }
+                        </tr>
+
+                        @if (_creatingCustomerId == r.CustomerId)
+                        {
+                            <tr class="bg-indigo-50/40 dark:bg-indigo-500/5">
+                                <td></td>
+                                <td colspan="8" class="px-3 py-3">
+                                    <div class="flex flex-wrap items-end gap-3">
+                                        <div>
+                                            <label class="block text-[11px] text-zinc-500 mb-1">State</label>
+                                            <select @bind="_editStateId" class="px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm">
+                                                @foreach (var s in _states)
+                                                {
+                                                    <option value="@s.Id">@s.Code — @s.Name</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-[11px] text-zinc-500 mb-1">Monthly rent</label>
+                                            <input type="number" step="0.01" min="0" @bind="_editRent"
+                                                   class="w-32 px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm" />
+                                        </div>
+                                        <button @onclick="SaveCreateAsync" disabled="@_busy"
+                                                class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">Create &amp; link</button>
+                                        <button @onclick="CancelEdit" class="px-2 py-1 rounded text-xs text-zinc-500 hover:underline">Cancel</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+
+            <div class="px-4 py-3 border-t border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-500">
+                <div>Page @(_page + 1) of @TotalPages</div>
+                <div class="flex items-center gap-2">
+                    <button @onclick="PrevPage" disabled="@(_page == 0)" class="px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 disabled:opacity-40">Prev</button>
+                    <button @onclick="NextPage" disabled="@(_page >= TotalPages - 1)" class="px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 disabled:opacity-40">Next</button>
+                </div>
+            </div>
+        </div>
+
+        @if (_message is not null)
+        {
+            <div class="text-xs @(_messageOk ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")">@_message</div>
+        }
+    }
+</div>
+
+@code {
+    private int _pmId;
+    private bool _loading = true;
+    private bool _disabled;
+    private bool _busy;
+    private string? _message;
+    private bool _messageOk;
+
+    private List<TenantRow> _rows = new();
+    private List<TenantRow> _filtered = new();
+    private List<TenantRow> _pageRows = new();
+    private IReadOnlyList<(int Id, string Code, string Name)> _states = Array.Empty<(int, string, string)>();
+    private readonly HashSet<int> _selected = new();
+
+    private string _search = string.Empty;
+    private string _filter = "all";
+    private int _bulkStateId;
+
+    private const int PageSize = 25;
+    private int _page;
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(_filtered.Count / (double)PageSize));
+    private int LinkedCount => _rows.Count(r => r.LeaseId is not null);
+
+    // inline edit/create state
+    private int? _editingCustomerId;
+    private int? _creatingCustomerId;
+    private int? _editLeaseId;
+    private decimal _editRent;
+    private int _editStateId;
+
+    private static readonly CultureInfo Usd = CultureInfo.GetCultureInfo("en-US");
+
+    protected override async Task OnInitializedAsync()
+    {
+        _pmId = await Pm.GetPmIdAsync();
+        _disabled = !await Flags.IsEnabledAsync("tenancy.tenants_screen", _pmId, CancellationToken.None);
+        if (!_disabled)
+        {
+            _states = await Grid.GetStatesAsync(CancellationToken.None);
+            await ReloadAsync();
+        }
+        _loading = false;
+    }
+
+    private async Task ReloadAsync()
+    {
+        _rows = (await Grid.GetRowsAsync(_pmId, CancellationToken.None))
+            .OrderBy(r => r.CustomerName, StringComparer.OrdinalIgnoreCase).ToList();
+        ApplyFilters();
+    }
+
+    private void OnFilterChanged() { _page = 0; ApplyFilters(); }
+
+    private void ApplyFilters()
+    {
+        IEnumerable<TenantRow> q = _rows;
+        q = _filter switch
+        {
+            "linked"   => q.Where(r => r.LeaseId is not null),
+            "unlinked" => q.Where(r => r.LeaseId is null),
+            "review"   => q.Where(r => r.FeeRisk is FeeRisk.OverCap or FeeRisk.Review),
+            _          => q
+        };
+        if (!string.IsNullOrWhiteSpace(_search))
+        {
+            var n = _search.Trim();
+            q = q.Where(r => r.CustomerName.Contains(n, StringComparison.OrdinalIgnoreCase)
+                          || (r.Email != null && r.Email.Contains(n, StringComparison.OrdinalIgnoreCase)));
+        }
+        _filtered = q.ToList();
+        if (_page >= TotalPages) _page = TotalPages - 1;
+        if (_page < 0) _page = 0;
+        SlicePage();
+    }
+
+    private void SlicePage() => _pageRows = _filtered.Skip(_page * PageSize).Take(PageSize).ToList();
+    private void PrevPage() { if (_page > 0) { _page--; SlicePage(); } }
+    private void NextPage() { if (_page < TotalPages - 1) { _page++; SlicePage(); } }
+
+    private void ToggleOne(int customerId, bool on)
+    {
+        if (on) _selected.Add(customerId); else _selected.Remove(customerId);
+    }
+
+    private void BeginEdit(TenantRow r)
+    {
+        _editingCustomerId = r.CustomerId;
+        _creatingCustomerId = null;
+        _editLeaseId = r.LeaseId;
+        _editRent = r.MonthlyRent ?? 0m;
+        _editStateId = r.StateId ?? (_states.Count > 0 ? _states[0].Id : 0);
+    }
+
+    private void BeginCreate(TenantRow r)
+    {
+        _creatingCustomerId = r.CustomerId;
+        _editingCustomerId = null;
+        _editRent = 0m;
+        // Prefer the customer's billing state if it maps to a known state code.
+        var match = _states.FirstOrDefault(s => string.Equals(s.Code, r.BillingState, StringComparison.OrdinalIgnoreCase));
+        _editStateId = match.Id != 0 ? match.Id : (_states.Count > 0 ? _states[0].Id : 0);
+    }
+
+    private void CancelEdit() { _editingCustomerId = null; _creatingCustomerId = null; }
+
+    private async Task SaveEditAsync()
+    {
+        if (_editLeaseId is not int leaseId) return;
+        await RunAsync(async () =>
+        {
+            await Grid.UpdateLeaseAsync(leaseId, _editRent, _editStateId, CancellationToken.None);
+            return "Lease updated.";
+        });
+    }
+
+    private async Task SaveCreateAsync()
+    {
+        if (_creatingCustomerId is not int customerId) return;
+        await RunAsync(async () =>
+        {
+            await Grid.CreateLeaseForCustomerAsync(_pmId, customerId, _editStateId, _editRent, CancellationToken.None);
+            return "Lease created and linked.";
+        });
+    }
+
+    private async Task ApplyBulkStateAsync()
+    {
+        if (_bulkStateId == 0 || _selected.Count == 0) return;
+        await RunAsync(async () =>
+        {
+            var targets = _rows.Where(r => _selected.Contains(r.CustomerId) && r.LeaseId is int && r.MonthlyRent is decimal).ToList();
+            foreach (var r in targets)
+            {
+                await Grid.UpdateLeaseAsync(r.LeaseId!.Value, r.MonthlyRent!.Value, _bulkStateId, CancellationToken.None);
+            }
+            _selected.Clear();
+            _bulkStateId = 0;
+            return $"Applied state to {targets.Count} lease(s).";
+        });
+    }
+
+    // Shared run wrapper: guards re-entrancy, validates rent, reloads, sets message.
+    private async Task RunAsync(Func<Task<string>> action)
+    {
+        if (_busy) return;
+        _busy = true;
+        _message = null;
+        try
+        {
+            if ((_editingCustomerId is not null || _creatingCustomerId is not null) && _editRent <= 0m)
+            {
+                _messageOk = false;
+                _message = "Rent must be greater than zero.";
+                return;
+            }
+            var ok = await action();
+            _editingCustomerId = null;
+            _creatingCustomerId = null;
+            await ReloadAsync();
+            _messageOk = true;
+            _message = ok;
+        }
+        catch (Exception ex)
+        {
+            _messageOk = false;
+            _message = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string RiskLabel(FeeRisk r) => r switch
+    {
+        FeeRisk.Ok => "OK",
+        FeeRisk.Review => "Review",
+        FeeRisk.OverCap => "Over cap",
+        _ => "—"
+    };
+
+    private static string RiskClass(FeeRisk r) => r switch
+    {
+        FeeRisk.Ok      => "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
+        FeeRisk.Review  => "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
+        FeeRisk.OverCap => "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400",
+        _               => "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+    };
+}

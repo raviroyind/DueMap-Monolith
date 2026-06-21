@@ -18,6 +18,8 @@
 @inject INoticeDeliveryRepository Deliveries
 @inject IPmNoticePreferencesService PmPrefs
 @inject IStateReader StateReader
+@inject DueMap.Common.FeatureFlags.IFeatureFlags Flags
+@inject NavigationManager Nav
 @inject NavigationManager Nav
 
 <PageTitle>Leases — DueMap</PageTitle>
@@ -477,6 +479,14 @@
     protected override async Task OnInitializedAsync()
     {
         _pmId = await Pm.GetPmIdAsync();
+        // P1-5: when the unified Tenants screen is enabled, this page is
+        // superseded — redirect. Kept (un-redirected) for rollback when the
+        // flag is off.
+        if (await Flags.IsEnabledAsync("tenancy.tenants_screen", _pmId, CancellationToken.None))
+        {
+            Nav.NavigateTo("/tenants", replace: true);
+            return;
+        }
         await LoadAsync();
     }
 

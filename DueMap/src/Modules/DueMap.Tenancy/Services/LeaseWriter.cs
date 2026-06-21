@@ -62,6 +62,22 @@ internal sealed class LeaseWriter : ILeaseWriter
         return lease;
     }
 
+    public async Task UpdateCoreFieldsAsync(int leaseId, decimal monthlyRent, int stateId, CancellationToken ct)
+    {
+        if (monthlyRent <= 0m)
+        {
+            throw new ArgumentException("Monthly rent must be positive.", nameof(monthlyRent));
+        }
+
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var lease = await db.Leases.FirstOrDefaultAsync(l => l.Id == leaseId, ct)
+            ?? throw new InvalidOperationException($"Lease {leaseId} not found.");
+
+        lease.MonthlyRent = monthlyRent;
+        lease.StateId = stateId;
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task UpdateLateFeeProfileAsync(int leaseId, LateFeeProfileInput profile, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(profile);

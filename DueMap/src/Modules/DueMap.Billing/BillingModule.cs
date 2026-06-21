@@ -44,6 +44,9 @@ public sealed class BillingModule : IModule
         // Reports — daily close email per PM (Hangfire-triggered in Worker).
         services.AddScoped<Reports.IDailyCloseReportService, Reports.DailyCloseReportService>();
 
+        // ---- Unified Tenants screen (P1-5) ------------------------------
+        services.AddScoped<Tenants.ITenantsGridService, Tenants.TenantsGridService>();
+
         // ---- AutoSetup (P1-3) -------------------------------------------
         services.AddScoped<AutoSetup.IComplianceScanService, AutoSetup.ComplianceScanService>();
         services.AddScoped<AutoSetup.IAutoSetupService, AutoSetup.AutoSetupService>();
