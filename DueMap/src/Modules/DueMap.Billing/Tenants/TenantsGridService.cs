@@ -82,7 +82,12 @@ internal sealed class TenantsGridService : ITenantsGridService
                 // follow-up (see P1-5 deferral notes).
                 RemindersEnabled: lease is not null,
                 FeeRisk:         risk,
-                AutopayStatus:   "—"));   // placeholder until Phase 2 autopay
+                AutopayStatus:   lease?.AutopayStatus switch     // P2-1
+                {
+                    DueMap.Tenancy.Domain.AutopayStatus.Enrolled => "Autopay",
+                    DueMap.Tenancy.Domain.AutopayStatus.None     => "Manual",
+                    _                                            => "—"
+                }));
         }
 
         return rows;

@@ -57,6 +57,8 @@ public sealed class IntegrationsModule : IModule
         services.AddScoped<INoticeDispatcher, NoticeDispatcher>();
         // P2-2 — SMS opt-out list. TwilioSmsSender checks it before every send.
         services.AddScoped<ISmsSuppressionStore, SmsSuppressionStore>();
+        // P2-1 — autopay deep links + status inference (money-untouched).
+        services.AddScoped<DueMap.Integrations.Accounting.IAutopayService, AutopayService>();
 
         // Pulls the authoritative invoice PDF from QBO/Xero for the current
         // rent period — attached to late_fee_notice emails by ActionExecutor.

@@ -24,6 +24,12 @@ public interface ILeaseWriter
     /// staging flag. Rent must be positive; state must exist.
     /// </summary>
     Task UpdateCoreFieldsAsync(int leaseId, decimal monthlyRent, int stateId, CancellationToken ct);
+
+    /// <summary>
+    /// Stamp the inferred autopay status + check timestamp during sync (P2-1).
+    /// No-op if the lease no longer exists.
+    /// </summary>
+    Task UpdateAutopayStatusAsync(int leaseId, AutopayStatus status, DateTime checkedAt, CancellationToken ct);
 }
 
 /// <summary>

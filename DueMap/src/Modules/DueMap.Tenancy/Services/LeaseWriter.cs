@@ -62,6 +62,17 @@ internal sealed class LeaseWriter : ILeaseWriter
         return lease;
     }
 
+    public async Task UpdateAutopayStatusAsync(int leaseId, AutopayStatus status, DateTime checkedAt, CancellationToken ct)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var lease = await db.Leases.FirstOrDefaultAsync(l => l.Id == leaseId, ct);
+        if (lease is null) return;   // lease vanished between read + write; nothing to stamp
+
+        lease.AutopayStatus = status;
+        lease.AutopayCheckedAt = checkedAt;
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task UpdateCoreFieldsAsync(int leaseId, decimal monthlyRent, int stateId, CancellationToken ct)
     {
         if (monthlyRent <= 0m)

@@ -49,4 +49,11 @@ public sealed class Lease
     /// created before AutoSetup landed.
     /// </summary>
     public bool FeesStaged { get; set; }
+
+    // ---- Autopay (P2-1, v24) --------------------------------------------
+    /// <summary>Inferred autopay/reliable-payer status; drives nag suppression (P2-4).</summary>
+    public AutopayStatus AutopayStatus { get; set; } = AutopayStatus.Unknown;
+
+    /// <summary>When the autopay status was last evaluated during sync.</summary>
+    public DateTime? AutopayCheckedAt { get; set; }
 }

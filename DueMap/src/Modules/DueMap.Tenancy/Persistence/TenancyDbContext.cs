@@ -72,6 +72,9 @@ public sealed class TenancyDbContext : DbContext
             e.Property(x => x.LateFeeGraceDays).HasColumnName("late_fee_grace_days");
             e.Property(x => x.LateFeeDailyAccrual).HasColumnName("late_fee_daily_accrual");
             e.Property(x => x.FeesStaged).HasColumnName("fees_staged");
+            // v24 (P2-1) — autopay status.
+            e.Property(x => x.AutopayStatus).HasColumnName("autopay_status").HasConversion<byte>();
+            e.Property(x => x.AutopayCheckedAt).HasColumnName("autopay_checked_at");
         });
 
         modelBuilder.Entity<PmNoticePreferences>(e =>
