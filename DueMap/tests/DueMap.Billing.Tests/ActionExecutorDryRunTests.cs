@@ -39,10 +39,11 @@ public sealed class ActionExecutorDryRunTests
     private readonly IAssessmentRunRepository            _runs       = Substitute.For<IAssessmentRunRepository>();
     private readonly ILateFeeAssessmentRepository        _fees       = Substitute.For<ILateFeeAssessmentRepository>();
     private readonly ILateFeeInvoiceAttachmentFetcher    _attachments = Substitute.For<ILateFeeInvoiceAttachmentFetcher>();
+    private readonly DueMap.Common.FeatureFlags.IFeatureFlags _flags = Substitute.For<DueMap.Common.FeatureFlags.IFeatureFlags>();
 
     private ActionExecutor NewSut() => new(
         _templates, _renderer, _deliveries, _dispatcher, _contacts,
-        _invoices, _rules, _runs, _fees, _attachments,
+        _invoices, _rules, _runs, _fees, _attachments, _flags,
         NullLogger<ActionExecutor>.Instance);
 
     private static Lease NewLease() => new()

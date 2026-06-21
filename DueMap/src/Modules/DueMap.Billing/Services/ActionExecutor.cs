@@ -1,5 +1,6 @@
 using System.Globalization;
 using DueMap.Billing.Domain;
+using DueMap.Common.FeatureFlags;
 using DueMap.Integrations.Notices;
 using DueMap.Notices;
 using DueMap.Notices.Domain;
@@ -29,6 +30,7 @@ internal sealed partial class ActionExecutor : IActionExecutor
     private readonly IAssessmentRunRepository _runs;
     private readonly ILateFeeAssessmentRepository _fees;
     private readonly ILateFeeInvoiceAttachmentFetcher _attachments;
+    private readonly IFeatureFlags _flags;
     private readonly ILogger<ActionExecutor> _logger;
 
     public ActionExecutor(
@@ -42,6 +44,7 @@ internal sealed partial class ActionExecutor : IActionExecutor
         IAssessmentRunRepository runs,
         ILateFeeAssessmentRepository fees,
         ILateFeeInvoiceAttachmentFetcher attachments,
+        IFeatureFlags flags,
         ILogger<ActionExecutor> logger)
     {
         _templates = templates;
@@ -54,6 +57,7 @@ internal sealed partial class ActionExecutor : IActionExecutor
         _runs = runs;
         _fees = fees;
         _attachments = attachments;
+        _flags = flags;
         _logger = logger;
     }
 
@@ -178,7 +182,21 @@ internal sealed partial class ActionExecutor : IActionExecutor
         // template is expected to wrap the Pay Now button in {% if pay_url %}.
         var payUrl = await _invoices.GetCurrentPayUrlAsync(lease.Id, businessDate, ct);
 
-        var variables = BuildVariables(lease, contact, currentDueDate, payUrl);
+        // P2-4: autopay-aware reminders (billing.autopay_aware). Enrolled tenants
+        // get an informational heads-up (autopay_enrolled) instead of a nudge;
+        // non-enrolled tenants get the "Set up autopay" deep link (the hosted
+        // pay page — same value IAutopayService.BuildSetupUrlAsync returns).
+        // Only applies to reminders, not the late-fee notice.
+        var autopayEnrolled = false;
+        string? autopaySetupUrl = null;
+        if (IsReminder(action.Kind)
+            && await _flags.IsEnabledAsync("billing.autopay_aware", lease.PropertyManagerId, ct))
+        {
+            if (lease.AutopayStatus == AutopayStatus.Enrolled) autopayEnrolled = true;
+            else                                               autopaySetupUrl = payUrl;
+        }
+
+        var variables = BuildVariables(lease, contact, currentDueDate, payUrl, autopayEnrolled, autopaySetupUrl);
 
         // Render the merged subject/body. We construct a synthetic
         // NoticeTemplateVersion carrying the renderable fields so the
@@ -328,16 +346,27 @@ internal sealed partial class ActionExecutor : IActionExecutor
     }
 
     private static Dictionary<string, object?> BuildVariables(
-        Lease lease, TenantContact contact, DateOnly currentDueDate, string? payUrl) =>
+        Lease lease, TenantContact contact, DateOnly currentDueDate, string? payUrl,
+        bool autopayEnrolled = false, string? autopaySetupUrl = null) =>
         new()
         {
-            ["tenant_name"]  = contact.DisplayName ?? "Tenant",
-            ["amount_owed"]  = lease.MonthlyRent,
-            ["monthly_rent"] = lease.MonthlyRent,
-            ["due_date"]     = currentDueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            ["lease_id"]     = lease.Id,
-            ["pay_url"]      = payUrl
+            ["tenant_name"]       = contact.DisplayName ?? "Tenant",
+            ["amount_owed"]       = lease.MonthlyRent,
+            ["monthly_rent"]      = lease.MonthlyRent,
+            ["due_date"]          = currentDueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            ["lease_id"]          = lease.Id,
+            ["pay_url"]           = payUrl,
+            // P2-4: templates can branch — heads-up copy when enrolled, a
+            // "Set up autopay" CTA when a setup URL is present.
+            ["autopay_enrolled"]  = autopayEnrolled,
+            ["autopay_setup_url"] = autopaySetupUrl
         };
+
+    /// <summary>The reminder action kinds autopay-aware behavior applies to (not late-fee).</summary>
+    private static bool IsReminder(ActionKind kind) => kind is
+        ActionKind.SendPreDueReminder or
+        ActionKind.SendDueDateReminder or
+        ActionKind.SendGracePeriodReminder;
 
     [LoggerMessage(EventId = 4001, Level = LogLevel.Information,
         Message = "Skipped {NoticeTypeCode} for lease {LeaseId}: no tenant contact synced yet")]
