@@ -510,8 +510,8 @@ webhooks.MapPost("/twilio",     () => Results.Ok())   // TODO: SMS delivery call
 // P2-2: Twilio inbound SMS — STOP/START opt-out handling. Twilio POSTs an
 // x-www-form-urlencoded body with From + Body when a tenant replies. We mirror
 // the carrier-level STOP into our suppression list so we never even attempt a
-// send. (TODO: validate X-Twilio-Signature before trusting START, which could
-// otherwise be spoofed to un-suppress a number.)
+// send. The request is signature-verified (X-Twilio-Signature) before we trust
+// it — critical for START, which un-suppresses a number.
 // Standard carrier opt-out / opt-in keywords (created once, not per request).
 var smsStopWords  = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT" };
 var smsStartWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "START", "UNSTOP", "YES" };
@@ -519,9 +519,32 @@ var smsStartWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "STA
 webhooks.MapPost("/twilio/inbound", async (
     HttpRequest req,
     DueMap.Integrations.Notices.ISmsSuppressionStore suppressions,
+    Microsoft.Extensions.Options.IOptions<DueMap.Integrations.IntegrationsOptions> intOpts,
     CancellationToken ct) =>
 {
     var form = await req.ReadFormAsync(ct);
+
+    // ---- Verify the request really came from Twilio ----
+    // Validate when an auth token is configured (prod). In dev with no token we
+    // can't validate and there's no live Twilio anyway, so we skip + log.
+    var authToken = intOpts.Value.Twilio.AuthToken;
+    if (!string.IsNullOrWhiteSpace(authToken))
+    {
+        var signature = req.Headers["X-Twilio-Signature"].ToString();
+        // The URL Twilio signed is the public callback URL. Behind a TLS-
+        // terminating proxy, ensure forwarded headers set the https scheme so
+        // this matches what Twilio used.
+        var url = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetEncodedUrl(req);
+        var parameters = form.ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
+
+        var validator = new Twilio.Security.RequestValidator(authToken);
+        if (string.IsNullOrEmpty(signature) || !validator.Validate(url, parameters, signature))
+        {
+            Log.Warning("Rejected Twilio inbound SMS: invalid or missing X-Twilio-Signature.");
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
+    }
+
     var from = form["From"].ToString();
     var body = form["Body"].ToString().Trim();
     if (string.IsNullOrWhiteSpace(from)) return Results.Ok();
