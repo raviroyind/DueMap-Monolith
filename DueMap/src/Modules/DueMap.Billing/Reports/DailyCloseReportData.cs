@@ -11,7 +11,21 @@ public sealed record DailyCloseReportData(
     string PmDisplayName,
     DailyCloseSummary Summary,
     IReadOnlyList<DailyCloseReminderRow> Reminders,
-    IReadOnlyList<DailyCloseFeeRow> Fees);
+    IReadOnlyList<DailyCloseFeeRow> Fees,
+    // P1-6: the "What needs you" section — operator-actionable items with
+    // deep links. Empty when the day was clean.
+    IReadOnlyList<DailyCloseAttentionItem> NeedsYou);
+
+/// <summary>
+/// One "What needs you" item: something the PM must act on, with a deep link.
+/// <paramref name="Severity"/> is "crit" (red) or "warn" (amber).
+/// </summary>
+public sealed record DailyCloseAttentionItem(
+    string Severity,
+    string Title,
+    string Detail,
+    string LinkLabel,
+    string LinkUrl);
 
 public sealed record DailyCloseSummary(
     int UnpaidInvoices,

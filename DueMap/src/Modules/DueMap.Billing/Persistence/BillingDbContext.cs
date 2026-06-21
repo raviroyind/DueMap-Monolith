@@ -32,6 +32,7 @@ public sealed class BillingDbContext : DbContext
             e.Property(x => x.MonthlyRentSnapshot).HasColumnName("monthly_rent_snapshot").HasColumnType("decimal(10,2)");
             e.Property(x => x.StateRuleVersionId).HasColumnName("state_rule_version_id");
             e.Property(x => x.LocalRuleOverrideId).HasColumnName("local_rule_override_id");
+            e.Property(x => x.DisclosureSnapshot).HasColumnName("disclosure_snapshot");   // v21 (P1-6)
             e.Property(x => x.Status)
                 .HasColumnName("status")
                 .HasMaxLength(20)

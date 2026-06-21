@@ -119,6 +119,11 @@ internal sealed partial class ActionExecutor : IActionExecutor
         }
 
         // ---- Live: write the assessment + run row -------------------------
+        // P1-6 §6.2: stamp a disclosure snapshot alongside the rule version so
+        // the row proves WHICH terms produced the fee, provable even after the
+        // rule is later versioned.
+        var disclosure = LateFeeDisclosure.From(rule, lease.MonthlyRent, feeAmount).ToJson();
+
         var fee = await _fees.RecordAsync(new LateFeeAssessment
         {
             LeaseId = lease.Id,
@@ -128,6 +133,7 @@ internal sealed partial class ActionExecutor : IActionExecutor
             MonthlyRentSnapshot = lease.MonthlyRent,
             StateRuleVersionId = rule.StateRuleVersionId,
             LocalRuleOverrideId = rule.LocalRuleOverrideId,
+            DisclosureSnapshot = disclosure,
             Status = LateFeeAssessmentStatus.Assessed
         }, ct);
 

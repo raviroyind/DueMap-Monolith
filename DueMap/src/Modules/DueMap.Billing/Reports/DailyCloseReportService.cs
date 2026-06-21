@@ -1,3 +1,5 @@
+using System.Globalization;
+using DueMap.Integrations.Accounting;
 using DueMap.Integrations.Notices;
 using DueMap.Notices;
 using DueMap.Tenancy;
@@ -8,12 +10,17 @@ namespace DueMap.Billing.Reports;
 
 internal sealed partial class DailyCloseReportService : IDailyCloseReportService
 {
+    // Past-due balances at/above this draw a "What needs you" flag.
+    private const decimal LargeDelinquencyThreshold = 1000m;
+    private const string AppBase = "https://app.duemap.com";
+
     private readonly IPropertyManagerReader _pms;
     private readonly ILeaseReader _leases;
     private readonly IRentInvoiceRepository _invoices;
     private readonly ICustomerRepository _customers;
     private readonly INoticeDeliveryRepository _deliveries;
     private readonly ILateFeeAssessmentRepository _fees;
+    private readonly IAccountingConnectionService _connections;
     private readonly INoticeDispatcher _dispatcher;
     private readonly ILogger<DailyCloseReportService> _logger;
 
@@ -24,6 +31,7 @@ internal sealed partial class DailyCloseReportService : IDailyCloseReportService
         ICustomerRepository customers,
         INoticeDeliveryRepository deliveries,
         ILateFeeAssessmentRepository fees,
+        IAccountingConnectionService connections,
         INoticeDispatcher dispatcher,
         ILogger<DailyCloseReportService> logger)
     {
@@ -33,6 +41,7 @@ internal sealed partial class DailyCloseReportService : IDailyCloseReportService
         _customers = customers;
         _deliveries = deliveries;
         _fees = fees;
+        _connections = connections;
         _dispatcher = dispatcher;
         _logger = logger;
     }
@@ -145,13 +154,75 @@ internal sealed partial class DailyCloseReportService : IDailyCloseReportService
             })
             .ToList();
 
+        var needsYou = await BuildNeedsYouAsync(pm.Id, openInvoices, pastDue, ct);
+
         return new DailyCloseReportData(
             PropertyManagerId: pm.Id,
             BusinessDate: businessDate,
             PmDisplayName: pm.Name,
             Summary: summary,
             Reminders: reminderRows,
-            Fees: feeRows);
+            Fees: feeRows,
+            NeedsYou: needsYou);
+    }
+
+    /// <summary>
+    /// The "What needs you" list (P1-6). Each item is something the PM must
+    /// act on, with a deep link. Sources today: broken accounting connection,
+    /// open invoices not linked to a lease (DueMap can't act on them), and
+    /// large past-due balances. "disputed/contacted" + "ambiguous state"
+    /// join this list once those signals are tracked.
+    /// </summary>
+    private async Task<IReadOnlyList<DailyCloseAttentionItem>> BuildNeedsYouAsync(
+        int pmId,
+        IReadOnlyList<RentInvoice> openInvoices,
+        IReadOnlyList<RentInvoice> pastDue,
+        CancellationToken ct)
+    {
+        var items = new List<DailyCloseAttentionItem>();
+
+        // 1) Broken accounting connection — processing is paused for this PM.
+        var health = await _connections.GetHealthAsync(pmId, ct);
+        if (health is { HealthStatus: ConnectionHealthStatus.Broken })
+        {
+            items.Add(new DailyCloseAttentionItem(
+                Severity:  "crit",
+                Title:     "Your accounting connection is paused",
+                Detail:    string.IsNullOrWhiteSpace(health.PausedReason)
+                               ? "Reconnect so DueMap can keep syncing invoices and sending reminders."
+                               : health.PausedReason!,
+                LinkLabel: "Reconnect",
+                LinkUrl:   $"{AppBase}/connections"));
+        }
+
+        // 2) Open invoices not linked to a lease — DueMap can't remind/assess
+        //    on them until they're linked.
+        var unlinkedOpen = openInvoices.Count(i => i.LeaseId is null);
+        if (unlinkedOpen > 0)
+        {
+            items.Add(new DailyCloseAttentionItem(
+                Severity:  "warn",
+                Title:     $"{unlinkedOpen} open invoice{(unlinkedOpen == 1 ? "" : "s")} not linked to a lease",
+                Detail:    "Reminders and late fees won't run for these until each customer is linked to a lease.",
+                LinkLabel: "Review tenants",
+                LinkUrl:   $"{AppBase}/tenants"));
+        }
+
+        // 3) Large delinquency — past-due balances at/above the threshold.
+        var big = pastDue.Where(i => i.Balance >= LargeDelinquencyThreshold)
+                         .OrderByDescending(i => i.Balance).ToList();
+        if (big.Count > 0)
+        {
+            var top = big[0].Balance.ToString("C0", CultureInfo.GetCultureInfo("en-US"));
+            items.Add(new DailyCloseAttentionItem(
+                Severity:  "warn",
+                Title:     $"{big.Count} large past-due balance{(big.Count == 1 ? "" : "s")} (top {top})",
+                Detail:    "These may warrant a personal follow-up beyond the automated reminders.",
+                LinkLabel: "View overdue",
+                LinkUrl:   $"{AppBase}/invoices"));
+        }
+
+        return items;
     }
 
     [LoggerMessage(EventId = 7101, Level = LogLevel.Information,
