@@ -72,7 +72,7 @@ internal sealed partial class ActionExecutor : IActionExecutor
         // "what would happen if not yet done" so the reviewer sees the day's
         // intent against a clean slate.
         if (mode == ExecutionMode.Live
-            && await _runs.HasRunAsync(lease.Id, currentDueDate, action.Kind, ct))
+            && await _runs.HasRunAsync(lease.Id, currentDueDate, action.Kind, ct, action.StepKey))
         {
             return new ActionExecutionResult(ActionOutcome.SkippedAlreadyDone, null);
         }
@@ -143,7 +143,8 @@ internal sealed partial class ActionExecutor : IActionExecutor
             DueDate = currentDueDate,
             AssessmentDate = businessDate,
             ActionKind = ActionKind.AssessLateFee,
-            LateFeeAssessmentId = fee.Id
+            LateFeeAssessmentId = fee.Id,
+            StepKey = action.StepKey
         }, ct);
 
         return run is null
@@ -201,7 +202,7 @@ internal sealed partial class ActionExecutor : IActionExecutor
             return new ActionExecutionResult(ActionOutcome.Failed, ex.Message);
         }
 
-        var (channel, to) = ChooseChannel(contact);
+        var (channel, to) = ChooseChannel(contact, action.PreferredChannel);
 
         // ---- DryRun: build a preview row, no dispatch, no writes ----------
         if (mode == ExecutionMode.DryRun)
@@ -275,7 +276,8 @@ internal sealed partial class ActionExecutor : IActionExecutor
             DueDate = currentDueDate,
             AssessmentDate = businessDate,
             ActionKind = action.Kind,
-            NoticeDeliveryId = delivery.Id
+            NoticeDeliveryId = delivery.Id,
+            StepKey = action.StepKey
         }, ct);
 
         if (dispatchResult.Status == DispatchStatus.Failed)
@@ -305,10 +307,25 @@ internal sealed partial class ActionExecutor : IActionExecutor
         return line.Length > 140 ? line[..140] + "…" : line;
     }
 
-    private static (DispatchChannel Channel, string To) ChooseChannel(TenantContact contact) =>
-        !string.IsNullOrWhiteSpace(contact.Email)
+    private static (DispatchChannel Channel, string To) ChooseChannel(TenantContact contact, string? preferred = null)
+    {
+        // P2-3: honor a sequence step's preferred channel when it's deliverable;
+        // otherwise fall back to the default (email if present, else SMS).
+        if (string.Equals(preferred, "sms", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(contact.Phone))
+        {
+            return (DispatchChannel.Sms, contact.Phone!);
+        }
+        if (string.Equals(preferred, "email", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(contact.Email))
+        {
+            return (DispatchChannel.Email, contact.Email);
+        }
+
+        return !string.IsNullOrWhiteSpace(contact.Email)
             ? (DispatchChannel.Email, contact.Email)
-            : (DispatchChannel.Sms,   contact.Phone!);
+            : (DispatchChannel.Sms, contact.Phone!);
+    }
 
     private static Dictionary<string, object?> BuildVariables(
         Lease lease, TenantContact contact, DateOnly currentDueDate, string? payUrl) =>

@@ -33,6 +33,7 @@ public sealed class BillingModule : IModule
         services.AddScoped<IRentScheduleService, MonthlyRentScheduleService>();
         services.AddScoped<IEffectivePolicyService, EffectivePolicyService>();
         services.AddScoped<IAssessmentPlanner, AssessmentPlanner>();
+        services.AddScoped<ISequenceResolver, SequenceResolver>();   // P2-3
         services.AddScoped<IAssessmentRunRepository, AssessmentRunRepository>();
         services.AddScoped<ILateFeeAssessmentRepository, LateFeeAssessmentRepository>();
         services.AddScoped<IPmProcessingRunRepository, PmProcessingRunRepository>();

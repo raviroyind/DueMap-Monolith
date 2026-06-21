@@ -17,8 +17,11 @@ public sealed class AssessmentPlannerTests
     private readonly IRentScheduleService _schedule = Substitute.For<IRentScheduleService>();
     private readonly IRentInvoiceRepository _invoices = Substitute.For<IRentInvoiceRepository>();
     private readonly IRulesService _rules = Substitute.For<IRulesService>();
+    private readonly ISequenceResolver _sequences = Substitute.For<ISequenceResolver>();
+    private readonly DueMap.Common.FeatureFlags.IFeatureFlags _flags = Substitute.For<DueMap.Common.FeatureFlags.IFeatureFlags>();
 
-    private AssessmentPlanner NewSut() => new(_policy, _schedule, _invoices, _rules);
+    // billing.sequences defaults OFF (mock returns false) → legacy cadence.
+    private AssessmentPlanner NewSut() => new(_policy, _schedule, _invoices, _rules, _sequences, _flags);
 
     private static Lease Lease() =>
         new() { Id = 1, PropertyManagerId = 10, StateId = 5, MonthlyRent = 2000m,

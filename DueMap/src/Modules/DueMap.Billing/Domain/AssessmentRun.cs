@@ -18,5 +18,12 @@ public sealed class AssessmentRun
     public long? NoticeDeliveryId { get; set; }
     public int? LateFeeAssessmentId { get; set; }
 
+    /// <summary>
+    /// P2-3: discriminator for multi-touch reminder sequences. Null for the
+    /// legacy one-per-kind cadence; set to the sequence step's key so the
+    /// (lease, due_date, kind, step_key) unique constraint fires each step once.
+    /// </summary>
+    public string? StepKey { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }

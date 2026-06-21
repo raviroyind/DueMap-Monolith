@@ -21,8 +21,10 @@ public sealed class AssessmentPlannerStagedSkipTests
     private readonly IRentScheduleService    _schedule = Substitute.For<IRentScheduleService>();
     private readonly IRentInvoiceRepository  _invoices = Substitute.For<IRentInvoiceRepository>();
     private readonly IRulesService           _rules    = Substitute.For<IRulesService>();
+    private readonly ISequenceResolver       _sequences = Substitute.For<ISequenceResolver>();
+    private readonly DueMap.Common.FeatureFlags.IFeatureFlags _flags = Substitute.For<DueMap.Common.FeatureFlags.IFeatureFlags>();
 
-    private AssessmentPlanner NewSut() => new(_policy, _schedule, _invoices, _rules);
+    private AssessmentPlanner NewSut() => new(_policy, _schedule, _invoices, _rules, _sequences, _flags);
 
     private static Lease StagedLease(bool feesStaged) => new()
     {

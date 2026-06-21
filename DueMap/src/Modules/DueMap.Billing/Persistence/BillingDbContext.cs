@@ -1,5 +1,8 @@
+using System.Text.Json;
 using DueMap.Billing.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace DueMap.Billing.Persistence;
 
@@ -15,6 +18,7 @@ public sealed class BillingDbContext : DbContext
     public DbSet<LateFeeAssessment> LateFeeAssessments => Set<LateFeeAssessment>();
     public DbSet<AssessmentRun>     AssessmentRuns     => Set<AssessmentRun>();
     public DbSet<PmProcessingRun>   PmProcessingRuns   => Set<PmProcessingRun>();
+    public DbSet<NoticeSequence>    NoticeSequences    => Set<NoticeSequence>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -58,9 +62,33 @@ public sealed class BillingDbContext : DbContext
                 .HasConversion(v => v.ToWire(), v => ActionKindMapping.FromWire(v));
             e.Property(x => x.NoticeDeliveryId).HasColumnName("notice_delivery_id");
             e.Property(x => x.LateFeeAssessmentId).HasColumnName("late_fee_assessment_id");
+            e.Property(x => x.StepKey).HasColumnName("step_key").HasMaxLength(40);   // v23 (P2-3)
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
 
-            e.HasIndex(x => new { x.LeaseId, x.DueDate, x.ActionKind }).IsUnique();
+            // P2-3: idempotency key widened to include step_key. NULL step_key
+            // preserves the legacy (lease, due, kind) uniqueness exactly.
+            e.HasIndex(x => new { x.LeaseId, x.DueDate, x.ActionKind, x.StepKey }).IsUnique();
+        });
+
+        modelBuilder.Entity<NoticeSequence>(e =>
+        {
+            e.ToTable("notice_sequences");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.PropertyManagerId).HasColumnName("pm_id");
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(80).IsRequired();
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+
+            // Steps persist as a JSON column. A ValueComparer keeps EF's change
+            // tracker honest about the mutable list.
+            var stepsConverter = new ValueConverter<List<NoticeSequenceStep>, string>(
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                v => JsonSerializer.Deserialize<List<NoticeSequenceStep>>(v, (JsonSerializerOptions?)null) ?? new List<NoticeSequenceStep>());
+            var stepsComparer = new ValueComparer<List<NoticeSequenceStep>>(
+                (a, b) => JsonSerializer.Serialize(a, (JsonSerializerOptions?)null) == JsonSerializer.Serialize(b, (JsonSerializerOptions?)null),
+                v => v == null ? 0 : JsonSerializer.Serialize(v, (JsonSerializerOptions?)null).GetHashCode(StringComparison.Ordinal),
+                v => JsonSerializer.Deserialize<List<NoticeSequenceStep>>(JsonSerializer.Serialize(v, (JsonSerializerOptions?)null), (JsonSerializerOptions?)null) ?? new List<NoticeSequenceStep>());
+            e.Property(x => x.Steps).HasColumnName("steps_json").HasConversion(stepsConverter, stepsComparer);
         });
 
         modelBuilder.Entity<PmProcessingRun>(e =>
