@@ -244,6 +244,16 @@ internal sealed partial class ActionExecutor : IActionExecutor
             BodyText: rendered.BodyText,
             Attachments: attachments), ct);
 
+        // P2-2: a Suppressed result (SMS channel off, or recipient opted out)
+        // is intentional, not a failure. Record NOTHING — no delivery row, no
+        // run row — so it isn't logged as a failure and naturally retries on a
+        // later tick (e.g. if the tenant texts START, or the flag is enabled).
+        if (dispatchResult.Status == DispatchStatus.Suppressed)
+        {
+            return new ActionExecutionResult(ActionOutcome.SkippedNoContact,
+                $"Not sent: {dispatchResult.FailureReason}");
+        }
+
         var delivery = await _deliveries.RecordAsync(new NoticeDelivery
         {
             PropertyManagerId = lease.PropertyManagerId,

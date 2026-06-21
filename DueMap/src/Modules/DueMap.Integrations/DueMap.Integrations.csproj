@@ -8,7 +8,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\DueMap.Common\DueMap.Common.csproj" />
     <ProjectReference Include="..\DueMap.Tenancy\DueMap.Tenancy.csproj" />
-    <ProjectReference Include="..\DueMap.Tenancy\DueMap.Tenancy.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DueMap.Integrations.Tests" />
   </ItemGroup>
 
   <ItemGroup>

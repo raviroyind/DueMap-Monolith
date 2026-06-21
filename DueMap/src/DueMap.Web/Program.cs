@@ -507,6 +507,38 @@ webhooks.MapPost("/sendgrid",   () => Results.Ok())   // TODO: delivery / bounce
 webhooks.MapPost("/twilio",     () => Results.Ok())   // TODO: SMS delivery callbacks
         .WithName("TwilioWebhook");
 
+// P2-2: Twilio inbound SMS — STOP/START opt-out handling. Twilio POSTs an
+// x-www-form-urlencoded body with From + Body when a tenant replies. We mirror
+// the carrier-level STOP into our suppression list so we never even attempt a
+// send. (TODO: validate X-Twilio-Signature before trusting START, which could
+// otherwise be spoofed to un-suppress a number.)
+// Standard carrier opt-out / opt-in keywords (created once, not per request).
+var smsStopWords  = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT" };
+var smsStartWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "START", "UNSTOP", "YES" };
+
+webhooks.MapPost("/twilio/inbound", async (
+    HttpRequest req,
+    DueMap.Integrations.Notices.ISmsSuppressionStore suppressions,
+    CancellationToken ct) =>
+{
+    var form = await req.ReadFormAsync(ct);
+    var from = form["From"].ToString();
+    var body = form["Body"].ToString().Trim();
+    if (string.IsNullOrWhiteSpace(from)) return Results.Ok();
+
+    if (smsStopWords.Contains(body))
+    {
+        await suppressions.SuppressAsync(from, $"Inbound SMS: {body.ToUpperInvariant()}", propertyManagerId: null, ct);
+    }
+    else if (smsStartWords.Contains(body))
+    {
+        await suppressions.UnsuppressAsync(from, ct);
+    }
+
+    // Empty 200 — Twilio treats this as "no auto-reply from the app."
+    return Results.Ok();
+}).WithName("TwilioInboundSms");
+
 // -------------------------------------------------------------------------
 // OAuth endpoints for accounting onboarding (QuickBooks + Xero).
 //   GET  /oauth/{provider}/connect/{pmId}    → 302 to the provider authorize URL

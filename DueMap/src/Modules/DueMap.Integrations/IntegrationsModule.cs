@@ -55,6 +55,8 @@ public sealed class IntegrationsModule : IModule
         services.AddScoped<IEmailSender, SendGridEmailSender>();
         services.AddScoped<ISmsSender, TwilioSmsSender>();
         services.AddScoped<INoticeDispatcher, NoticeDispatcher>();
+        // P2-2 — SMS opt-out list. TwilioSmsSender checks it before every send.
+        services.AddScoped<ISmsSuppressionStore, SmsSuppressionStore>();
 
         // Pulls the authoritative invoice PDF from QBO/Xero for the current
         // rent period — attached to late_fee_notice emails by ActionExecutor.
