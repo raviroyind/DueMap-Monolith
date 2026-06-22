@@ -9,8 +9,19 @@
     <base href="/" />
     <title>DueMap</title>
     <link rel="stylesheet" href="css/app.css" />
+
+    @* Medium Editor — WYSIWYG body editor for the notice-template modal.
+       Self-hosted (pinned v5.23.3) so it works offline in dev/Docker and carries
+       no runtime third-party CDN dependency. duemap-editor.css layers our
+       light/dark tweaks on top of the default theme. *@
+    <link rel="stylesheet" href="lib/medium-editor/css/medium-editor.min.css" />
+    <link rel="stylesheet" href="lib/medium-editor/css/default.min.css" />
+    <link rel="stylesheet" href="lib/medium-editor/duemap-editor.css" />
+
     <script src="js/theme.js"></script>
     <script src="js/template-editor.js"></script>
+    <script src="lib/medium-editor/medium-editor.min.js"></script>
+    <script src="js/medium-editor-interop.js"></script>
 
     @* driver.js — guided onboarding tour. Pinned to a specific version from
        jsDelivr. Production deployments should self-host these two files under
