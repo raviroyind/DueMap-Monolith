@@ -136,24 +136,23 @@
                 <div>
                     <label for="tpl-html-body" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">HTML body</label>
 
-                    @* Tab strip: large segmented control with a clear active state.
-                       Sits on its own line above the editor so it can't be missed,
-                       and uses indigo accent + white card lift on the active tab so
-                       the user always knows which mode they're in. *@
-                    <div class="inline-flex p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-700/60 text-sm mb-2.5">
+                    @* Underline-style tabs: a shared bottom rule with the active
+                       tab marked by an indigo underline that overlaps the rule
+                       (-mb-px). Reads as classic tabs rather than a pill toggle. *@
+                    <div class="flex items-center gap-1 border-b border-zinc-200 dark:border-zinc-700 mb-3">
                         <button type="button" @onclick="@(() => _htmlTab = HtmlTab.Design)"
                                 class="@(_htmlTab == HtmlTab.Design
-                                    ? "bg-white dark:bg-zinc-900 text-indigo-700 dark:text-indigo-300 shadow-sm ring-1 ring-indigo-500/15"
-                                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200")
-                                    inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-150">
+                                    ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                                    : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600")
+                                    inline-flex items-center gap-2 px-4 py-2.5 -mb-px border-b-2 font-semibold text-sm transition-colors duration-150">
                             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
                             Design
                         </button>
                         <button type="button" @onclick="ShowPreviewAsync"
                                 class="@(_htmlTab == HtmlTab.Preview
-                                    ? "bg-white dark:bg-zinc-900 text-indigo-700 dark:text-indigo-300 shadow-sm ring-1 ring-indigo-500/15"
-                                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200")
-                                    inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-150">
+                                    ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                                    : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600")
+                                    inline-flex items-center gap-2 px-4 py-2.5 -mb-px border-b-2 font-semibold text-sm transition-colors duration-150">
                             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
                             Preview
                         </button>
@@ -172,6 +171,17 @@
                         }
                         else
                         {
+                            @* Formatting affordance: Medium Editor's toolbar only
+                               appears on selection, which isn't discoverable on its
+                               own. This bar tells the PM the surface is rich-text and
+                               how to summon the toolbar. *@
+                            <div class="flex items-start gap-2.5 mb-2 px-3.5 py-2.5 rounded-lg bg-indigo-50/70 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-600 dark:text-indigo-400 mt-0.5 shrink-0"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>
+                                <p class="text-xs text-indigo-900 dark:text-indigo-200 leading-relaxed">
+                                    <span class="font-semibold">Highlight any text</span> to format it — a toolbar pops up with bold, italic, links, headings and lists.
+                                </p>
+                            </div>
+
                             @* WYSIWYG body. Content is owned by Medium Editor (wired
                                up in OnAfterRenderAsync) — deliberately NO @bind, or
                                Blazor's render diff would wipe the editor's DOM. C#
@@ -180,9 +190,6 @@
                             <div id="@BodyEditorId"
                                  class="rt-editor w-full min-h-[45vh] md:min-h-[55vh] px-3.5 py-3 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150"
                                  @onfocus="@(() => _focusedFieldId = BodyEditorId)"></div>
-                            <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1.5">
-                                Select text to format it. Placeholder chips below drop in tenant details, and the pay-link logic is filled in automatically when the notice is sent.
-                            </p>
                         }
                     }
                     else
