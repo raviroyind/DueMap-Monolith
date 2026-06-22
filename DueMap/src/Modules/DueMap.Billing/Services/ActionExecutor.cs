@@ -1,5 +1,6 @@
 using System.Globalization;
 using DueMap.Billing.Domain;
+using DueMap.Common.FeatureFlags;
 using DueMap.Integrations.Notices;
 using DueMap.Notices;
 using DueMap.Notices.Domain;
@@ -29,6 +30,7 @@ internal sealed partial class ActionExecutor : IActionExecutor
     private readonly IAssessmentRunRepository _runs;
     private readonly ILateFeeAssessmentRepository _fees;
     private readonly ILateFeeInvoiceAttachmentFetcher _attachments;
+    private readonly IFeatureFlags _flags;
     private readonly ILogger<ActionExecutor> _logger;
 
     public ActionExecutor(
@@ -42,6 +44,7 @@ internal sealed partial class ActionExecutor : IActionExecutor
         IAssessmentRunRepository runs,
         ILateFeeAssessmentRepository fees,
         ILateFeeInvoiceAttachmentFetcher attachments,
+        IFeatureFlags flags,
         ILogger<ActionExecutor> logger)
     {
         _templates = templates;
@@ -54,6 +57,7 @@ internal sealed partial class ActionExecutor : IActionExecutor
         _runs = runs;
         _fees = fees;
         _attachments = attachments;
+        _flags = flags;
         _logger = logger;
     }
 
@@ -62,28 +66,35 @@ internal sealed partial class ActionExecutor : IActionExecutor
         DateOnly currentDueDate,
         DateOnly businessDate,
         PlannedAction action,
-        CancellationToken ct)
+        ExecutionMode mode = ExecutionMode.Live,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(lease);
         ArgumentNullException.ThrowIfNull(action);
 
-        if (await _runs.HasRunAsync(lease.Id, currentDueDate, action.Kind, ct))
+        // Idempotency check is a Live-mode concern — DryRun deliberately shows
+        // "what would happen if not yet done" so the reviewer sees the day's
+        // intent against a clean slate.
+        if (mode == ExecutionMode.Live
+            && await _runs.HasRunAsync(lease.Id, currentDueDate, action.Kind, ct, action.StepKey))
         {
             return new ActionExecutionResult(ActionOutcome.SkippedAlreadyDone, null);
         }
 
         return action.Kind switch
         {
-            ActionKind.AssessLateFee => await ExecuteLateFeeAsync(lease, currentDueDate, businessDate, action, ct),
-            _                        => await ExecuteSendAsync(lease, currentDueDate, businessDate, action, ct)
+            ActionKind.AssessLateFee => await ExecuteLateFeeAsync(lease, currentDueDate, businessDate, action, mode, ct),
+            _                        => await ExecuteSendAsync(lease, currentDueDate, businessDate, action, mode, ct)
         };
     }
 
     private async Task<ActionExecutionResult> ExecuteLateFeeAsync(
-        Lease lease, DateOnly currentDueDate, DateOnly businessDate, PlannedAction action, CancellationToken ct)
+        Lease lease, DateOnly currentDueDate, DateOnly businessDate, PlannedAction action,
+        ExecutionMode mode, CancellationToken ct)
     {
         // Resolve the rule again here to capture provenance (version + override ids)
         // for the assessment row. The Rules cache makes this a memory hit.
+        // Read-only — safe to do in DryRun too.
         var rule = await _rules.ResolveRuleByStateIdAsync(lease.StateId, businessDate, lease.JurisdictionId, ct);
         if (rule is null)
         {
@@ -91,15 +102,42 @@ internal sealed partial class ActionExecutor : IActionExecutor
                 $"No active state rule for lease {lease.Id} on {businessDate:yyyy-MM-dd}");
         }
 
+        var feeAmount = action.FeeAmount ?? rule.ComputeFee(lease.MonthlyRent);
+
+        // ---- DryRun: build a preview row, no writes -----------------------
+        if (mode == ExecutionMode.DryRun)
+        {
+            var preview = new PlannedActionPreview(
+                LeaseId:            lease.Id,
+                TenantDisplayName:  null,                                 // not resolved on fee path
+                ActionKindCode:     "assess_late_fee",
+                Channel:            "",
+                ToAddress:          null,
+                Amount:             feeAmount,
+                DueDate:            currentDueDate,
+                Provenance:         $"state rule v={rule.StateRuleVersionId}"
+                                    + (rule.LocalRuleOverrideId is int oid ? $" override={oid}" : ""),
+                RenderedSubject:    null,
+                RenderedFirstLine:  null);
+            return new ActionExecutionResult(ActionOutcome.Executed, $"fee={feeAmount.ToString(CultureInfo.InvariantCulture)}", preview);
+        }
+
+        // ---- Live: write the assessment + run row -------------------------
+        // P1-6 §6.2: stamp a disclosure snapshot alongside the rule version so
+        // the row proves WHICH terms produced the fee, provable even after the
+        // rule is later versioned.
+        var disclosure = LateFeeDisclosure.From(rule, lease.MonthlyRent, feeAmount).ToJson();
+
         var fee = await _fees.RecordAsync(new LateFeeAssessment
         {
             LeaseId = lease.Id,
             DueDate = currentDueDate,
             AssessmentDate = businessDate,
-            FeeAmount = action.FeeAmount ?? rule.ComputeFee(lease.MonthlyRent),
+            FeeAmount = feeAmount,
             MonthlyRentSnapshot = lease.MonthlyRent,
             StateRuleVersionId = rule.StateRuleVersionId,
             LocalRuleOverrideId = rule.LocalRuleOverrideId,
+            DisclosureSnapshot = disclosure,
             Status = LateFeeAssessmentStatus.Assessed
         }, ct);
 
@@ -109,7 +147,8 @@ internal sealed partial class ActionExecutor : IActionExecutor
             DueDate = currentDueDate,
             AssessmentDate = businessDate,
             ActionKind = ActionKind.AssessLateFee,
-            LateFeeAssessmentId = fee.Id
+            LateFeeAssessmentId = fee.Id,
+            StepKey = action.StepKey
         }, ct);
 
         return run is null
@@ -118,7 +157,8 @@ internal sealed partial class ActionExecutor : IActionExecutor
     }
 
     private async Task<ActionExecutionResult> ExecuteSendAsync(
-        Lease lease, DateOnly currentDueDate, DateOnly businessDate, PlannedAction action, CancellationToken ct)
+        Lease lease, DateOnly currentDueDate, DateOnly businessDate, PlannedAction action,
+        ExecutionMode mode, CancellationToken ct)
     {
         var contact = await _contacts.ResolveAsync(lease.Id, ct);
         if (contact is null || (string.IsNullOrWhiteSpace(contact.Email) && string.IsNullOrWhiteSpace(contact.Phone)))
@@ -142,7 +182,21 @@ internal sealed partial class ActionExecutor : IActionExecutor
         // template is expected to wrap the Pay Now button in {% if pay_url %}.
         var payUrl = await _invoices.GetCurrentPayUrlAsync(lease.Id, businessDate, ct);
 
-        var variables = BuildVariables(lease, contact, currentDueDate, payUrl);
+        // P2-4: autopay-aware reminders (billing.autopay_aware). Enrolled tenants
+        // get an informational heads-up (autopay_enrolled) instead of a nudge;
+        // non-enrolled tenants get the "Set up autopay" deep link (the hosted
+        // pay page — same value IAutopayService.BuildSetupUrlAsync returns).
+        // Only applies to reminders, not the late-fee notice.
+        var autopayEnrolled = false;
+        string? autopaySetupUrl = null;
+        if (IsReminder(action.Kind)
+            && await _flags.IsEnabledAsync("billing.autopay_aware", lease.PropertyManagerId, ct))
+        {
+            if (lease.AutopayStatus == AutopayStatus.Enrolled) autopayEnrolled = true;
+            else                                               autopaySetupUrl = payUrl;
+        }
+
+        var variables = BuildVariables(lease, contact, currentDueDate, payUrl, autopayEnrolled, autopaySetupUrl);
 
         // Render the merged subject/body. We construct a synthetic
         // NoticeTemplateVersion carrying the renderable fields so the
@@ -166,7 +220,26 @@ internal sealed partial class ActionExecutor : IActionExecutor
             return new ActionExecutionResult(ActionOutcome.Failed, ex.Message);
         }
 
-        var (channel, to) = ChooseChannel(contact);
+        var (channel, to) = ChooseChannel(contact, action.PreferredChannel);
+
+        // ---- DryRun: build a preview row, no dispatch, no writes ----------
+        if (mode == ExecutionMode.DryRun)
+        {
+            var firstLine = FirstLine(rendered.BodyText);
+            var preview = new PlannedActionPreview(
+                LeaseId:            lease.Id,
+                TenantDisplayName:  contact.DisplayName,
+                ActionKindCode:     action.NoticeTypeCode,
+                Channel:            channel.ToString(),
+                ToAddress:          to,
+                Amount:             null,
+                DueDate:            currentDueDate,
+                Provenance:         $"template v={renderable.SystemTemplateVersionId}"
+                                    + (renderable.PmTemplateOverrideId is int oid ? $" override={oid}" : ""),
+                RenderedSubject:    rendered.Subject,
+                RenderedFirstLine:  firstLine);
+            return new ActionExecutionResult(ActionOutcome.Executed, $"preview channel={channel}", preview);
+        }
 
         // Late-fee notices get the QBO/Xero-rendered invoice PDF attached so
         // the tenant has the authoritative document with the updated balance.
@@ -190,6 +263,16 @@ internal sealed partial class ActionExecutor : IActionExecutor
             BodyText: rendered.BodyText,
             Attachments: attachments), ct);
 
+        // P2-2: a Suppressed result (SMS channel off, or recipient opted out)
+        // is intentional, not a failure. Record NOTHING — no delivery row, no
+        // run row — so it isn't logged as a failure and naturally retries on a
+        // later tick (e.g. if the tenant texts START, or the flag is enabled).
+        if (dispatchResult.Status == DispatchStatus.Suppressed)
+        {
+            return new ActionExecutionResult(ActionOutcome.SkippedNoContact,
+                $"Not sent: {dispatchResult.FailureReason}");
+        }
+
         var delivery = await _deliveries.RecordAsync(new NoticeDelivery
         {
             PropertyManagerId = lease.PropertyManagerId,
@@ -211,7 +294,8 @@ internal sealed partial class ActionExecutor : IActionExecutor
             DueDate = currentDueDate,
             AssessmentDate = businessDate,
             ActionKind = action.Kind,
-            NoticeDeliveryId = delivery.Id
+            NoticeDeliveryId = delivery.Id,
+            StepKey = action.StepKey
         }, ct);
 
         if (dispatchResult.Status == DispatchStatus.Failed)
@@ -226,22 +310,63 @@ internal sealed partial class ActionExecutor : IActionExecutor
                 $"channel={channel} provider_id={dispatchResult.ProviderMessageId}");
     }
 
-    private static (DispatchChannel Channel, string To) ChooseChannel(TenantContact contact) =>
-        !string.IsNullOrWhiteSpace(contact.Email)
+    /// <summary>
+    /// Short excerpt of a rendered plain-text body for the DryRun preview.
+    /// We want enough to verify the body is sane in the admin view without
+    /// dumping the whole 2 KB notice into JSON. ~140 chars matches an SMS
+    /// for visual parity with that channel.
+    /// </summary>
+    private static string FirstLine(string body)
+    {
+        if (string.IsNullOrEmpty(body)) return string.Empty;
+        var firstBreak = body.IndexOf('\n');
+        var line = firstBreak < 0 ? body : body[..firstBreak];
+        line = line.Trim();
+        return line.Length > 140 ? line[..140] + "…" : line;
+    }
+
+    private static (DispatchChannel Channel, string To) ChooseChannel(TenantContact contact, string? preferred = null)
+    {
+        // P2-3: honor a sequence step's preferred channel when it's deliverable;
+        // otherwise fall back to the default (email if present, else SMS).
+        if (string.Equals(preferred, "sms", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(contact.Phone))
+        {
+            return (DispatchChannel.Sms, contact.Phone!);
+        }
+        if (string.Equals(preferred, "email", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(contact.Email))
+        {
+            return (DispatchChannel.Email, contact.Email);
+        }
+
+        return !string.IsNullOrWhiteSpace(contact.Email)
             ? (DispatchChannel.Email, contact.Email)
-            : (DispatchChannel.Sms,   contact.Phone!);
+            : (DispatchChannel.Sms, contact.Phone!);
+    }
 
     private static Dictionary<string, object?> BuildVariables(
-        Lease lease, TenantContact contact, DateOnly currentDueDate, string? payUrl) =>
+        Lease lease, TenantContact contact, DateOnly currentDueDate, string? payUrl,
+        bool autopayEnrolled = false, string? autopaySetupUrl = null) =>
         new()
         {
-            ["tenant_name"]  = contact.DisplayName ?? "Tenant",
-            ["amount_owed"]  = lease.MonthlyRent,
-            ["monthly_rent"] = lease.MonthlyRent,
-            ["due_date"]     = currentDueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            ["lease_id"]     = lease.Id,
-            ["pay_url"]      = payUrl
+            ["tenant_name"]       = contact.DisplayName ?? "Tenant",
+            ["amount_owed"]       = lease.MonthlyRent,
+            ["monthly_rent"]      = lease.MonthlyRent,
+            ["due_date"]          = currentDueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            ["lease_id"]          = lease.Id,
+            ["pay_url"]           = payUrl,
+            // P2-4: templates can branch — heads-up copy when enrolled, a
+            // "Set up autopay" CTA when a setup URL is present.
+            ["autopay_enrolled"]  = autopayEnrolled,
+            ["autopay_setup_url"] = autopaySetupUrl
         };
+
+    /// <summary>The reminder action kinds autopay-aware behavior applies to (not late-fee).</summary>
+    private static bool IsReminder(ActionKind kind) => kind is
+        ActionKind.SendPreDueReminder or
+        ActionKind.SendDueDateReminder or
+        ActionKind.SendGracePeriodReminder;
 
     [LoggerMessage(EventId = 4001, Level = LogLevel.Information,
         Message = "Skipped {NoticeTypeCode} for lease {LeaseId}: no tenant contact synced yet")]

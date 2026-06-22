@@ -31,9 +31,11 @@
 
 @if (_visible && _draft is not null)
 {
-    <div class="fixed inset-0 z-50 bg-zinc-900/40 backdrop-blur-sm flex items-center justify-center p-6"
+    <div class="fixed inset-0 z-50 bg-zinc-900/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-6"
          @onclick="Close">
-        <div class="w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200/80 dark:border-zinc-800 max-h-[90vh] flex flex-col"
+        @* Editor width: full-screen on mobile, ~70% of the viewport on desktop,
+           so the rich-text body has room to breathe. *@
+        <div class="w-full h-full md:h-auto md:w-[70vw] md:max-w-[70vw] bg-white dark:bg-zinc-900 md:rounded-2xl shadow-xl border border-zinc-200/80 dark:border-zinc-800 max-h-screen md:max-h-[90vh] flex flex-col"
              @onclick:stopPropagation="true">
 
             <!-- HEADER -->
@@ -158,9 +160,9 @@
 
                     @if (_htmlTab == HtmlTab.Design)
                     {
-                        <textarea id="tpl-html-body" rows="10" @bind="_draft.BodyHtml" @bind:event="oninput"
+                        <textarea id="tpl-html-body" @bind="_draft.BodyHtml" @bind:event="oninput"
                                   @onfocus="@(() => _focusedFieldId = "tpl-html-body")"
-                                  class="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm font-mono border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150"></textarea>
+                                  class="w-full min-h-[45vh] md:min-h-[55vh] px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm font-mono border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150 resize-y"></textarea>
                     }
                     else
                     {
@@ -184,13 +186,6 @@
                             </p>
                         </div>
                     }
-                </div>
-
-                <div>
-                    <label for="tpl-text-body" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Plain-text body</label>
-                    <textarea id="tpl-text-body" rows="6" @bind="_draft.BodyText" @bind:event="oninput"
-                              @onfocus="@(() => _focusedFieldId = "tpl-text-body")"
-                              class="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm font-mono border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150"></textarea>
                 </div>
 
                 <div class="flex items-start gap-2 flex-wrap">
@@ -253,9 +248,10 @@
     private IReadOnlyList<NoticeType> _noticeTypes = Array.Empty<NoticeType>();
     private IReadOnlyList<RulesState> _states = Array.Empty<RulesState>();
 
-    // ID of the last text field the user focused (subject / html body / plain body).
-    // Used by the placeholder chips to know which textarea to inject into. Default
-    // to the HTML body — that's where copy gets edited most often.
+    // ID of the last text field the user focused (subject / html body). Used by
+    // the placeholder chips to know which field to inject into. Default to the
+    // HTML body — that's where copy gets edited most often. (The plain-text body
+    // is no longer edited directly; it's derived from the rich HTML on save.)
     private string _focusedFieldId = "tpl-html-body";
 
     private enum HtmlTab { Design, Preview }
@@ -548,6 +544,11 @@
         // unconditionally is a no-op when already correct.
         _draft.PropertyManagerId = PropertyManagerId;
 
+        // Rich HTML is the only thing the PM edits now; the plain-text body
+        // (used for SMS + the email text part) is derived from it so the two
+        // never drift. Merge fields ({{ }}, {% %}) survive untouched.
+        _draft.BodyText = HtmlToPlainText(_draft.BodyHtml);
+
         _saving = true;
         try
         {
@@ -565,6 +566,37 @@
     {
         _visible = false;
         _draft = null;
+    }
+
+    /// <summary>
+    /// Derive a plain-text body from the rich HTML for the SMS + email text
+    /// part. Anchors become "label: url" so the pay link survives in SMS;
+    /// block-level tags become line breaks; everything else is stripped and
+    /// HTML entities decoded. Scriban tags ({{ }} / {% %}) pass through so the
+    /// text body still merges the lease's values at send time.
+    /// </summary>
+    private static string HtmlToPlainText(string? html)
+    {
+        if (string.IsNullOrWhiteSpace(html)) return string.Empty;
+
+        var s = html;
+        // <a href="X">label</a> -> "label: X" (keep the URL for SMS).
+        s = System.Text.RegularExpressions.Regex.Replace(
+            s, @"<a\b[^>]*?href\s*=\s*[""']([^""']+)[""'][^>]*>(.*?)</a>",
+            "$2: $1",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+        // Block enders / line breaks -> newline.
+        s = System.Text.RegularExpressions.Regex.Replace(
+            s, @"<\s*(br|/p|/div|/li|/h[1-6]|/tr)\s*/?>", "\n",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        // Strip remaining tags.
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"<[^>]+>", string.Empty);
+        // Decode entities (&amp; &nbsp; etc.).
+        s = System.Net.WebUtility.HtmlDecode(s);
+        // Collapse 3+ blank lines, trim trailing spaces per line.
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"[ \t]+\n", "\n");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\n{3,}", "\n\n");
+        return s.Trim();
     }
 
     // Drops the placeholder token at the current caret position of whichever

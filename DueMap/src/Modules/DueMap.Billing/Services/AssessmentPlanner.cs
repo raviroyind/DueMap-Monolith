@@ -1,4 +1,5 @@
 using DueMap.Billing.Domain;
+using DueMap.Common.FeatureFlags;
 using DueMap.Rules;
 using DueMap.Tenancy;
 using DueMap.Tenancy.Domain;
@@ -23,26 +24,54 @@ namespace DueMap.Billing.Services;
 /// </summary>
 internal sealed class AssessmentPlanner : IAssessmentPlanner
 {
+    private const string SequencesFlag = "billing.sequences";
+
     private readonly IEffectivePolicyService _policySvc;
     private readonly IRentScheduleService _schedule;
     private readonly IRentInvoiceRepository _invoices;
     private readonly IRulesService _rules;
+    private readonly ISequenceResolver _sequences;
+    private readonly IFeatureFlags _flags;
 
     public AssessmentPlanner(
         IEffectivePolicyService policySvc,
         IRentScheduleService schedule,
         IRentInvoiceRepository invoices,
-        IRulesService rules)
+        IRulesService rules,
+        ISequenceResolver sequences,
+        IFeatureFlags flags)
     {
         _policySvc = policySvc;
         _schedule = schedule;
         _invoices = invoices;
         _rules = rules;
+        _sequences = sequences;
+        _flags = flags;
     }
 
     public async Task<AssessmentPlan> PlanAsync(Lease lease, DateOnly assessmentDate, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(lease);
+
+        // P1-3: AutoSetup writes a staged late-fee profile and flips
+        // FeesStaged=true. The lease is held in review limbo until the PM
+        // clicks "Go live" (P1-4); the planner emits NO actions for it —
+        // no reminders, no fees. Returning an empty plan early keeps the
+        // upstream orchestrator + scheduler unchanged.
+        if (lease.FeesStaged)
+        {
+            // We don't even need to look up the policy or due date — the
+            // lease is paused. The current due date in the plan is still
+            // useful for diagnostics, so compute it cheaply.
+            var stagedDueDate = await _invoices.GetCurrentDueDateAsync(lease.Id, assessmentDate, ct)
+                              ?? _schedule.GetCurrentDueDate(lease, assessmentDate);
+            return new AssessmentPlan(
+                LeaseId:           lease.Id,
+                CurrentDueDate:    stagedDueDate,
+                AssessmentDate:    assessmentDate,
+                DaysRelativeToDue: assessmentDate.DayNumber - stagedDueDate.DayNumber,
+                Actions:           Array.Empty<PlannedAction>());
+        }
 
         var policy = await _policySvc.BuildAsync(lease, assessmentDate, ct);
 
@@ -55,19 +84,44 @@ internal sealed class AssessmentPlanner : IAssessmentPlanner
 
         var actions = new List<PlannedAction>(capacity: 2);
 
-        if (policy.PreDueEnabled && daysRel == -policy.PreDueDaysBefore)
-        {
-            actions.Add(PlannedAction.PreDueReminder());
-        }
+        // P2-3: when billing.sequences is on, the PM's reminder sequence drives
+        // the pre-due / due-date / grace touches (each carrying a step_key for
+        // idempotency); the post-due late-fee logic is unchanged. When off,
+        // the legacy single-touch-per-kind cadence runs exactly as before.
+        var sequencesOn = await _flags.IsEnabledAsync(SequencesFlag, lease.PropertyManagerId, ct);
 
-        if (policy.DueDateEnabled && daysRel == 0)
+        if (sequencesOn)
         {
-            actions.Add(PlannedAction.DueDateReminder());
-        }
+            var sequence = await _sequences.ResolveAsync(lease.PropertyManagerId, ct);
+            foreach (var step in SequenceSchedule.StepsDueOn(sequence, daysRel))
+            {
+                var planned = PlannedAction.FromSequenceStep(step);
+                if (planned is not null) actions.Add(planned);
+            }
 
-        if (policy.PostDueEnabled && daysRel > 0)
+            if (policy.PostDueEnabled && daysRel > 0)
+            {
+                // Sequence already supplies the grace reminder — only the late
+                // fee comes from the post-due path here.
+                await AppendPostDueActionsAsync(policy, daysRel, assessmentDate, actions, ct, emitGraceReminder: false);
+            }
+        }
+        else
         {
-            await AppendPostDueActionsAsync(policy, daysRel, assessmentDate, actions, ct);
+            if (policy.PreDueEnabled && daysRel == -policy.PreDueDaysBefore)
+            {
+                actions.Add(PlannedAction.PreDueReminder());
+            }
+
+            if (policy.DueDateEnabled && daysRel == 0)
+            {
+                actions.Add(PlannedAction.DueDateReminder());
+            }
+
+            if (policy.PostDueEnabled && daysRel > 0)
+            {
+                await AppendPostDueActionsAsync(policy, daysRel, assessmentDate, actions, ct, emitGraceReminder: true);
+            }
         }
 
         return new AssessmentPlan(
@@ -83,12 +137,13 @@ internal sealed class AssessmentPlanner : IAssessmentPlanner
         int daysRel,
         DateOnly assessmentDate,
         List<PlannedAction> actions,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool emitGraceReminder = true)
     {
         switch (policy.PostDueMode)
         {
             case TenancyPostDueMode.GracePeriod:
-                if (daysRel == 1)
+                if (emitGraceReminder && daysRel == 1)
                 {
                     actions.Add(PlannedAction.GracePeriodReminder());
                 }

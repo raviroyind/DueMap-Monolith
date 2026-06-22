@@ -1,0 +1,207 @@
+@page "/admin/pm/{PmId:int}/activity"
+@layout DueMap.Web.Components.Layout.AdminLayout
+@using DueMap.Common.FeatureFlags
+@using DueMap.Web.Services
+@inject WorkerLogReader Reader
+@inject IFeatureFlags Flags
+
+<PageTitle>PM #@PmId activity — DueMap admin</PageTitle>
+
+<div class="max-w-6xl mx-auto px-8 py-8 space-y-5">
+
+    <div>
+        <div class="flex items-center gap-3">
+            <h2 class="text-2xl font-semibold tracking-tight">PM #@PmId — activity</h2>
+            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wider text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10">
+                Admin
+            </span>
+        </div>
+        <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 max-w-2xl leading-relaxed">
+            Per-PM activity timeline pulled from <code class="font-mono text-xs">logs.events</code>,
+            newest first. Use this to answer "what happened to this tenant?" in 10 seconds —
+            click a row to expand the exception + property bag.
+        </p>
+    </div>
+
+    @if (_disabled)
+    {
+        <div class="rounded-xl border border-amber-200/70 dark:border-amber-500/20 bg-amber-50/60 dark:bg-amber-500/5 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+            The ops cockpit is currently disabled. Set the
+            <code class="font-mono text-xs">ops.cockpit</code> feature flag to <code class="font-mono text-xs">enabled_global = 1</code>
+            (or add this account's PM id to the per-PM allow-list) to use this page.
+        </div>
+    }
+    else
+    {
+        <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                <div>
+                    <label class="block text-xs font-medium text-zinc-500 mb-1.5">Min severity</label>
+                    <select @bind="_minLevel"
+                            class="w-full px-2.5 py-1.5 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                        <option value="">Information</option>
+                        <option value="Warning">Warning+</option>
+                        <option value="Error">Error+</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-500 mb-1.5">Window</label>
+                    <select @bind="_windowHours"
+                            class="w-full px-2.5 py-1.5 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                        <option value="1">Last 1 hour</option>
+                        <option value="6">Last 6 hours</option>
+                        <option value="24">Last 24 hours</option>
+                        <option value="168">Last 7 days</option>
+                        <option value="720">Last 30 days</option>
+                    </select>
+                </div>
+                <div class="text-right">
+                    <button @onclick="LoadAsync" disabled="@_loading"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 shadow-sm transition-colors duration-150 disabled:opacity-50">
+                        Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="mt-3 text-xs text-zinc-500">
+                @if (!_loading) { @($"{_rows.Count} row{(_rows.Count == 1 ? "" : "s")} · newest first") }
+                else { @("Loading…") }
+            </div>
+        </div>
+
+        @if (_loading)
+        {
+            <p class="text-sm text-zinc-500">Loading…</p>
+        }
+        else if (_rows.Count == 0)
+        {
+            <div class="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-white/40 dark:bg-zinc-900/40 p-12 text-center">
+                <p class="text-sm font-medium mb-1">No activity in the selected window.</p>
+                <p class="text-sm text-zinc-500">Widen the window, lower the severity, or wait for the next worker tick.</p>
+            </div>
+        }
+        else
+        {
+            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead class="bg-zinc-50/60 dark:bg-zinc-900/60 text-left">
+                        <tr>
+                            <th class="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-44">Timestamp (UTC)</th>
+                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-20">Level</th>
+                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-28">Run</th>
+                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Message</th>
+                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-56">Source</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                        @foreach (var row in _rows)
+                        {
+                            <tr class="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 cursor-pointer"
+                                @onclick="@(() => ToggleExpand(row.Id))">
+                                <td class="px-4 py-2.5 text-xs text-zinc-500 tabular-nums">@row.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                <td class="px-3 py-2.5">
+                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium @LevelPill(row.Level)">
+                                        @row.Level
+                                    </span>
+                                </td>
+                                <td class="px-3 py-2.5 text-xs tabular-nums text-zinc-500">
+                                    @(row.RunId is long r ? $"R{r}" : "—")
+                                </td>
+                                <td class="px-3 py-2.5 text-sm">
+                                    <div class="line-clamp-2">@row.Message</div>
+                                    @if (!string.IsNullOrEmpty(row.Exception) && _expanded.Contains(row.Id))
+                                    {
+                                        <pre class="mt-2 px-3 py-2 rounded bg-rose-50/60 dark:bg-rose-500/10 text-[11px] text-rose-900 dark:text-rose-200 overflow-x-auto font-mono whitespace-pre-wrap">@row.Exception</pre>
+                                    }
+                                    @if (_expanded.Contains(row.Id) && !string.IsNullOrEmpty(row.PropertiesJson))
+                                    {
+                                        <pre class="mt-2 px-3 py-2 rounded bg-zinc-50 dark:bg-zinc-800/60 text-[11px] text-zinc-600 dark:text-zinc-300 overflow-x-auto font-mono whitespace-pre-wrap">@row.PropertiesJson</pre>
+                                    }
+                                </td>
+                                <td class="px-3 py-2.5 text-[11px] text-zinc-500 font-mono truncate max-w-[16rem]" title="@row.SourceContext">
+                                    @ShortenContext(row.SourceContext)
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public int PmId { get; set; }
+
+    private bool _loading = true;
+    private bool _disabled;
+    private List<WorkerLogEntry> _rows = new();
+    private readonly HashSet<long> _expanded = new();
+
+    private string _minLevel    = "";
+    private int    _windowHours = 24;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            // ops.cockpit gates the whole timeline surface. Independent of
+            // the AdminBasicAuth gate — Basic Auth proves "you're an
+            // operator," the flag proves "we've turned this feature on."
+            _disabled = !await Flags.IsEnabledAsync("ops.cockpit", propertyManagerId: null, CancellationToken.None);
+            if (_disabled)
+            {
+                _rows = new();
+                return;
+            }
+
+            var nowUtc = DateTime.UtcNow;
+            var q = new WorkerLogQuery(
+                FromUtc:      nowUtc.AddHours(-_windowHours),
+                ToUtc:        nowUtc.AddMinutes(1),
+                MinimumLevel: string.IsNullOrEmpty(_minLevel) ? null : _minLevel,
+                PmId:         PmId,               // <-- the key parameter; everything else is the existing reader
+                Search:       null,
+                MaxRows:      500);
+
+            try
+            {
+                _rows = (await Reader.QueryAsync(q, CancellationToken.None)).ToList();
+            }
+            catch
+            {
+                _rows = new();
+            }
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ToggleExpand(long id)
+    {
+        if (!_expanded.Add(id)) _expanded.Remove(id);
+    }
+
+    private static string LevelPill(string level) => level switch
+    {
+        "Fatal"       => "bg-rose-200 text-rose-900 dark:bg-rose-500/20 dark:text-rose-300 font-semibold",
+        "Error"       => "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
+        "Warning"     => "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+        "Information" => "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+        "Debug"       => "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
+        _             => "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+    };
+
+    private static string ShortenContext(string? full)
+    {
+        if (string.IsNullOrEmpty(full)) return "—";
+        var lastDot = full.LastIndexOf('.');
+        return lastDot >= 0 ? full[(lastDot + 1)..] : full;
+    }
+}

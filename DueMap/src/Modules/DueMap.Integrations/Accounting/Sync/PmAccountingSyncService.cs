@@ -20,7 +20,9 @@ internal sealed partial class PmAccountingSyncService : IPmAccountingSync
     private readonly ICustomerRepository _customers;
     private readonly IRentInvoiceRepository _invoices;
     private readonly ILeaseReader _leases;
+    private readonly ILeaseWriter _leaseWriter;
     private readonly IPropertyManagerWriter _pmWriter;
+    private readonly DueMap.Common.FeatureFlags.IFeatureFlags _flags;
     private readonly ILogger<PmAccountingSyncService> _logger;
 
     public PmAccountingSyncService(
@@ -30,7 +32,9 @@ internal sealed partial class PmAccountingSyncService : IPmAccountingSync
         ICustomerRepository customers,
         IRentInvoiceRepository invoices,
         ILeaseReader leases,
+        ILeaseWriter leaseWriter,
         IPropertyManagerWriter pmWriter,
+        DueMap.Common.FeatureFlags.IFeatureFlags flags,
         ILogger<PmAccountingSyncService> logger)
     {
         _connections = connections;
@@ -39,7 +43,9 @@ internal sealed partial class PmAccountingSyncService : IPmAccountingSync
         _customers = customers;
         _invoices = invoices;
         _leases = leases;
+        _leaseWriter = leaseWriter;
         _pmWriter = pmWriter;
+        _flags = flags;
         _logger = logger;
     }
 
@@ -82,7 +88,11 @@ internal sealed partial class PmAccountingSyncService : IPmAccountingSync
                     Email = sc.Email,
                     Phone = sc.Phone,
                     IsActive = sc.IsActive,
-                    LastSyncedAt = DateTime.UtcNow
+                    LastSyncedAt = DateTime.UtcNow,
+                    // v18 (P1-1) — surface billing state for DiscoveryService.
+                    // Provider clients already normalise to 2-letter upper or
+                    // null; we just pass through.
+                    BillingState = sc.BillingState
                 }, ct);
             }
 
@@ -123,6 +133,11 @@ internal sealed partial class PmAccountingSyncService : IPmAccountingSync
                 invoicesPersisted++;
             }
 
+            // P2-1: autopay status read-back (gated by integrations.autopay).
+            // No API exposes a true enrollment flag, so we infer per lease from
+            // payment behavior over its past-due-dated invoices. OFF => skipped.
+            await ReadBackAutopayStatusAsync(propertyManagerId, ct);
+
             await UpdateLastSyncAsync(propertyManagerId, success: true, error: null, ct);
 
             // First successful sync flips the PM to "Synced" and then immediately
@@ -138,10 +153,34 @@ internal sealed partial class PmAccountingSyncService : IPmAccountingSync
         catch (Exception ex)
         {
             await UpdateLastSyncAsync(propertyManagerId, success: false, error: ex.Message, ct);
+
+            // P0-3 self-heal: when the failure is *authentication* (refresh
+            // token revoked, app uninstalled, scopes downgraded) rather than
+            // transient (5xx, network blip, rate limit), mark the connection
+            // Broken so the orchestrator skips this PM until they reconnect.
+            // Other failure modes stay transient and don't pause processing —
+            // tomorrow's sweep will retry naturally.
+            //
+            // We detect by substring on the client's exception message, which
+            // is formatted "QuickBooks API returned 401: …" / "Xero API
+            // returned 403: …". If we ever standardise on a typed
+            // AccountingAuthFailedException, switch to a pattern-match here.
+            if (IsAuthFailure(ex))
+            {
+                await _connections.MarkBrokenAsync(
+                    propertyManagerId,
+                    $"Sync auth failure: {ex.Message}",
+                    ct);
+            }
+
             LogSyncFailed(_logger, ex, propertyManagerId, conn.Provider);
             return new PmSyncResult(false, 0, 0, ex.Message);
         }
     }
+
+    private static bool IsAuthFailure(Exception ex) =>
+        ex.Message.Contains("401", StringComparison.Ordinal) ||
+        ex.Message.Contains("403", StringComparison.Ordinal);
 
     private async Task<int?> TryAutoLinkLeaseAsync(int propertyManagerId, int customerId, CancellationToken ct)
     {
@@ -152,6 +191,41 @@ internal sealed partial class PmAccountingSyncService : IPmAccountingSync
             .Where(l => l.CustomerId == customerId)
             .ToList();
         return leases.Count == 1 ? leases[0].Id : null;
+    }
+
+    /// <summary>
+    /// P2-1 autopay status read-back. Gated by <c>integrations.autopay</c>.
+    /// For each active lease, infers autopay/reliable-payer status from the
+    /// payment outcomes of its past-due-dated invoices and stamps the lease.
+    /// Money-untouched — read-only against synced data.
+    /// </summary>
+    private async Task ReadBackAutopayStatusAsync(int propertyManagerId, CancellationToken ct)
+    {
+        if (!await _flags.IsEnabledAsync("integrations.autopay", propertyManagerId, ct))
+        {
+            return;
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var leases = await _leases.ListActiveAsync(propertyManagerId, today, ct);
+        var invoices = await _invoices.ListByPropertyManagerAsync(propertyManagerId, ct);
+
+        var byLease = invoices
+            .Where(i => i.LeaseId is not null)
+            .GroupBy(i => i.LeaseId!.Value)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var now = DateTime.UtcNow;
+        foreach (var lease in leases)
+        {
+            var paidFlags = (byLease.TryGetValue(lease.Id, out var list) ? list : new List<RentInvoice>())
+                .Where(i => i.DueDate < today)                                  // past their due date
+                .Select(i => i.Status == RentInvoiceStatus.Paid || i.Balance <= 0m)
+                .ToList();
+
+            var status = AutopayStatusInference.Infer(paidFlags);
+            await _leaseWriter.UpdateAutopayStatusAsync(lease.Id, status, now, ct);
+        }
     }
 
     private async Task UpdateLastSyncAsync(int propertyManagerId, bool success, string? error, CancellationToken ct)

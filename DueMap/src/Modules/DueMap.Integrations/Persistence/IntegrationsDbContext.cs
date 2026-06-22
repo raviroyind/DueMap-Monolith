@@ -9,10 +9,23 @@ public sealed class IntegrationsDbContext : DbContext
 
     public DbSet<PmAccountingConnection> PmAccountingConnections => Set<PmAccountingConnection>();
     public DbSet<OAuthAttempt>           OAuthAttempts           => Set<OAuthAttempt>();
+    public DbSet<DueMap.Integrations.Notices.SmsSuppression> SmsSuppressions => Set<DueMap.Integrations.Notices.SmsSuppression>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("integrations");
+
+        modelBuilder.Entity<DueMap.Integrations.Notices.SmsSuppression>(e =>
+        {
+            e.ToTable("sms_suppressions");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.Phone).HasColumnName("phone").HasMaxLength(20).IsRequired();
+            e.Property(x => x.PropertyManagerId).HasColumnName("pm_id");
+            e.Property(x => x.Reason).HasColumnName("reason").HasMaxLength(100).IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.HasIndex(x => x.Phone).IsUnique();
+        });
 
         modelBuilder.Entity<PmAccountingConnection>(e =>
         {
@@ -37,6 +50,13 @@ public sealed class IntegrationsDbContext : DbContext
                 .HasMaxLength(20)
                 .HasConversion(v => v.ToWire(), v => ConnectionStatusMapping.FromWire(v));
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            // v17 — operational health (P0-3). Stored as the underlying tinyint.
+            e.Property(x => x.HealthStatus)
+                .HasColumnName("health_status")
+                .HasConversion<byte>();
+            e.Property(x => x.LastHealthCheck).HasColumnName("last_health_check");
+            e.Property(x => x.PausedReason).HasColumnName("paused_reason").HasMaxLength(200);
         });
 
         modelBuilder.Entity<OAuthAttempt>(e =>

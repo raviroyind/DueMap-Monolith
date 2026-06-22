@@ -18,9 +18,9 @@ internal sealed class AssessmentRunRepository : IAssessmentRunRepository
         _db = db;
     }
 
-    public Task<bool> HasRunAsync(int leaseId, DateOnly dueDate, ActionKind kind, CancellationToken ct) =>
+    public Task<bool> HasRunAsync(int leaseId, DateOnly dueDate, ActionKind kind, CancellationToken ct, string? stepKey = null) =>
         _db.AssessmentRuns.AsNoTracking()
-            .AnyAsync(r => r.LeaseId == leaseId && r.DueDate == dueDate && r.ActionKind == kind, ct);
+            .AnyAsync(r => r.LeaseId == leaseId && r.DueDate == dueDate && r.ActionKind == kind && r.StepKey == stepKey, ct);
 
     public async Task<AssessmentRun?> TryRecordAsync(AssessmentRun run, CancellationToken ct)
     {

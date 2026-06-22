@@ -6,6 +6,8 @@
 @inject ILeaseReader LeaseReader
 @inject ICustomerRepository Customers
 @inject ILeaseLinkService Linker
+@inject DueMap.Common.FeatureFlags.IFeatureFlags Flags
+@inject NavigationManager Nav
 
 <PageTitle>Link customers — DueMap</PageTitle>
 
@@ -156,6 +158,12 @@
     protected override async Task OnInitializedAsync()
     {
         _pmId = await Pm.GetPmIdAsync();
+        // P1-5: superseded by the unified Tenants screen when the flag is on.
+        if (await Flags.IsEnabledAsync("tenancy.tenants_screen", _pmId, CancellationToken.None))
+        {
+            Nav.NavigateTo("/tenants", replace: true);
+            return;
+        }
         await LoadAsync();
     }
 

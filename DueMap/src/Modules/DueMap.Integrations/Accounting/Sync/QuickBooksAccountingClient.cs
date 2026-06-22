@@ -175,7 +175,27 @@ internal sealed class QuickBooksAccountingClient : IAccountingDataClient
         DisplayName: c.DisplayName ?? "(no name)",
         Email: c.PrimaryEmailAddr?.Address,
         Phone: c.PrimaryPhone?.FreeFormNumber,
-        IsActive: c.Active ?? true);
+        IsActive: c.Active ?? true,
+        BillingState: NormaliseState(c.BillAddr?.CountrySubDivisionCode));
+
+    /// <summary>
+    /// QBO stores state as <c>CountrySubDivisionCode</c>, but the value is
+    /// free-form text — sandbox companies often have "California" or "ca ".
+    /// We accept anything that uppercases to exactly 2 alpha chars; anything
+    /// else becomes NULL so the DiscoveryService treats it as ambiguous.
+    /// </summary>
+    private static string? NormaliseState(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var trimmed = raw.Trim();
+        if (trimmed.Length != 2) return null;
+        var upper = trimmed.ToUpperInvariant();
+        for (var i = 0; i < 2; i++)
+        {
+            if (upper[i] < 'A' || upper[i] > 'Z') return null;
+        }
+        return upper;
+    }
 
     private static SyncedInvoice MapInvoice(QbInvoice i)
     {
@@ -219,7 +239,9 @@ internal sealed class QuickBooksAccountingClient : IAccountingDataClient
         [property: JsonPropertyName("DisplayName")]       string? DisplayName,
         [property: JsonPropertyName("PrimaryEmailAddr")]  QbEmail? PrimaryEmailAddr,
         [property: JsonPropertyName("PrimaryPhone")]      QbPhone? PrimaryPhone,
-        [property: JsonPropertyName("Active")]            bool? Active);
+        [property: JsonPropertyName("Active")]            bool? Active,
+        // v18 (P1-1) — billing address for state inference.
+        [property: JsonPropertyName("BillAddr")]          QbAddr? BillAddr);
     private sealed record QbEmail([property: JsonPropertyName("Address")] string? Address);
     private sealed record QbPhone([property: JsonPropertyName("FreeFormNumber")] string? FreeFormNumber);
 

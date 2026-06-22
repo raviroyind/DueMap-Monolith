@@ -246,20 +246,33 @@
     private bool _modalOpen;
     private bool _sending;
     private string? _sendError;
-    private string _emailSubject = "A quick heads-up about your rent reminders";
+    private string _emailSubject = "Important: how your rent reminders and late fees work from now on";
     private string _emailBody = DefaultBodyHtml;
     private Microsoft.AspNetCore.Components.ElementReference _editorRef;
 
-    // Default copy — neutral, friendly. PM can rewrite freely in the modal.
-    // Verbatim string (NOT raw string) — the Razor compiler chokes on C# 11
-    // raw string literals inside @code blocks. See REG-4 in the QA plan.
+    // P1-4 intro-email copy. This message IS the written late-fee disclosure:
+    // it announces DueMap, states plainly that reminders + late fees begin
+    // after the next daily sync, explains how to pay / where the portal is,
+    // and how to opt out of SMS. Informational only — it carries no fee math
+    // or per-tenant amounts. The PM can edit freely before sending.
+    // Verbatim concatenated string (NOT a raw string) — the Razor compiler
+    // chokes on C# 11 raw string literals inside @code blocks. See REG-4.
     private const string DefaultBodyHtml =
         "<p>Hi there,</p>" +
-        "<p>We've set up a new system to help us keep rent reminders consistent and timely. " +
-        "Starting soon you'll receive automated emails from us when rent is coming due, and " +
-        "again if a payment slips past due date.</p>" +
-        "<p>Nothing about how you pay rent is changing — this is just a heads-up so the emails " +
-        "don't catch you by surprise.</p>" +
+        "<p>We've started using DueMap to keep rent reminders consistent and on time. " +
+        "Here's what to expect, starting after our next daily update:</p>" +
+        "<ul>" +
+        "<li><strong>Friendly reminders</strong> by email before rent is due, on the due date, " +
+        "and again if it slips past due.</li>" +
+        "<li><strong>Late fees</strong> may apply once rent is past due and any grace period has " +
+        "passed, in line with your lease and state law. Paying on time means you'll never see one.</li>" +
+        "</ul>" +
+        "<p><strong>How to pay:</strong> nothing about how you pay is changing. Each reminder " +
+        "includes a secure “Pay now” link, and you can always view balances and invoices in your " +
+        "tenant portal.</p>" +
+        "<p>If you'd prefer not to receive text-message reminders, just reply “STOP” to any text " +
+        "and we'll keep it to email only.</p>" +
+        "<p>Questions? Just reply to this email — we're happy to help.</p>" +
         "<p>Thanks!</p>";
 
     protected override async Task OnInitializedAsync()

@@ -1,11 +1,11 @@
-﻿using DueMap.Rules.Domain;
+using DueMap.Rules.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace DueMap.Rules.Persistence;
 
 /// <summary>
 /// EF Core context over the <c>rules</c> schema. The schema is owned by the
-/// SQL DDL in <c>db/duemap_schema.sql</c> â€” this context maps to existing
+/// SQL DDL in <c>db/duemap_schema.sql</c> — this context maps to existing
 /// tables, it does not own migrations for them. Treat the SQL script as the
 /// source of truth.
 /// </summary>
@@ -54,6 +54,16 @@ public sealed class RulesDbContext : DbContext
             e.Property(x => x.SourceCitation).HasColumnName("source_citation").HasMaxLength(500).IsRequired();
             e.Property(x => x.Notes).HasColumnName("notes");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            // v19 (P1-2) — §6.1 guardrail columns.
+            e.Property(x => x.MaxPercent).HasColumnName("max_percent").HasColumnType("decimal(5,2)");
+            e.Property(x => x.MaxFlatAmount).HasColumnName("max_flat_amount").HasColumnType("decimal(10,2)");
+            e.Property(x => x.MinGraceDays).HasColumnName("min_grace_days");
+            e.Property(x => x.DailyAccrualOk).HasColumnName("daily_accrual_ok");
+            e.Property(x => x.RequiresWrittenDisclosure).HasColumnName("requires_written_disclosure");
+            e.Property(x => x.StandardKind).HasColumnName("standard_kind");
+            e.Property(x => x.SafeDefaultPct).HasColumnName("safe_default_pct").HasColumnType("decimal(5,2)");
+            e.Property(x => x.PlainSummary).HasColumnName("plain_summary").HasMaxLength(600);
+            e.Property(x => x.SourceUrl).HasColumnName("source_url").HasMaxLength(400);
         });
 
         modelBuilder.Entity<LocalJurisdiction>(e =>

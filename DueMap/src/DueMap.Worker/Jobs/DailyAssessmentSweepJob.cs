@@ -74,8 +74,11 @@ internal sealed partial class DailyAssessmentSweepJob : IDailyAssessmentSweepJob
             // report as a Hangfire continuation. ContinueJobWith only runs the
             // child if the parent finishes successfully — so a failed orchestrator
             // doesn't send a stale report.
+            // Pass ExecutionMode.Live explicitly — Hangfire's expression-tree
+            // capture doesn't infer optional-parameter defaults (P0-2 added the
+            // ExecutionMode parameter; this is the nightly Live path).
             var orchId = _jobs.Enqueue<IPmDailyOrchestrator>(
-                o => o.ProcessAsync(pm.Id, businessDate, CancellationToken.None));
+                o => o.ProcessAsync(pm.Id, businessDate, DueMap.Billing.Domain.ExecutionMode.Live, CancellationToken.None));
 
             _jobs.ContinueJobWith<IDailyCloseReportJob>(
                 orchId,

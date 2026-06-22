@@ -39,4 +39,11 @@ public sealed class PropertyManager
         StepCloseDoneAt       is not null &&
         StepNoticePrefsDoneAt is not null &&
         StepPreflightDoneAt   is not null;
+
+    // ---- AutoSetup (P1-3, v20) ------------------------------------------
+    /// <summary>JSON-serialised <c>AutoSetupSummary</c>. Surfaced verbatim on the review screen.</summary>
+    public string? AutoSetupSummary { get; set; }
+
+    /// <summary>Most recent AutoSetup run. Re-runs overwrite.</summary>
+    public DateTime? AutoSetupDoneAt { get; set; }
 }

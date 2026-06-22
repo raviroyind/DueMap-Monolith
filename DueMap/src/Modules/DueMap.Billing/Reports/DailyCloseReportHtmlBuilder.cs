@@ -37,9 +37,38 @@ internal static class DailyCloseReportHtmlBuilder
           .Append(d.BusinessDate.ToString("MMMM d, yyyy", Culture)).Append(@".</div>
         </div>");
 
+        // -------- What needs you (P1-6) --------
+        sb.Append(@"<div style=""background:#fff;padding:18px 28px 6px;"">
+            <div style=""font-size:13px;font-weight:600;color:#9f1239;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;"">What needs you</div>");
+        if (d.NeedsYou.Count == 0)
+        {
+            sb.Append(@"<div style=""font-size:13px;color:#16a34a;padding:4px 0 8px;"">Nothing needs your attention — all clear.</div>");
+        }
+        else
+        {
+            foreach (var item in d.NeedsYou)
+            {
+                var accent = item.Severity == "crit" ? "#be123c" : "#d97706";
+                var bg     = item.Severity == "crit" ? "#fef2f2" : "#fffbeb";
+                sb.Append(@"<div style=""border-left:3px solid ").Append(accent)
+                  .Append(@";background:").Append(bg)
+                  .Append(@";padding:10px 14px;margin-bottom:8px;border-radius:0 6px 6px 0;"">
+                    <div style=""font-size:13px;font-weight:600;color:#27272a;"">").Append(HtmlEncode(item.Title)).Append(@"</div>
+                    <div style=""font-size:12px;color:#52525b;margin-top:2px;line-height:1.5;"">").Append(HtmlEncode(item.Detail)).Append(@"</div>
+                    <a href=""").Append(HtmlEncode(item.LinkUrl)).Append(@""" style=""display:inline-block;margin-top:6px;font-size:12px;font-weight:600;color:").Append(accent).Append(@";text-decoration:none;"">")
+                  .Append(HtmlEncode(item.LinkLabel)).Append(" →</a>\n                </div>");
+            }
+        }
+        sb.Append("</div>");
+
+        // -------- What happened (P1-6 section header) --------
+        sb.Append(@"<div style=""background:#fff;padding:18px 28px 0;"">
+            <div style=""font-size:13px;font-weight:600;color:#3730a3;text-transform:uppercase;letter-spacing:0.06em;border-top:1px solid #e4e4e7;padding-top:16px;"">What happened</div>
+        </div>");
+
         // -------- Summary table --------
-        sb.Append(@"<div style=""background:#fff;padding:0 28px 6px;"">
-            <div style=""font-size:13px;font-weight:600;color:#3730a3;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;"">Summary</div>
+        sb.Append(@"<div style=""background:#fff;padding:12px 28px 6px;"">
+            <div style=""font-size:12px;font-weight:600;color:#71717a;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;"">Summary</div>
             <table style=""width:100%;border-collapse:collapse;font-size:13px;"">
                 <thead>
                     <tr style=""background:#f4f4f5;text-align:left;"">
@@ -150,6 +179,24 @@ internal static class DailyCloseReportHtmlBuilder
         var sb = new StringBuilder(2048);
         sb.AppendLine(ic, $"DueMap — Daily close report — {d.BusinessDate:yyyy-MM-dd}");
         sb.AppendLine(ic, $"Hi {d.PmDisplayName},").AppendLine();
+
+        sb.AppendLine(ic, $"WHAT NEEDS YOU ({d.NeedsYou.Count})");
+        if (d.NeedsYou.Count == 0)
+        {
+            sb.AppendLine("  Nothing needs your attention — all clear.");
+        }
+        else
+        {
+            foreach (var item in d.NeedsYou)
+            {
+                sb.AppendLine(ic, $"  [{item.Severity.ToUpperInvariant()}] {item.Title}");
+                sb.AppendLine(ic, $"        {item.Detail}");
+                sb.AppendLine(ic, $"        {item.LinkLabel}: {item.LinkUrl}");
+            }
+        }
+        sb.AppendLine();
+
+        sb.AppendLine("WHAT HAPPENED");
         sb.AppendLine("SUMMARY");
         sb.AppendLine(ic, $"  Unpaid invoices: {d.Summary.UnpaidInvoices}  ({Money(d.Summary.UnpaidAmount)})");
         sb.AppendLine(ic, $"  Past-due: {d.Summary.PastDueInvoices}  ({Money(d.Summary.PastDueAmount)})");

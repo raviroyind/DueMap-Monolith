@@ -177,6 +177,13 @@ internal sealed partial class AccountingConnectionService : IAccountingConnectio
             conn.Status = ConnectionStatus.TokenExpired;
             conn.LastSyncError = ex.Message;
             conn.UpdatedAt = DateTime.UtcNow;
+            // P0-3: refresh failure is the canonical "broken" signal — the
+            // user has revoked, uninstalled, or otherwise invalidated the
+            // grant. Mark here so the orchestrator's health gate trips on
+            // the next sweep without waiting for the sync 401.
+            conn.HealthStatus    = ConnectionHealthStatus.Broken;
+            conn.PausedReason    = $"Token refresh failed: {Truncate(ex.Message, 180)}";
+            conn.LastHealthCheck = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
             LogRefreshFailed(_logger, ex, propertyManagerId);
             return null;
@@ -208,6 +215,81 @@ internal sealed partial class AccountingConnectionService : IAccountingConnectio
         conn.LastSyncError           = null;
         conn.UpdatedAt               = now;
         if (conn.ConnectedAt == default) conn.ConnectedAt = now;
+
+        // v17 self-heal: a successful (re-)connect implicitly resets health.
+        // This is what makes the "user clicks Reconnect → orchestrator resumes"
+        // loop close on its own without an out-of-band Mark call.
+        conn.HealthStatus    = ConnectionHealthStatus.Healthy;
+        conn.PausedReason    = null;
+        conn.LastHealthCheck = now;
+    }
+
+    // ---- v17 / P0-3: health management --------------------------------------
+
+    public async Task MarkBrokenAsync(int propertyManagerId, string reason, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        // Cap to the schema width — long provider error blobs would otherwise
+        // truncate at the DB layer with a generic error.
+        if (reason.Length > 200) reason = reason[..200];
+
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var conn = await db.PmAccountingConnections
+            .FirstOrDefaultAsync(c => c.PropertyManagerId == propertyManagerId, ct);
+        if (conn is null) return;
+
+        conn.HealthStatus    = ConnectionHealthStatus.Broken;
+        conn.PausedReason    = reason;
+        conn.LastHealthCheck = DateTime.UtcNow;
+        conn.UpdatedAt       = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        LogConnectionBroken(_logger, propertyManagerId, reason);
+    }
+
+    public async Task MarkHealthyAsync(int propertyManagerId, CancellationToken ct)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var conn = await db.PmAccountingConnections
+            .FirstOrDefaultAsync(c => c.PropertyManagerId == propertyManagerId, ct);
+        if (conn is null) return;
+
+        // No-op if already healthy — avoids a spurious UPDATE on every sync.
+        if (conn.HealthStatus == ConnectionHealthStatus.Healthy && conn.PausedReason is null)
+        {
+            return;
+        }
+
+        conn.HealthStatus    = ConnectionHealthStatus.Healthy;
+        conn.PausedReason    = null;
+        conn.LastHealthCheck = DateTime.UtcNow;
+        conn.UpdatedAt       = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        LogConnectionResumed(_logger, propertyManagerId);
+    }
+
+    public async Task<ConnectionHealthSnapshot?> GetHealthAsync(int propertyManagerId, CancellationToken ct)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        return await db.PmAccountingConnections
+            .AsNoTracking()
+            .Where(c => c.PropertyManagerId == propertyManagerId)
+            .Select(c => new ConnectionHealthSnapshot(
+                c.PropertyManagerId, c.Provider, c.HealthStatus, c.PausedReason, c.LastHealthCheck))
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<ConnectionHealthSnapshot>> ListUnhealthyAsync(CancellationToken ct)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        return await db.PmAccountingConnections
+            .AsNoTracking()
+            .Where(c => c.HealthStatus != ConnectionHealthStatus.Healthy)
+            .OrderBy(c => c.PropertyManagerId)
+            .Select(c => new ConnectionHealthSnapshot(
+                c.PropertyManagerId, c.Provider, c.HealthStatus, c.PausedReason, c.LastHealthCheck))
+            .ToListAsync(ct);
     }
 
     private IOAuthProvider ResolveProvider(AccountingProvider provider) =>
@@ -226,6 +308,16 @@ internal sealed partial class AccountingConnectionService : IAccountingConnectio
     static partial void LogConnected(ILogger logger, int propertyManagerId, AccountingProvider provider, string realmId);
 
     [LoggerMessage(EventId = 6002, Level = LogLevel.Warning,
-        Message = "Token refresh failed for pm={PropertyManagerId}; connection marked TokenExpired")]
+        Message = "Token refresh failed for pm={PropertyManagerId}; connection marked TokenExpired + Broken")]
     static partial void LogRefreshFailed(ILogger logger, Exception ex, int propertyManagerId);
+
+    [LoggerMessage(EventId = 6003, Level = LogLevel.Warning,
+        Message = "Connection marked Broken for pm={PropertyManagerId}: {Reason}")]
+    static partial void LogConnectionBroken(ILogger logger, int propertyManagerId, string reason);
+
+    [LoggerMessage(EventId = 6004, Level = LogLevel.Information,
+        Message = "Connection resumed (Healthy) for pm={PropertyManagerId}")]
+    static partial void LogConnectionResumed(ILogger logger, int propertyManagerId);
+
+    private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max];
 }

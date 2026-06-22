@@ -30,7 +30,6 @@ internal sealed class QuickBooksOAuthProvider : IOAuthProvider
 
     public string BuildAuthorizationUrl(string state, string redirectUri)
     {
-        
         ArgumentException.ThrowIfNullOrEmpty(state);
         ArgumentException.ThrowIfNullOrEmpty(redirectUri);
 

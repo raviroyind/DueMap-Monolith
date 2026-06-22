@@ -163,7 +163,24 @@ internal sealed class XeroAccountingClient : IAccountingDataClient
         Email: c.EmailAddress,
         Phone: c.Phones?.FirstOrDefault(p => string.Equals(p.PhoneType, "DEFAULT", StringComparison.OrdinalIgnoreCase))?.PhoneNumber
              ?? c.Phones?.FirstOrDefault()?.PhoneNumber,
-        IsActive: !string.Equals(c.ContactStatus, "ARCHIVED", StringComparison.OrdinalIgnoreCase));
+        IsActive: !string.Equals(c.ContactStatus, "ARCHIVED", StringComparison.OrdinalIgnoreCase),
+        // v18 (P1-1) — billing state. Xero exposes addresses by AddressType
+        // (POBOX, STREET); we take the first address with a non-empty Region
+        // and normalise to 2-letter uppercase. Anything weird → null.
+        BillingState: NormaliseState(c.Addresses?.FirstOrDefault(a => !string.IsNullOrWhiteSpace(a.Region))?.Region));
+
+    private static string? NormaliseState(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var trimmed = raw.Trim();
+        if (trimmed.Length != 2) return null;
+        var upper = trimmed.ToUpperInvariant();
+        for (var i = 0; i < 2; i++)
+        {
+            if (upper[i] < 'A' || upper[i] > 'Z') return null;
+        }
+        return upper;
+    }
 
     private static SyncedInvoice MapInvoice(XeroInvoice i) => new(
         ExternalId: i.InvoiceID,
@@ -202,7 +219,13 @@ internal sealed class XeroAccountingClient : IAccountingDataClient
         [property: JsonPropertyName("Name")]          string? Name,
         [property: JsonPropertyName("EmailAddress")]  string? EmailAddress,
         [property: JsonPropertyName("Phones")]        List<XeroPhone>? Phones,
-        [property: JsonPropertyName("ContactStatus")] string? ContactStatus);
+        [property: JsonPropertyName("ContactStatus")] string? ContactStatus,
+        // v18 (P1-1) — address surface for billing-state inference.
+        [property: JsonPropertyName("Addresses")]     List<XeroAddress>? Addresses);
+
+    private sealed record XeroAddress(
+        [property: JsonPropertyName("AddressType")] string? AddressType,
+        [property: JsonPropertyName("Region")]      string? Region);
     private sealed record XeroPhone(
         [property: JsonPropertyName("PhoneType")]   string? PhoneType,
         [property: JsonPropertyName("PhoneNumber")] string? PhoneNumber);

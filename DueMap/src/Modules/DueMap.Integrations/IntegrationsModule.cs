@@ -55,6 +55,10 @@ public sealed class IntegrationsModule : IModule
         services.AddScoped<IEmailSender, SendGridEmailSender>();
         services.AddScoped<ISmsSender, TwilioSmsSender>();
         services.AddScoped<INoticeDispatcher, NoticeDispatcher>();
+        // P2-2 — SMS opt-out list. TwilioSmsSender checks it before every send.
+        services.AddScoped<ISmsSuppressionStore, SmsSuppressionStore>();
+        // P2-1 — autopay deep links + status inference (money-untouched).
+        services.AddScoped<DueMap.Integrations.Accounting.IAutopayService, AutopayService>();
 
         // Pulls the authoritative invoice PDF from QBO/Xero for the current
         // rent period — attached to late_fee_notice emails by ActionExecutor.
@@ -99,9 +103,34 @@ public sealed class IntegrationsModule : IModule
 
         services.AddScoped<IPmAccountingSync, PmAccountingSyncService>();
 
+        // "First sync on connect" job — enqueued by the Web OAuth callback so
+        // a connection always pulls data server-side, even if the user never
+        // completes the syncing wizard. Executed by the Worker's Hangfire
+        // server; the Web host only enqueues it.
+        services.AddScoped<Accounting.Jobs.IInitialSyncJob, Accounting.Jobs.InitialSyncJob>();
+
         // Used by the onboarding Daily Close form to pre-fill timezone from
         // the connected accounting system. Doesn't persist anything itself —
         // pure read + map.
         services.AddScoped<IAccountingTimezoneSuggester, AccountingTimezoneSuggester>();
+
+        // ---- Ops alerting sinks (P0-4) ----
+        // The Common module registered NullAlertSink as the default; we
+        // OVERRIDE it here based on Ops:Alerts:Channel so the call chain
+        // is just one resolve regardless of which sink is active. Sinks
+        // are singletons — they hold one HttpClient or one IEmailSender
+        // reference and are stateless beyond that.
+        var alertChannel = configuration["Ops:Alerts:Channel"]?.Trim().ToLowerInvariant();
+        if (alertChannel == "email")
+        {
+            services.AddSingleton<DueMap.Common.Ops.IAlertSink, DueMap.Integrations.Ops.EmailAlertSink>();
+        }
+        else if (alertChannel == "webhook")
+        {
+            services.AddHttpClient<DueMap.Integrations.Ops.WebhookAlertSink>();
+            services.AddSingleton<DueMap.Common.Ops.IAlertSink>(sp =>
+                sp.GetRequiredService<DueMap.Integrations.Ops.WebhookAlertSink>());
+        }
+        // else: leave NullAlertSink in place (Common's default).
     }
 }

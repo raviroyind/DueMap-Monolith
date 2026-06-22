@@ -1,4 +1,8 @@
 @using Microsoft.AspNetCore.Components.Routing
+@using DueMap.Common.FeatureFlags
+@using DueMap.Web.Services
+@inject IFeatureFlags Flags
+@inject PmContext Pm
 
 <nav class="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
     <div data-tour="sidebar-setup">
@@ -34,24 +38,39 @@
     <div data-tour="sidebar-portfolio">
         <div class="px-2 pb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Portfolio</div>
         <ul class="space-y-0.5">
-            <li>
-                <NavLink class="nav-link" ActiveClass="nav-link-active" href="leases">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
-                    Leases
-                </NavLink>
-            </li>
+            @if (_tenantsScreen)
+            {
+                <li>
+                    <NavLink class="nav-link" ActiveClass="nav-link-active" href="tenants">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        Tenants
+                    </NavLink>
+                </li>
+            }
+            else
+            {
+                <li>
+                    <NavLink class="nav-link" ActiveClass="nav-link-active" href="leases">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
+                        Leases
+                    </NavLink>
+                </li>
+            }
             <li>
                 <NavLink class="nav-link" ActiveClass="nav-link-active" href="invoices">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
                     Invoices
                 </NavLink>
             </li>
-            <li>
-                <NavLink class="nav-link" ActiveClass="nav-link-active" href="link-customers">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    Link customers
-                </NavLink>
-            </li>
+            @if (!_tenantsScreen)
+            {
+                <li>
+                    <NavLink class="nav-link" ActiveClass="nav-link-active" href="link-customers">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        Link customers
+                    </NavLink>
+                </li>
+            }
             <li>
                 <NavLink class="nav-link" ActiveClass="nav-link-active" href="processing-status">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.5.5 0 0 1-.96 0L9.24 3.18a.5.5 0 0 0-.96 0l-2.35 8.36A2 2 0 0 1 4 13H2"/></svg>
@@ -61,6 +80,28 @@
         </ul>
     </div>
 </nav>
+
+@code {
+    // P1-5: when tenancy.tenants_screen is on, the unified "Tenants" link
+    // replaces "Leases" + "Link customers" in the nav. Resolved per-PM so a
+    // per-PM rollout flips the nav for exactly the enrolled workspaces.
+    // Fail-safe: any error (no PM context yet, flag DB down) keeps the
+    // classic links so navigation never breaks.
+    private bool _tenantsScreen;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var pmId = await Pm.GetPmIdAsync();
+            _tenantsScreen = await Flags.IsEnabledAsync("tenancy.tenants_screen", pmId, CancellationToken.None);
+        }
+        catch
+        {
+            _tenantsScreen = false;
+        }
+    }
+}
 
 @*
     NavLink renders ordinary anchor tags + adds .nav-link-active when matched.

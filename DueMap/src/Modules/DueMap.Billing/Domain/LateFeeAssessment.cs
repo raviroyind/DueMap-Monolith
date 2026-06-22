@@ -19,6 +19,16 @@ public sealed class LateFeeAssessment
     public int StateRuleVersionId { get; set; }
     public int? LocalRuleOverrideId { get; set; }
 
+    /// <summary>
+    /// JSON evidence snapshot (P1-6, §6.2): the rule terms that produced this
+    /// fee — state code, citation, source URL, fee type/percent/flat/cap,
+    /// grace days, plain-language summary, plus the computed fee and the rent
+    /// it applied to. Captured at assessment time so the record stays provable
+    /// even after the rule is later versioned. Null only for rows written
+    /// before v21.
+    /// </summary>
+    public string? DisclosureSnapshot { get; set; }
+
     public LateFeeAssessmentStatus Status { get; set; } = LateFeeAssessmentStatus.Assessed;
     public string? ReversalReason { get; set; }
     public DateTime? ReversedAt { get; set; }

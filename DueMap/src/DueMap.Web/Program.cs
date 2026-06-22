@@ -3,6 +3,8 @@ using Hangfire;
 using Hangfire.SqlServer;
 using DueMap.Billing;
 using DueMap.Common.Modularity;
+using DueMap.Common.FeatureFlags;
+using DueMap.Common.Ops;
 using DueMap.Identity;
 using DueMap.Integrations;
 using DueMap.Integrations.Accounting;
@@ -80,6 +82,25 @@ builder.Services.AddScoped<DueMap.Web.Services.WorkerLogReader>();
 // Tenant-portal session resolver. Reads the dm_tenant cookie and joins
 // against tenant_sessions on every authenticated /t/* render.
 builder.Services.AddScoped<DueMap.Web.Services.TenantContext>();
+
+// Feature flags (P0-1): "ship dark, enable per-PM." Web and Worker share
+// the same ops.feature_flags table so a toggle takes effect in both
+// processes within ~60s. Default is OFF for unknown keys — fail-safe.
+builder.Services.AddFeatureFlags(
+    builder.Configuration.GetConnectionString("Default")
+        ?? throw new InvalidOperationException("Missing ConnectionStrings:Default for feature flags."));
+
+// P0-4: operator alerting (dedupe-by-key, fail-soft). Sink choice (email /
+// webhook / null) is configured by Ops:Alerts:Channel and bound inside
+// IntegrationsModule. Common's AddAlerting registers NullAlertSink as the
+// default so resolves always succeed.
+builder.Services.AddAlerting(builder.Configuration);
+
+// P0-4: admin Basic-Auth credentials are read from config/secrets, not
+// hardcoded. Middleware returns 503 if either Username or Password is
+// missing — explicit fail-closed rather than silent dev fallback.
+builder.Services.AddOptions<DueMap.Web.Security.AdminBasicAuthOptions>()
+    .Bind(builder.Configuration.GetSection(DueMap.Web.Security.AdminBasicAuthOptions.SectionName));
 
 // "Sign in with Intuit" via the QBO OAuth flow. The OIDC handler stays
 // registered (further down) for the day Intuit approves the sandbox app
@@ -376,6 +397,46 @@ app.MapGet("/samples/duemap-rent-roll-sample.xlsx", () =>
 }).AllowAnonymous();
 
 // -------------------------------------------------------------------------
+// P0-2: dry-run simulation endpoint. Returns the plan a PM's day WOULD
+// produce without writing or dispatching anything. Gated by the
+// ops.dry_run feature flag (503 when off) and by AdminBasicAuthMiddleware.
+// -------------------------------------------------------------------------
+app.MapGet("/admin/dry-run/{pmId:int}", async (
+    int pmId,
+    string? date,
+    DueMap.Common.FeatureFlags.IFeatureFlags flags,
+    DueMap.Billing.IPmDailyOrchestrator orchestrator,
+    CancellationToken ct) =>
+{
+    if (!await flags.IsEnabledAsync("ops.dry_run", ct: ct))
+    {
+        return Results.Json(new { error = "Feature 'ops.dry_run' is disabled. Toggle it in ops.feature_flags." },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+
+    var businessDate = string.IsNullOrWhiteSpace(date)
+        ? DateOnly.FromDateTime(DateTime.UtcNow)
+        : (DateOnly.TryParse(date, System.Globalization.CultureInfo.InvariantCulture,
+                             System.Globalization.DateTimeStyles.None, out var parsed)
+            ? parsed
+            : DateOnly.FromDateTime(DateTime.UtcNow));
+
+    var outcome = await orchestrator.ProcessAsync(
+        pmId, businessDate, DueMap.Billing.Domain.ExecutionMode.DryRun, ct);
+
+    return Results.Ok(new
+    {
+        propertyManagerId = pmId,
+        businessDate = businessDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+        outcome.LeasesPlanned,
+        outcome.ActionsExecuted,
+        outcome.ActionsSkipped,
+        outcome.ActionsFailed,
+        preview = outcome.DryRunPreview
+    });
+}).AllowAnonymous();   // AdminBasicAuthMiddleware does the actual auth gate.
+
+// -------------------------------------------------------------------------
 // Tenant portal: invoice PDF download. Gated by the dm_tenant session cookie.
 // Pulls the authoritative PDF straight from the connected accounting system
 // (QBO or Xero) — same path used by the late-fee notice attachment.
@@ -446,6 +507,61 @@ webhooks.MapPost("/sendgrid",   () => Results.Ok())   // TODO: delivery / bounce
 webhooks.MapPost("/twilio",     () => Results.Ok())   // TODO: SMS delivery callbacks
         .WithName("TwilioWebhook");
 
+// P2-2: Twilio inbound SMS — STOP/START opt-out handling. Twilio POSTs an
+// x-www-form-urlencoded body with From + Body when a tenant replies. We mirror
+// the carrier-level STOP into our suppression list so we never even attempt a
+// send. The request is signature-verified (X-Twilio-Signature) before we trust
+// it — critical for START, which un-suppresses a number.
+// Standard carrier opt-out / opt-in keywords (created once, not per request).
+var smsStopWords  = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT" };
+var smsStartWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "START", "UNSTOP", "YES" };
+
+webhooks.MapPost("/twilio/inbound", async (
+    HttpRequest req,
+    DueMap.Integrations.Notices.ISmsSuppressionStore suppressions,
+    Microsoft.Extensions.Options.IOptions<DueMap.Integrations.IntegrationsOptions> intOpts,
+    CancellationToken ct) =>
+{
+    var form = await req.ReadFormAsync(ct);
+
+    // ---- Verify the request really came from Twilio ----
+    // Validate when an auth token is configured (prod). In dev with no token we
+    // can't validate and there's no live Twilio anyway, so we skip + log.
+    var authToken = intOpts.Value.Twilio.AuthToken;
+    if (!string.IsNullOrWhiteSpace(authToken))
+    {
+        var signature = req.Headers["X-Twilio-Signature"].ToString();
+        // The URL Twilio signed is the public callback URL. Behind a TLS-
+        // terminating proxy, ensure forwarded headers set the https scheme so
+        // this matches what Twilio used.
+        var url = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetEncodedUrl(req);
+        var parameters = form.ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
+
+        var validator = new Twilio.Security.RequestValidator(authToken);
+        if (string.IsNullOrEmpty(signature) || !validator.Validate(url, parameters, signature))
+        {
+            Log.Warning("Rejected Twilio inbound SMS: invalid or missing X-Twilio-Signature.");
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
+    }
+
+    var from = form["From"].ToString();
+    var body = form["Body"].ToString().Trim();
+    if (string.IsNullOrWhiteSpace(from)) return Results.Ok();
+
+    if (smsStopWords.Contains(body))
+    {
+        await suppressions.SuppressAsync(from, $"Inbound SMS: {body.ToUpperInvariant()}", propertyManagerId: null, ct);
+    }
+    else if (smsStartWords.Contains(body))
+    {
+        await suppressions.UnsuppressAsync(from, ct);
+    }
+
+    // Empty 200 — Twilio treats this as "no auto-reply from the app."
+    return Results.Ok();
+}).WithName("TwilioInboundSms");
+
 // -------------------------------------------------------------------------
 // OAuth endpoints for accounting onboarding (QuickBooks + Xero).
 //   GET  /oauth/{provider}/connect/{pmId}    → 302 to the provider authorize URL
@@ -472,7 +588,8 @@ oauthGroup.MapGet("/{provider}/connect/{pmId:int}", async (
 });
 
 oauthGroup.MapGet("/{provider}/callback", async (
-    string provider, HttpRequest req, IAccountingConnectionService svc, CancellationToken ct) =>
+    string provider, HttpRequest req, IAccountingConnectionService svc,
+    Hangfire.IBackgroundJobClient jobs, CancellationToken ct) =>
 {
     if (!TryParseProvider(provider, out var parsed))
     {
@@ -492,6 +609,16 @@ oauthGroup.MapGet("/{provider}/callback", async (
         Code: code,
         State: state,
         RealmId: string.IsNullOrEmpty(realmId) ? null : realmId), ct);
+
+    // Guarantee a first sync server-side the moment the connection is
+    // persisted — independent of any UI page. This is what keeps a freshly
+    // connected account from sitting at "Last sync: never": the daily sweep
+    // skips PMs with no active leases (chicken-and-egg — leases come from the
+    // sync), so without this nothing would ever pull the first batch unless
+    // the user happened to complete the syncing wizard. The Worker runs it;
+    // SyncForAsync is idempotent so overlap with the wizard's own sync is safe.
+    jobs.Enqueue<DueMap.Integrations.Accounting.Jobs.IInitialSyncJob>(
+        j => j.RunAsync(conn.PropertyManagerId, CancellationToken.None));
 
     // Land on the onboarding sync page so the user sees real progress for
     // their first customer/invoice pull instead of staring at a stale dashboard.

@@ -6,8 +6,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="DueMap.Common.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
+    <!-- Added for IFeatureFlags (v16, P0-1). MemoryCache for the 60s in-memory
+         cache; Logging.Abstractions so failures are loud. Microsoft.Data.SqlClient
+         keeps the read path on ADO (one tiny query) without dragging in EF Core. -->
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+    <!-- P0-4: AddAlerting binds AlertsOptions from IConfiguration. The
+         OptionsBuilder.Bind(IConfiguration) extension lives in this package. -->
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

@@ -29,6 +29,9 @@
          which needs ConfigurationManager 8.0+, but Serilog itself pulls a 6.0.1 floor.
          Pinning explicitly here picks the higher one. -->
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.0" />
+    <!-- Resolves NU1605 — Serilog.Sinks.MSSqlServer pulls Microsoft.Data.SqlClient 5.2.1
+         which needs ConfigurationManager 8.0+, but Serilog itself pulls a 6.0.1 floor.
+         Pinning explicitly here picks the higher one. -->
   </ItemGroup>
 
 </Project>

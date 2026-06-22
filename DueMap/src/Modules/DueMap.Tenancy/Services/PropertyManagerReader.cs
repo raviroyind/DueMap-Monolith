@@ -24,4 +24,13 @@ internal sealed class PropertyManagerReader : IPropertyManagerReader
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
         return await db.PropertyManagers.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
     }
+
+    public async Task<string?> GetAutoSetupSummaryJsonAsync(int propertyManagerId, CancellationToken ct)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        return await db.PropertyManagers.AsNoTracking()
+            .Where(p => p.Id == propertyManagerId)
+            .Select(p => p.AutoSetupSummary)
+            .FirstOrDefaultAsync(ct);
+    }
 }

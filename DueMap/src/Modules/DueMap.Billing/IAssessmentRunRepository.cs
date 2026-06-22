@@ -10,7 +10,13 @@ namespace DueMap.Billing;
 /// </summary>
 public interface IAssessmentRunRepository
 {
-    Task<bool> HasRunAsync(int leaseId, DateOnly dueDate, ActionKind kind, CancellationToken ct);
+    /// <summary>
+    /// True if an action of this kind already ran for the (lease, due_date).
+    /// P2-3: <paramref name="stepKey"/> further scopes the check to a single
+    /// sequence step — null matches the legacy one-per-kind cadence. Optional +
+    /// last so existing callers are unaffected.
+    /// </summary>
+    Task<bool> HasRunAsync(int leaseId, DateOnly dueDate, ActionKind kind, CancellationToken ct, string? stepKey = null);
 
     /// <summary>
     /// Insert a new run row. Returns the persisted entity, or <c>null</c> if a

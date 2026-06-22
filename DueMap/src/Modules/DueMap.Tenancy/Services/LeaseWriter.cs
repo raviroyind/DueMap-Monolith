@@ -61,4 +61,51 @@ internal sealed class LeaseWriter : ILeaseWriter
         await db.SaveChangesAsync(ct);
         return lease;
     }
+
+    public async Task UpdateAutopayStatusAsync(int leaseId, AutopayStatus status, DateTime checkedAt, CancellationToken ct)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var lease = await db.Leases.FirstOrDefaultAsync(l => l.Id == leaseId, ct);
+        if (lease is null) return;   // lease vanished between read + write; nothing to stamp
+
+        lease.AutopayStatus = status;
+        lease.AutopayCheckedAt = checkedAt;
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task UpdateCoreFieldsAsync(int leaseId, decimal monthlyRent, int stateId, CancellationToken ct)
+    {
+        if (monthlyRent <= 0m)
+        {
+            throw new ArgumentException("Monthly rent must be positive.", nameof(monthlyRent));
+        }
+
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var lease = await db.Leases.FirstOrDefaultAsync(l => l.Id == leaseId, ct)
+            ?? throw new InvalidOperationException($"Lease {leaseId} not found.");
+
+        lease.MonthlyRent = monthlyRent;
+        lease.StateId = stateId;
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task UpdateLateFeeProfileAsync(int leaseId, LateFeeProfileInput profile, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var lease = await db.Leases.FirstOrDefaultAsync(l => l.Id == leaseId, ct)
+            ?? throw new InvalidOperationException($"Lease {leaseId} not found.");
+
+        lease.LateFeeType         = profile.LateFeeType;
+        lease.LateFeePercent      = profile.LateFeePercent;
+        lease.LateFeeFlatAmount   = profile.LateFeeFlatAmount;
+        lease.LateFeeGraceDays    = profile.GraceDays;
+        lease.LateFeeDailyAccrual = profile.DailyAccrual;
+        // Staged on every AutoSetup write — the explicit "Go live" action
+        // (P1-4) flips this back to false. Re-running AutoSetup re-stages.
+        lease.FeesStaged = true;
+
+        await db.SaveChangesAsync(ct);
+    }
 }

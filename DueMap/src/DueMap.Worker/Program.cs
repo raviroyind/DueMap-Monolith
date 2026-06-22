@@ -2,6 +2,8 @@
 using Hangfire.SqlServer;
 using DueMap.Billing;
 using DueMap.Common.Modularity;
+using DueMap.Common.FeatureFlags;
+using DueMap.Common.Ops;
 using DueMap.Identity;
 using DueMap.Integrations;
 using DueMap.Notices;
@@ -33,6 +35,18 @@ builder.Services.AddModules(builder.Configuration,
 // Worker-host-local job registrations.
 builder.Services.AddScoped<IDailyAssessmentSweepJob, DailyAssessmentSweepJob>();
 builder.Services.AddScoped<IDailyCloseReportJob, DailyCloseReportJob>();
+// P0-2: ad-hoc dry-run, triggerable from the Hangfire dashboard.
+builder.Services.AddScoped<IDryRunOnePmJob, DryRunOnePmJob>();
+
+// Feature flags (P0-1): same ops.feature_flags table as Web. Identical
+// resolution semantics in both processes so a single flip controls both.
+builder.Services.AddFeatureFlags(
+    builder.Configuration.GetConnectionString("Default")
+        ?? throw new InvalidOperationException("Missing ConnectionStrings:Default for feature flags."));
+
+// P0-4: operator alerting — Worker fires the bulk of alerts (sweep stalled,
+// sync auth failures across many PMs). Sink choice mirrors Web's.
+builder.Services.AddAlerting(builder.Configuration);
 
 // Data Protection — must use the same keyring as the Web host so the Worker
 // can decrypt OAuth tokens written during onboarding.

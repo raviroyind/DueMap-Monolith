@@ -127,7 +127,20 @@ internal sealed partial class RulesService : IRulesService
             HardCapAmount: ovr?.HardCapAmount ?? baseRule.HardCapAmount,
             NoticeRequiredBeforeFee: baseRule.NoticeRequiredBeforeFee,
             NoticeAdvanceDays: ovr?.NoticeAdvanceDays ?? baseRule.NoticeAdvanceDays,
-            SourceCitation: citation);
+            SourceCitation: citation,
+            // ---- §6.1 guardrails — passed through verbatim from the state
+            // row. Local overrides DO NOT relax these (a city can lower a
+            // state ceiling, never raise it — and v1 doesn't model that
+            // because no local override authored to date does either).
+            StateMaxPercent:           baseRule.MaxPercent,
+            StateMaxFlatAmount:        baseRule.MaxFlatAmount,
+            StateMinGraceDays:         baseRule.MinGraceDays,
+            DailyAccrualOk:            baseRule.DailyAccrualOk,
+            RequiresWrittenDisclosure: baseRule.RequiresWrittenDisclosure,
+            StandardKind:              baseRule.StandardKind,
+            SafeDefaultPct:            baseRule.SafeDefaultPct,
+            PlainSummary:              baseRule.PlainSummary,
+            SourceUrl:                 baseRule.SourceUrl);
     }
 
     [LoggerMessage(

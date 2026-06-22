@@ -26,4 +26,14 @@ public sealed class Customer
     /// uses this to filter "already done" vs "still to send."
     /// </summary>
     public DateTime? PreflightNotifiedAt { get; set; }
+
+    /// <summary>
+    /// 2-letter state from the customer's billing address (QBO
+    /// <c>BillAddr.CountrySubDivisionCode</c> or Xero
+    /// <c>Address.Region</c>). NULL when the address has no region or
+    /// when the provider didn't expose one. Used by
+    /// <see cref="Discovery.IDiscoveryService"/> to infer a lease's state.
+    /// Always uppercase + trimmed when populated.
+    /// </summary>
+    public string? BillingState { get; set; }
 }

@@ -51,4 +51,16 @@ internal sealed class PropertyManagerWriter : IPropertyManagerWriter
             await db.SaveChangesAsync(ct);
         }
     }
+
+    public async Task RecordAutoSetupSummaryAsync(int propertyManagerId, string summaryJson, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(summaryJson);
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var row = await db.PropertyManagers.FirstOrDefaultAsync(p => p.Id == propertyManagerId, ct)
+            ?? throw new InvalidOperationException($"PropertyManager {propertyManagerId} not found.");
+
+        row.AutoSetupSummary = summaryJson;
+        row.AutoSetupDoneAt  = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+    }
 }
