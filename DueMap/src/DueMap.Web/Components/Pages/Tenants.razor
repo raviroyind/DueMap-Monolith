@@ -9,11 +9,11 @@
 
 <PageTitle>Tenants — DueMap</PageTitle>
 
-<div class="max-w-7xl mx-auto px-8 py-8 space-y-5">
+<div class="max-w-7xl mx-auto px-6 md:px-8 py-8 space-y-5">
 
     <div>
-        <h2 class="text-2xl font-semibold tracking-tight">Tenants</h2>
-        <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 max-w-3xl leading-relaxed">
+        <h2 class="page-title">Tenants</h2>
+        <p class="mt-1.5 text-sm text-muted max-w-3xl leading-relaxed">
             Every synced customer in one place. Set rent and state inline, link a customer to a lease,
             and see at a glance whether each fee is within state limits. This replaces the separate
             Leases and Link Customers screens.
@@ -22,32 +22,33 @@
 
     @if (_loading)
     {
-        <p class="text-sm text-zinc-500">Loading tenants…</p>
+        <p class="text-sm text-muted">Loading tenants…</p>
     }
     else if (_disabled)
     {
-        <div class="rounded-xl border border-amber-200/70 dark:border-amber-500/20 bg-amber-50/60 dark:bg-amber-500/5 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
-            The unified Tenants screen is currently off. Set the
-            <code class="font-mono text-xs">tenancy.tenants_screen</code> feature flag on to use it.
-            In the meantime, use <a href="/leases" class="underline">Leases</a> and
-            <a href="/link-customers" class="underline">Link customers</a>.
+        <div class="alert alert-warning">
+            <div>
+                The unified Tenants screen is currently off. Set the
+                <code class="font-mono text-xs">tenancy.tenants_screen</code> feature flag on to use it.
+                In the meantime, use <a href="/leases" class="underline">Leases</a> and
+                <a href="/link-customers" class="underline">Link customers</a>.
+            </div>
         </div>
     }
     else
     {
         @* ---- filters + bulk bar ---- *@
-        <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4 space-y-3">
+        <div class="card p-4 space-y-3">
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div class="sm:col-span-2">
-                    <label class="block text-xs font-medium text-zinc-500 mb-1.5">Search name or email</label>
+                    <label class="form-label">Search name or email</label>
                     <input type="search" placeholder="e.g. Cool Cars, jane@@example.com"
                            @bind="_search" @bind:event="oninput" @bind:after="OnFilterChanged"
-                           class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700" />
+                           class="form-control" />
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-zinc-500 mb-1.5">Show</label>
-                    <select @bind="_filter" @bind:after="OnFilterChanged"
-                            class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                    <label class="form-label">Show</label>
+                    <select @bind="_filter" @bind:after="OnFilterChanged" class="form-select">
                         <option value="all">All tenants</option>
                         <option value="linked">Linked to a lease</option>
                         <option value="unlinked">Not linked</option>
@@ -58,11 +59,10 @@
 
             @* bulk apply state across selected linked rows *@
             <div class="flex flex-wrap items-center gap-2 text-sm">
-                <span class="text-zinc-400 dark:text-zinc-500">@_selected.Count selected</span>
-                <span class="text-zinc-300 dark:text-zinc-600">·</span>
-                <span class="text-zinc-500">Set state for selected:</span>
-                <select @bind="_bulkStateId"
-                        class="px-2 py-1 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                <span class="text-muted">@_selected.Count selected</span>
+                <span class="text-muted">·</span>
+                <span class="text-muted">Set state for selected:</span>
+                <select @bind="_bulkStateId" class="form-select h-9 w-auto">
                     <option value="0">— choose —</option>
                     @foreach (var s in _states)
                     {
@@ -70,103 +70,100 @@
                     }
                 </select>
                 <button @onclick="ApplyBulkStateAsync" disabled="@(_selected.Count == 0 || _bulkStateId == 0 || _busy)"
-                        class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                        class="btn btn-sm btn-primary">
                     Apply to @_selected.Count
                 </button>
-                <span class="text-zinc-400 dark:text-zinc-500 ml-auto">@_rows.Count tenants · @LinkedCount linked</span>
+                <span class="text-muted ml-auto">@_rows.Count tenants · @LinkedCount linked</span>
             </div>
         </div>
 
-        <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
-            <table class="w-full text-sm">
-                <thead class="bg-zinc-50/60 dark:bg-zinc-900/60 text-left">
+        <div class="card">
+            <table class="table">
+                <thead>
                     <tr>
-                        <th class="px-4 py-2.5 w-10"></th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Customer</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-20">State</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-32">Rent</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-24">Late fee</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-28">Fee risk</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-24">Reminders</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-24">Autopay</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-40 text-right">Lease</th>
+                        <th class="w-10"></th>
+                        <th>Customer</th>
+                        <th class="w-20">State</th>
+                        <th class="w-32">Rent</th>
+                        <th class="w-24">Late fee</th>
+                        <th class="w-28">Fee risk</th>
+                        <th class="w-24">Reminders</th>
+                        <th class="w-24">Autopay</th>
+                        <th class="w-40 text-right">Lease</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                <tbody>
                     @if (_pageRows.Count == 0)
                     {
-                        <tr><td colspan="9" class="px-4 py-10 text-center text-sm text-zinc-500">No tenants match these filters.</td></tr>
+                        <tr><td colspan="9" class="px-4 py-10 text-center text-sm text-muted">No tenants match these filters.</td></tr>
                     }
                     @foreach (var r in _pageRows)
                     {
                         var editing = _editingCustomerId == r.CustomerId;
-                        <tr class="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 align-top">
-                            <td class="px-4 py-2.5">
-                                <input type="checkbox" disabled="@(r.LeaseId is null)"
+                        <tr class="align-top">
+                            <td>
+                                <input type="checkbox" class="checkbox" disabled="@(r.LeaseId is null)"
                                        checked="@_selected.Contains(r.CustomerId)"
                                        @onchange="@(e => ToggleOne(r.CustomerId, (bool)e.Value!))" />
                             </td>
-                            <td class="px-3 py-2.5">
-                                <div class="font-medium">@r.CustomerName</div>
-                                <div class="text-xs text-zinc-500">@(string.IsNullOrWhiteSpace(r.Email) ? "no email" : r.Email)</div>
+                            <td>
+                                <div class="cell-strong">@r.CustomerName</div>
+                                <div class="text-xs text-muted">@(string.IsNullOrWhiteSpace(r.Email) ? "no email" : r.Email)</div>
                             </td>
 
                             @if (editing)
                             {
-                                <td class="px-3 py-2.5">
-                                    <select @bind="_editStateId" class="w-full px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm">
+                                <td>
+                                    <select @bind="_editStateId" class="form-select h-8 text-xs">
                                         @foreach (var s in _states)
                                         {
                                             <option value="@s.Id">@s.Code</option>
                                         }
                                     </select>
                                 </td>
-                                <td class="px-3 py-2.5">
-                                    <input type="number" step="0.01" min="0" @bind="_editRent"
-                                           class="w-full px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm" />
+                                <td>
+                                    <input type="number" step="0.01" min="0" @bind="_editRent" class="form-control h-8 text-xs" />
                                 </td>
-                                <td class="px-3 py-2.5 text-xs text-zinc-400" colspan="4">
+                                <td class="text-xs text-muted" colspan="4">
                                     Editing — save to update rent &amp; state.
                                 </td>
-                                <td class="px-3 py-2.5 text-right whitespace-nowrap">
-                                    <button @onclick="SaveEditAsync" disabled="@_busy"
-                                            class="px-2.5 py-1 rounded text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">Save</button>
-                                    <button @onclick="CancelEdit"
-                                            class="px-2 py-1 rounded text-xs text-zinc-500 hover:underline">Cancel</button>
+                                <td class="text-right whitespace-nowrap">
+                                    <button @onclick="SaveEditAsync" disabled="@_busy" class="btn btn-sm btn-primary">Save</button>
+                                    <button @onclick="CancelEdit" class="btn btn-sm btn-link">Cancel</button>
                                 </td>
                             }
                             else
                             {
-                                <td class="px-3 py-2.5">
+                                <td>
                                     @if (r.StateCode is not null)
                                     {
-                                        <span class="inline-flex px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">@r.StateCode</span>
+                                        <span class="inline-flex px-1.5 py-0.5 rounded bg-surface-2 text-xs font-mono">@r.StateCode</span>
                                     }
-                                    else { <span class="text-zinc-400 text-xs">—</span> }
+                                    else { <span class="text-muted text-xs">—</span> }
                                 </td>
-                                <td class="px-3 py-2.5 tabular-nums">
+                                <td class="tabular">
                                     @(r.MonthlyRent is decimal rent ? rent.ToString("C0", Usd) : "—")
                                 </td>
-                                <td class="px-3 py-2.5 tabular-nums">
+                                <td class="tabular">
                                     @(r.LateFeePercent is decimal p ? $"{p.ToString("0.##", CultureInfo.InvariantCulture)}%" : "—")
                                 </td>
-                                <td class="px-3 py-2.5">
-                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium @RiskClass(r.FeeRisk)">@RiskLabel(r.FeeRisk)</span>
+                                <td>
+                                    <span class="badge @RiskClass(r.FeeRisk)">@RiskLabel(r.FeeRisk)</span>
                                 </td>
-                                <td class="px-3 py-2.5 text-xs">@(r.RemindersEnabled ? "On" : "—")</td>
-                                <td class="px-3 py-2.5 text-xs text-zinc-400">@r.AutopayStatus</td>
-                                <td class="px-3 py-2.5 text-right whitespace-nowrap">
+                                <td class="text-xs">@(r.RemindersEnabled ? "On" : "—")</td>
+                                <td class="text-xs text-muted">@r.AutopayStatus</td>
+                                <td class="text-right whitespace-nowrap">
                                     @if (r.LeaseId is not null)
                                     {
                                         @if (r.FeesStaged)
                                         {
-                                            <span class="inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 mr-1">staged</span>
+                                            <span class="badge badge-warning mr-1">staged</span>
                                         }
-                                        <button @onclick="@(() => BeginEdit(r))" class="text-indigo-600 dark:text-indigo-400 text-xs hover:underline">Edit</button>
+                                        <button @onclick="@(() => BeginEdit(r))" class="btn btn-sm btn-link">Edit</button>
                                     }
                                     else
                                     {
-                                        <button @onclick="@(() => BeginCreate(r))" class="text-amber-600 dark:text-amber-400 text-xs hover:underline">Create lease</button>
+                                        <button @onclick="@(() => BeginCreate(r))" class="btn btn-sm btn-link text-warning">Create lease</button>
                                     }
                                 </td>
                             }
@@ -174,13 +171,13 @@
 
                         @if (_creatingCustomerId == r.CustomerId)
                         {
-                            <tr class="bg-indigo-50/40 dark:bg-indigo-500/5">
+                            <tr class="bg-primary-soft">
                                 <td></td>
                                 <td colspan="8" class="px-3 py-3">
                                     <div class="flex flex-wrap items-end gap-3">
                                         <div>
-                                            <label class="block text-[11px] text-zinc-500 mb-1">State</label>
-                                            <select @bind="_editStateId" class="px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm">
+                                            <label class="block text-[11px] text-muted mb-1">State</label>
+                                            <select @bind="_editStateId" class="form-select h-9 w-auto">
                                                 @foreach (var s in _states)
                                                 {
                                                     <option value="@s.Id">@s.Code — @s.Name</option>
@@ -188,13 +185,11 @@
                                             </select>
                                         </div>
                                         <div>
-                                            <label class="block text-[11px] text-zinc-500 mb-1">Monthly rent</label>
-                                            <input type="number" step="0.01" min="0" @bind="_editRent"
-                                                   class="w-32 px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm" />
+                                            <label class="block text-[11px] text-muted mb-1">Monthly rent</label>
+                                            <input type="number" step="0.01" min="0" @bind="_editRent" class="form-control w-32 h-9" />
                                         </div>
-                                        <button @onclick="SaveCreateAsync" disabled="@_busy"
-                                                class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">Create &amp; link</button>
-                                        <button @onclick="CancelEdit" class="px-2 py-1 rounded text-xs text-zinc-500 hover:underline">Cancel</button>
+                                        <button @onclick="SaveCreateAsync" disabled="@_busy" class="btn btn-sm btn-primary">Create &amp; link</button>
+                                        <button @onclick="CancelEdit" class="btn btn-sm btn-link">Cancel</button>
                                     </div>
                                 </td>
                             </tr>
@@ -203,18 +198,18 @@
                 </tbody>
             </table>
 
-            <div class="px-4 py-3 border-t border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-500">
+            <div class="px-4 py-3 border-t border-line flex items-center justify-between text-xs text-muted">
                 <div>Page @(_page + 1) of @TotalPages</div>
                 <div class="flex items-center gap-2">
-                    <button @onclick="PrevPage" disabled="@(_page == 0)" class="px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 disabled:opacity-40">Prev</button>
-                    <button @onclick="NextPage" disabled="@(_page >= TotalPages - 1)" class="px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 disabled:opacity-40">Next</button>
+                    <button @onclick="PrevPage" disabled="@(_page == 0)" class="btn btn-sm btn-secondary">Prev</button>
+                    <button @onclick="NextPage" disabled="@(_page >= TotalPages - 1)" class="btn btn-sm btn-secondary">Next</button>
                 </div>
             </div>
         </div>
 
         @if (_message is not null)
         {
-            <div class="text-xs @(_messageOk ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")">@_message</div>
+            <div class="text-xs @(_messageOk ? "text-success" : "text-danger")">@_message</div>
         }
     }
 </div>
@@ -400,11 +395,12 @@
         _ => "—"
     };
 
+    // Osen badge family for the fee-risk pill.
     private static string RiskClass(FeeRisk r) => r switch
     {
-        FeeRisk.Ok      => "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
-        FeeRisk.Review  => "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
-        FeeRisk.OverCap => "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400",
-        _               => "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+        FeeRisk.Ok      => "badge-success",
+        FeeRisk.Review  => "badge-warning",
+        FeeRisk.OverCap => "badge-danger",
+        _               => "badge-neutral"
     };
 }
