@@ -7,9 +7,7 @@
 
 @if (TempData["SsoNotice"] is string ssoNotice)
 {
-    <div class="mb-5 rounded-xl border border-indigo-200/70 dark:border-indigo-500/20 bg-indigo-50/60 dark:bg-indigo-500/5 px-4 py-3 text-sm text-indigo-900 dark:text-indigo-200">
-        @ssoNotice
-    </div>
+    <div class="alert alert-primary mb-5">@ssoNotice</div>
 }
 
 @* OIDC RemoteFailure handler bounces us back here with ?sso_error=... so the
@@ -17,9 +15,11 @@
    instead of a stack trace. *@
 @if (!string.IsNullOrEmpty(Request.Query["sso_error"]))
 {
-    <div class="mb-5 rounded-xl border border-rose-200/70 dark:border-rose-500/20 bg-rose-50/60 dark:bg-rose-500/5 px-4 py-3 text-sm text-rose-900 dark:text-rose-200">
-        <div class="font-medium">Single sign-on failed</div>
-        <div class="text-xs mt-1 break-words">@Request.Query["sso_error"]</div>
+    <div class="alert alert-danger mb-5">
+        <div>
+            <div class="alert-title">Single sign-on failed</div>
+            <div class="text-xs mt-1 break-words">@Request.Query["sso_error"]</div>
+        </div>
     </div>
 }
 
@@ -27,48 +27,39 @@
 
 @if (!string.IsNullOrEmpty(Model.ErrorMessage))
 {
-    <div class="mb-6 rounded-xl border border-rose-200/70 dark:border-rose-500/20 bg-rose-50/60 dark:bg-rose-500/5 px-4 py-3 flex items-start gap-3">
-        <span class="mt-0.5 inline-flex w-5 h-5 items-center justify-center rounded-full bg-rose-500 text-white shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
-        </span>
-        <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium text-rose-900 dark:text-rose-200">@Model.ErrorMessage</div>
-        </div>
+    <div class="alert alert-danger mb-6">
+        <svg class="alert-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+        <div class="flex-1 min-w-0 font-medium">@Model.ErrorMessage</div>
     </div>
 }
 
 <form method="post" class="space-y-5">
     <div>
-        <label for="email" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Email</label>
+        <label for="email" class="form-label">Email</label>
         <input id="email" type="email" asp-for="Input.Email" required autofocus
-               placeholder="you@example.com"
-               class="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-zinc-800 text-sm text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150" />
+               placeholder="you@example.com" class="form-control" />
     </div>
 
     <div>
         <div class="flex items-center justify-between mb-1.5">
-            <label for="password" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Password</label>
-            <a href="#" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">Forgot?</a>
+            <label for="password" class="form-label mb-0">Password</label>
+            <a href="#" class="btn-link text-xs">Forgot?</a>
         </div>
-        <input id="password" type="password" asp-for="Input.Password" required
-               class="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-zinc-800 text-sm text-zinc-900 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150" />
+        <input id="password" type="password" asp-for="Input.Password" required class="form-control" />
     </div>
 
-    <label class="flex items-center gap-2.5 cursor-pointer select-none">
-        <input type="checkbox" asp-for="Input.RememberMe" class="checkbox" />
-        <span class="text-sm text-zinc-700 dark:text-zinc-300">Keep me signed in for 14 days</span>
+    <label class="form-check">
+        <input type="checkbox" asp-for="Input.RememberMe" />
+        <span class="text-sm">Keep me signed in for 14 days</span>
     </label>
 
-    <button type="submit"
-            class="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 shadow-sm transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900">
+    <button type="submit" class="btn btn-primary w-full">
         Sign in
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
     </button>
 </form>
 
-<p class="mt-6 text-center text-sm text-zinc-600 dark:text-zinc-400">
+<p class="mt-6 text-center text-sm text-muted">
     New to DueMap?
-    <a asp-page="/Account/Register" class="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">
-        Create a property manager account
-    </a>
+    <a asp-page="/Account/Register" class="font-medium text-primary">Create a property manager account</a>
 </p>
