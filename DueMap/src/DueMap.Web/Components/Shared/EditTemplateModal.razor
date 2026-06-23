@@ -28,6 +28,7 @@
 @inject INoticeTypeReader NoticeTypeReader
 @inject IStateReader StateReader
 @inject IJSRuntime JS
+@implements IAsyncDisposable
 
 @if (_visible && _draft is not null)
 {
@@ -135,24 +136,23 @@
                 <div>
                     <label for="tpl-html-body" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">HTML body</label>
 
-                    @* Tab strip: large segmented control with a clear active state.
-                       Sits on its own line above the editor so it can't be missed,
-                       and uses indigo accent + white card lift on the active tab so
-                       the user always knows which mode they're in. *@
-                    <div class="inline-flex p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-700/60 text-sm mb-2.5">
+                    @* Underline-style tabs: a shared bottom rule with the active
+                       tab marked by an indigo underline that overlaps the rule
+                       (-mb-px). Reads as classic tabs rather than a pill toggle. *@
+                    <div class="flex items-center gap-1 border-b border-zinc-200 dark:border-zinc-700 mb-3">
                         <button type="button" @onclick="@(() => _htmlTab = HtmlTab.Design)"
                                 class="@(_htmlTab == HtmlTab.Design
-                                    ? "bg-white dark:bg-zinc-900 text-indigo-700 dark:text-indigo-300 shadow-sm ring-1 ring-indigo-500/15"
-                                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200")
-                                    inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-150">
+                                    ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                                    : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600")
+                                    inline-flex items-center gap-2 px-4 py-2.5 -mb-px border-b-2 font-semibold text-sm transition-colors duration-150">
                             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
                             Design
                         </button>
-                        <button type="button" @onclick="@(() => _htmlTab = HtmlTab.Preview)"
+                        <button type="button" @onclick="ShowPreviewAsync"
                                 class="@(_htmlTab == HtmlTab.Preview
-                                    ? "bg-white dark:bg-zinc-900 text-indigo-700 dark:text-indigo-300 shadow-sm ring-1 ring-indigo-500/15"
-                                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200")
-                                    inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-150">
+                                    ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                                    : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600")
+                                    inline-flex items-center gap-2 px-4 py-2.5 -mb-px border-b-2 font-semibold text-sm transition-colors duration-150">
                             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
                             Preview
                         </button>
@@ -160,9 +160,37 @@
 
                     @if (_htmlTab == HtmlTab.Design)
                     {
-                        <textarea id="tpl-html-body" @bind="_draft.BodyHtml" @bind:event="oninput"
-                                  @onfocus="@(() => _focusedFieldId = "tpl-html-body")"
-                                  class="w-full min-h-[45vh] md:min-h-[55vh] px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm font-mono border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150 resize-y"></textarea>
+                        @if (_editorFailed)
+                        {
+                            @* Degraded fallback: Medium Editor didn't load, so we
+                               drop back to a raw-HTML textarea. Still editable —
+                               just without the WYSIWYG niceties. *@
+                            <textarea id="@BodyEditorId" @bind="_draft.BodyHtml" @bind:event="oninput"
+                                      @onfocus="@(() => _focusedFieldId = BodyEditorId)"
+                                      class="w-full min-h-[45vh] md:min-h-[55vh] px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm font-mono border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150 resize-y"></textarea>
+                        }
+                        else
+                        {
+                            @* Formatting affordance: Medium Editor's toolbar only
+                               appears on selection, which isn't discoverable on its
+                               own. This bar tells the PM the surface is rich-text and
+                               how to summon the toolbar. *@
+                            <div class="flex items-start gap-2.5 mb-2 px-3.5 py-2.5 rounded-lg bg-indigo-50/70 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-600 dark:text-indigo-400 mt-0.5 shrink-0"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>
+                                <p class="text-xs text-indigo-900 dark:text-indigo-200 leading-relaxed">
+                                    <span class="font-semibold">Highlight any text</span> to format it — a toolbar pops up with bold, italic, links, headings and lists.
+                                </p>
+                            </div>
+
+                            @* WYSIWYG body. Content is owned by Medium Editor (wired
+                               up in OnAfterRenderAsync) — deliberately NO @bind, or
+                               Blazor's render diff would wipe the editor's DOM. C#
+                               reads the value back via the OnBodyHtmlChanged callback
+                               and pulls a final copy on save. *@
+                            <div id="@BodyEditorId"
+                                 class="rt-editor w-full min-h-[45vh] md:min-h-[55vh] px-3.5 py-3 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150"
+                                 @onfocus="@(() => _focusedFieldId = BodyEditorId)"></div>
+                        }
                     }
                     else
                     {
@@ -193,7 +221,7 @@
                     @foreach (var p in Placeholders)
                     {
                         <button type="button"
-                                @onclick="@(() => InsertPlaceholderAsync(p.Token))"
+                                @onclick="@(() => InsertPlaceholderAsync(p.Token, asHtml: false))"
                                 title="@p.Description — inserts at cursor in the last focused field"
                                 class="var-pill cursor-pointer hover:brightness-110 transition">
                             @p.Label
@@ -206,7 +234,7 @@
                     @foreach (var s in Snippets)
                     {
                         <button type="button"
-                                @onclick="@(() => InsertPlaceholderAsync(s.Html))"
+                                @onclick="@(() => InsertPlaceholderAsync(s.Html, asHtml: true))"
                                 title="@s.Description"
                                 class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition-colors duration-150">
                             <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
@@ -248,11 +276,24 @@
     private IReadOnlyList<NoticeType> _noticeTypes = Array.Empty<NoticeType>();
     private IReadOnlyList<RulesState> _states = Array.Empty<RulesState>();
 
+    // DOM id of the rich-text body surface. Used both as the contenteditable's
+    // id and as the Medium Editor interop handle. Kept as a const so the Razor
+    // markup, the focus tracker, and the JS calls can't drift apart.
+    private const string BodyEditorId = "tpl-html-body";
+
     // ID of the last text field the user focused (subject / html body). Used by
     // the placeholder chips to know which field to inject into. Default to the
     // HTML body — that's where copy gets edited most often. (The plain-text body
     // is no longer edited directly; it's derived from the rich HTML on save.)
-    private string _focusedFieldId = "tpl-html-body";
+    private string _focusedFieldId = BodyEditorId;
+
+    // Medium Editor lifecycle. _editorInitialized tracks whether a live instance
+    // is bound to the contenteditable; _editorFailed flips on if the library
+    // didn't load (we then render a plain textarea fallback). _dotNetRef lets
+    // the JS side push edits back into _draft.BodyHtml.
+    private bool _editorInitialized;
+    private bool _editorFailed;
+    private DotNetObjectReference<EditTemplateModal>? _dotNetRef;
 
     private enum HtmlTab { Design, Preview }
     private HtmlTab _htmlTab = HtmlTab.Design;
@@ -350,6 +391,80 @@
             "Inserts a styled button that links to the invoice's public payment URL. Auto-hides when the invoice has no pay link.")
     };
 
+    // -- Medium Editor lifecycle -------------------------------------------
+
+    /// <summary>
+    /// Spins the WYSIWYG editor up/down to follow the visible Design surface.
+    /// The contenteditable only exists when the modal is open AND the Design tab
+    /// is active, so we (re)initialise whenever it appears and tear down when it
+    /// leaves (tab switch to Preview, or modal close). Re-init seeds from the
+    /// current draft, which OnBodyHtmlChanged keeps in sync.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_editorFailed) return;
+
+        var wantEditor = _visible && _draft is not null && _htmlTab == HtmlTab.Design;
+
+        if (wantEditor && !_editorInitialized)
+        {
+            _dotNetRef ??= DotNetObjectReference.Create(this);
+            var ok = await JS.InvokeAsync<bool>(
+                "dueMapEditor.init", BodyEditorId, _dotNetRef, _draft!.BodyHtml ?? string.Empty);
+            if (ok)
+            {
+                _editorInitialized = true;
+            }
+            else
+            {
+                // Library missing — fall back to the raw textarea on next render.
+                _editorFailed = true;
+                StateHasChanged();
+            }
+        }
+        else if (_editorInitialized && !wantEditor)
+        {
+            await JS.InvokeVoidAsync("dueMapEditor.destroy", BodyEditorId);
+            _editorInitialized = false;
+        }
+    }
+
+    /// <summary>
+    /// Called from JS whenever the PM edits the body. The contenteditable is
+    /// JS-owned, so this is the only path that mutates _draft.BodyHtml from the
+    /// editor. No StateHasChanged: the Design surface isn't Blazor-rendered, and
+    /// the Preview tab re-reads the value when the user switches to it.
+    /// </summary>
+    [JSInvokable]
+    public Task OnBodyHtmlChanged(string html)
+    {
+        if (_draft is not null) _draft.BodyHtml = html ?? string.Empty;
+        return Task.CompletedTask;
+    }
+
+    // Leaving Design for Preview: flush the editor's current HTML into the draft
+    // while the contenteditable is still in the DOM. Without this, a body change
+    // still inside the input debounce would be dropped when OnAfterRenderAsync
+    // tears the editor down for the Preview render.
+    private async Task ShowPreviewAsync()
+    {
+        if (_editorInitialized && !_editorFailed && _draft is not null)
+        {
+            _draft.BodyHtml = await JS.InvokeAsync<string>("dueMapEditor.getHtml", BodyEditorId);
+        }
+        _htmlTab = HtmlTab.Preview;
+    }
+
+    // Push a programmatic content change (prefill / reset) into the live editor.
+    // No-op when the editor isn't up yet (the open path seeds via init instead).
+    private async Task SyncEditorAsync()
+    {
+        if (_editorInitialized && !_editorFailed && _draft is not null)
+        {
+            await JS.InvokeVoidAsync("dueMapEditor.setHtml", BodyEditorId, _draft.BodyHtml ?? string.Empty);
+        }
+    }
+
     /// <summary>
     /// Direct mode: open the modal for a specific notice type, fixed to the
     /// PM-generic override (state = null). Used by NoticePreferences where the
@@ -439,7 +554,16 @@
         _saving = false;
         _htmlTab = HtmlTab.Design;
         _themeKey = EmailThemes.DefaultKey;
-        _focusedFieldId = "tpl-html-body";
+        _focusedFieldId = BodyEditorId;
+
+        // Re-opening for a different template without a close in between: drop the
+        // old editor so OnAfterRenderAsync re-seeds it from the incoming draft.
+        if (_editorInitialized)
+        {
+            try { await JS.InvokeVoidAsync("dueMapEditor.destroy", BodyEditorId); }
+            catch (JSException) { /* circuit/teardown race — ignore */ }
+            _editorInitialized = false;
+        }
 
         if (_noticeTypes.Count == 0)
         {
@@ -490,6 +614,7 @@
             _friendlyName = _noticeTypes.FirstOrDefault(t => t.Id == id)?.DisplayName ?? "Override";
         }
         await PrefillFromDefaultAsync();
+        await SyncEditorAsync();
         StateHasChanged();
     }
 
@@ -498,6 +623,7 @@
         if (_draft is null || _draft.Id != 0) return;
         _draft.StateId = int.TryParse(e.Value?.ToString(), out var sid) ? sid : (int?)null;
         await PrefillFromDefaultAsync();
+        await SyncEditorAsync();
         StateHasChanged();
     }
 
@@ -532,6 +658,7 @@
     private async Task ResetToDefaultAsync()
     {
         await PrefillFromDefaultAsync();
+        await SyncEditorAsync();
         StateHasChanged();
     }
 
@@ -543,6 +670,14 @@
         // from the source row but we belt-and-suspender it here). Setting it
         // unconditionally is a no-op when already correct.
         _draft.PropertyManagerId = PropertyManagerId;
+
+        // Pull the latest body straight from the editor before saving — the
+        // edit->C# round-trip is debounced, so a PM who types and immediately
+        // clicks Save could otherwise persist a slightly stale draft.
+        if (_editorInitialized && !_editorFailed)
+        {
+            _draft.BodyHtml = await JS.InvokeAsync<string>("dueMapEditor.getHtml", BodyEditorId);
+        }
 
         // Rich HTML is the only thing the PM edits now; the plain-text body
         // (used for SMS + the email text part) is derived from it so the two
@@ -599,12 +734,38 @@
         return s.Trim();
     }
 
-    // Drops the placeholder token at the current caret position of whichever
-    // text field the user last focused. The JS helper dispatches an `input`
-    // event so the @bind:event="oninput" binding on the textarea sees the
-    // change and updates _draft.BodyHtml / BodyText / Subject in C#.
-    private async Task InsertPlaceholderAsync(string token)
+    // Drops a placeholder token (asHtml: false) or a styled snippet (asHtml:
+    // true) at the caret of whichever field the user last focused.
+    //   * Body field with the live WYSIWYG -> the Medium Editor bridge, which
+    //     inserts a text node or parsed markup and fires editableInput so the
+    //     value syncs back to _draft.BodyHtml.
+    //   * Subject input (or the textarea fallback) -> the plain dueMapTemplate
+    //     helper, which mutates .value and dispatches `input` for @bind.
+    private async Task InsertPlaceholderAsync(string content, bool asHtml)
     {
-        await JS.InvokeVoidAsync("dueMapTemplate.insertAtCursor", _focusedFieldId, token);
+        var intoBodyEditor = _focusedFieldId == BodyEditorId && _editorInitialized && !_editorFailed;
+        if (intoBodyEditor)
+        {
+            await JS.InvokeVoidAsync("dueMapEditor.insertAtCursor", BodyEditorId, content, asHtml);
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("dueMapTemplate.insertAtCursor", _focusedFieldId, content);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_editorInitialized)
+            {
+                await JS.InvokeVoidAsync("dueMapEditor.destroy", BodyEditorId);
+            }
+        }
+        catch (JSDisconnectedException) { /* circuit already torn down */ }
+        catch (JSException) { /* best-effort cleanup */ }
+
+        _dotNetRef?.Dispose();
     }
 }

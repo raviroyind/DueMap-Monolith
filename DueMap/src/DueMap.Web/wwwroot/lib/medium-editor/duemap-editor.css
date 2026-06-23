@@ -1,0 +1,39 @@
+/* DueMap tweaks on top of medium-editor's default theme.
+   Served as-is (outside the Tailwind pipeline) so it ships regardless of the
+   CSS build. Scopes everything to .rt-editor / the medium-editor toolbar. */
+
+/* The contenteditable surface: let the placeholder + caret read naturally in
+   both themes. Layout (size, border, ring) comes from Tailwind on the element. */
+.rt-editor[contenteditable] {
+    cursor: text;
+    overflow-y: auto;
+}
+
+/* medium-editor renders its placeholder via :after on the empty editable. */
+.rt-editor.medium-editor-placeholder:after {
+    color: rgb(161 161 170);          /* zinc-400 */
+    font-style: normal;
+    font-family: inherit;
+}
+.dark .rt-editor.medium-editor-placeholder:after {
+    color: rgb(113 113 122);          /* zinc-500 */
+}
+
+/* Headings inside the WYSIWYG body shouldn't balloon — emails are not docs. */
+.rt-editor h2 { font-size: 1.15rem; font-weight: 700; margin: 0.4em 0 0.5em; }
+.rt-editor h3 { font-size: 1.02rem; font-weight: 600; margin: 0.4em 0 0.5em; }
+.rt-editor blockquote {
+    border-left: 3px solid rgb(212 212 216);
+    padding-left: 0.9em; margin: 0 0 0.85em; color: rgb(82 82 91);
+}
+.dark .rt-editor blockquote { border-left-color: rgb(63 63 70); color: rgb(161 161 170); }
+.rt-editor ol { padding-left: 1.4em; margin: 0 0 0.85em; list-style: decimal; }
+
+/* Keep the floating toolbar above the modal (modal sits at z-50). The default
+   theme already uses a high z-index; pin it so a stacking context can't bury it. */
+.medium-editor-toolbar { z-index: 2147483000 !important; }
+
+/* The anchor (link) form's input should be legible on the dark toolbar. */
+.medium-editor-toolbar-form .medium-editor-toolbar-input {
+    font-family: inherit;
+}
