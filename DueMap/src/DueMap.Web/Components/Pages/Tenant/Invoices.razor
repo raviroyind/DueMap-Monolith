@@ -15,41 +15,41 @@
 
     <div>
         <h1 class="text-2xl font-semibold tracking-tight">Invoices</h1>
-        <p class="mt-1 text-sm text-zinc-500">Your full payment history. Download a PDF for your records or pay an open invoice.</p>
+        <p class="mt-1 text-sm text-muted">Your full payment history. Download a PDF for your records or pay an open invoice.</p>
     </div>
 
     @if (_loading)
     {
-        <p class="text-sm text-zinc-500">Loading…</p>
+        <p class="text-sm text-muted">Loading…</p>
     }
     else if (_rows.Count == 0)
     {
-        <div class="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 p-10 text-center text-sm text-zinc-500">
+        <div class="rounded-xl border border-dashed border-line p-10 text-center text-sm text-muted">
             No invoices on file yet.
         </div>
     }
     else
     {
-        <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+        <div class="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
             <table class="w-full text-sm">
-                <thead class="bg-zinc-50/60 dark:bg-zinc-900/60 text-left">
+                <thead class="bg-surface-2 text-left">
                     <tr>
-                        <th class="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Due date</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Invoice</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 text-right">Amount</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 text-right">Balance</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Status</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 text-right">Actions</th>
+                        <th class="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted">Due date</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted">Invoice</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted text-right">Amount</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted text-right">Balance</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted">Status</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted text-right">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                <tbody class="divide-y divide-[color:var(--line)]">
                     @foreach (var i in _rows)
                     {
-                        <tr class="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30">
+                        <tr class="hover:bg-surface-2">
                             <td class="px-4 py-2.5 tabular-nums">@i.DueDate.ToString("yyyy-MM-dd")</td>
-                            <td class="px-3 py-2.5 text-xs font-mono text-zinc-500">@(i.ExternalDocNumber ?? i.ExternalId)</td>
+                            <td class="px-3 py-2.5 text-xs font-mono text-muted">@(i.ExternalDocNumber ?? i.ExternalId)</td>
                             <td class="px-3 py-2.5 text-right tabular-nums">@FormatMoney(i.TotalAmount, i.Currency)</td>
-                            <td class="px-3 py-2.5 text-right tabular-nums @(i.Balance > 0 ? "font-semibold" : "text-zinc-400")">@FormatMoney(i.Balance, i.Currency)</td>
+                            <td class="px-3 py-2.5 text-right tabular-nums @(i.Balance > 0 ? "font-semibold" : "text-muted")">@FormatMoney(i.Balance, i.Currency)</td>
                             <td class="px-3 py-2.5">
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium @StatusPill(i.Status)">@i.Status</span>
                             </td>
@@ -57,14 +57,14 @@
                                 <div class="inline-flex items-center gap-1">
                                     <a href="@($"/t/invoices/{i.Id}/pdf")" target="_blank" rel="noopener"
                                        title="Download PDF"
-                                       class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                                       class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-heading hover:bg-surface-2">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
                                         PDF
                                     </a>
                                     @if (i.Status == RentInvoiceStatus.Open && !string.IsNullOrEmpty(i.PublicPaymentUrl))
                                     {
                                         <a href="@i.PublicPaymentUrl" target="_blank" rel="noopener"
-                                           class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+                                           class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-white bg-primary hover:bg-primary-hover">
                                             Pay
                                         </a>
                                     }
@@ -106,8 +106,8 @@
     {
         RentInvoiceStatus.Paid   => "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
         RentInvoiceStatus.Open   => "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
-        RentInvoiceStatus.Voided => "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
-        _                        => "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+        RentInvoiceStatus.Voided => "bg-zinc-100 text-muted dark:bg-zinc-800 dark:text-muted",
+        _                        => "bg-zinc-100 text-muted dark:bg-zinc-800 dark:text-muted"
     };
 
     private static string FormatMoney(decimal amount, string currency)

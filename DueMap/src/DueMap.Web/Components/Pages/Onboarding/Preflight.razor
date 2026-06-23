@@ -18,7 +18,7 @@
 
     <div>
         <h2 class="text-2xl font-semibold tracking-tight">Notify your tenants (optional)</h2>
-        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-3xl">
+        <p class="mt-2 text-sm text-muted leading-relaxed max-w-3xl">
             Give your tenants a heads-up before they start receiving automated reminders and late-fee notices.
             Pick who to email, edit the message if you'd like, and send. You can skip this step now and
             do it later from the Tenants page.
@@ -27,23 +27,23 @@
 
     @if (_loading)
     {
-        <p class="text-sm text-zinc-500">Loading customers…</p>
+        <p class="text-sm text-muted">Loading customers…</p>
     }
     else
     {
         @* ---- FILTERS ---- *@
-        <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
+        <div class="rounded-xl border border-line bg-surface shadow-sm p-4">
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div class="sm:col-span-2">
-                    <label class="block text-xs font-medium text-zinc-500 mb-1.5">Search by name or email</label>
+                    <label class="block text-xs font-medium text-muted mb-1.5">Search by name or email</label>
                     <input type="search" placeholder="e.g. Jane Doe, jane@@example.com"
                            @bind="_search" @bind:event="oninput" @bind:after="OnFilterChanged"
-                           class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700" />
+                           class="w-full px-3 py-2 rounded-lg text-sm bg-surface border border-line" />
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-zinc-500 mb-1.5">Status</label>
+                    <label class="block text-xs font-medium text-muted mb-1.5">Status</label>
                     <select @bind="_statusFilter" @bind:after="OnFilterChanged"
-                            class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                            class="w-full px-3 py-2 rounded-lg text-sm bg-surface border border-line">
                         <option value="all">All tenants</option>
                         <option value="pending">Not yet notified</option>
                         <option value="done">Already notified</option>
@@ -55,39 +55,39 @@
         @* ---- BULK BAR ---- *@
         <div class="flex flex-wrap items-center gap-3 text-sm">
             <button @onclick="SelectAllOnPage"
-                    class="text-indigo-600 dark:text-indigo-400 hover:underline">Select all on page</button>
-            <span class="text-zinc-300 dark:text-zinc-600">·</span>
+                    class="text-primary hover:underline">Select all on page</button>
+            <span class="text-zinc-300 dark:text-body">·</span>
             <button @onclick="SelectNone"
-                    class="text-zinc-600 dark:text-zinc-400 hover:underline">Clear selection</button>
-            <span class="text-zinc-400 dark:text-zinc-500 ml-auto">
+                    class="text-muted hover:underline">Clear selection</button>
+            <span class="text-muted ml-auto">
                 @_selected.Count selected · @_filtered.Count match · @_allCustomers.Count total
             </span>
             <button @onclick="OpenSendModal" disabled="@(_selected.Count == 0)"
-                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed">
                 Send notification email
             </button>
         </div>
 
         @* ---- GRID ---- *@
-        <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+        <div class="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
             <table class="w-full text-sm">
-                <thead class="bg-zinc-50/60 dark:bg-zinc-900/60 text-left">
+                <thead class="bg-surface-2 text-left">
                     <tr>
                         <th class="px-4 py-2.5 w-10">
                             <input type="checkbox"
                                    checked="@AllOnPageSelected()"
                                    @onchange="ToggleAllOnPage" />
                         </th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Tenant</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Email</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-40">Preflight</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted">Tenant</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted">Email</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted w-40">Preflight</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                <tbody class="divide-y divide-[color:var(--line)]">
                     @if (_pageRows.Count == 0)
                     {
                         <tr>
-                            <td colspan="4" class="px-4 py-10 text-center text-sm text-zinc-500">
+                            <td colspan="4" class="px-4 py-10 text-center text-sm text-muted">
                                 No customers match these filters.
                             </td>
                         </tr>
@@ -95,7 +95,7 @@
                     @foreach (var c in _pageRows)
                     {
                         var canPick = !string.IsNullOrWhiteSpace(c.Email);
-                        <tr class="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30">
+                        <tr class="hover:bg-surface-2">
                             <td class="px-4 py-2.5">
                                 <input type="checkbox"
                                        disabled="@(!canPick)"
@@ -105,7 +105,7 @@
                             <td class="px-3 py-2.5">
                                 <div class="font-medium">@c.DisplayName</div>
                             </td>
-                            <td class="px-3 py-2.5 text-zinc-600 dark:text-zinc-300">
+                            <td class="px-3 py-2.5 text-body">
                                 @(string.IsNullOrWhiteSpace(c.Email)
                                     ? (MarkupString)"<span class=\"text-rose-500 text-xs\">no email on file</span>"
                                     : (MarkupString)System.Net.WebUtility.HtmlEncode(c.Email))
@@ -120,7 +120,7 @@
                                 }
                                 else
                                 {
-                                    <span class="text-zinc-400">—</span>
+                                    <span class="text-muted">—</span>
                                 }
                             </td>
                         </tr>
@@ -129,13 +129,13 @@
             </table>
 
             @* ---- PAGER ---- *@
-            <div class="px-4 py-3 border-t border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-500">
+            <div class="px-4 py-3 border-t border-line flex items-center justify-between text-xs text-muted">
                 <div>Page @(_page + 1) of @TotalPages</div>
                 <div class="flex items-center gap-2">
                     <button @onclick="PrevPage" disabled="@(_page == 0)"
-                            class="px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 disabled:opacity-40">Prev</button>
+                            class="px-2 py-1 rounded border border-line disabled:opacity-40">Prev</button>
                     <button @onclick="NextPage" disabled="@(_page >= TotalPages - 1)"
-                            class="px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 disabled:opacity-40">Next</button>
+                            class="px-2 py-1 rounded border border-line disabled:opacity-40">Next</button>
                 </div>
             </div>
         </div>
@@ -145,13 +145,13 @@
            every preflight. The step flag tracks "has the PM seen this screen",
            the per-customer flag tracks "has THIS tenant been emailed". *@
         <div class="flex items-center justify-between pt-2">
-            <span class="text-xs text-zinc-500">
+            <span class="text-xs text-muted">
                 @(_anyNotified
                     ? $"{NotifiedCount} tenant(s) notified so far. You can come back to this from the Tenants page."
                     : "You can come back to this from the Tenants page at any time.")
             </span>
             <button @onclick="CompleteOnboardingAsync"
-                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm">
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary-hover shadow-sm">
                 Done — go to dashboard →
             </button>
         </div>
@@ -163,37 +163,37 @@
 {
     <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm"
          @onclick="CloseModal">
-        <div class="w-full max-w-3xl rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-xl overflow-hidden"
+        <div class="w-full max-w-3xl rounded-2xl bg-surface border border-line shadow-xl overflow-hidden"
              @onclick:stopPropagation="true">
 
-            <div class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between">
+            <div class="px-6 py-4 border-b border-line flex items-center justify-between">
                 <div>
                     <div class="text-sm font-semibold">Preflight notification email</div>
-                    <div class="text-xs text-zinc-500 mt-0.5">Will be sent to @_selected.Count tenant@(_selected.Count == 1 ? "" : "s") with an email on file.</div>
+                    <div class="text-xs text-muted mt-0.5">Will be sent to @_selected.Count tenant@(_selected.Count == 1 ? "" : "s") with an email on file.</div>
                 </div>
-                <button @onclick="CloseModal" class="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">
+                <button @onclick="CloseModal" class="text-muted hover:text-heading">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                 </button>
             </div>
 
             <div class="px-6 py-5 space-y-4">
                 <div>
-                    <label class="block text-xs font-medium text-zinc-500 mb-1.5">Subject</label>
+                    <label class="block text-xs font-medium text-muted mb-1.5">Subject</label>
                     <input type="text" @bind="_emailSubject"
-                           class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700" />
+                           class="w-full px-3 py-2 rounded-lg text-sm bg-surface border border-line" />
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-zinc-500 mb-1.5">Message preview (editable)</label>
+                    <label class="block text-xs font-medium text-muted mb-1.5">Message preview (editable)</label>
                     @* contentEditable div + a tiny formatting bar gives the PM a
                        lightweight rich-text experience without pulling in a heavy
                        editor library. The HTML it produces is the literal email
                        body — kept simple to render reliably across mail clients. *@
-                    <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-                        <div class="flex items-center gap-1 px-2 py-1 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/40 text-xs">
+                    <div class="rounded-lg border border-line overflow-hidden">
+                        <div class="flex items-center gap-1 px-2 py-1 border-b border-line bg-zinc-50 dark:bg-zinc-800/40 text-xs">
                             <button type="button" @onclick="@(() => Exec("bold"))"      class="px-2 py-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 font-bold">B</button>
                             <button type="button" @onclick="@(() => Exec("italic"))"    class="px-2 py-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 italic">I</button>
                             <button type="button" @onclick="@(() => Exec("underline"))" class="px-2 py-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 underline">U</button>
-                            <span class="text-zinc-300 dark:text-zinc-600 mx-1">·</span>
+                            <span class="text-zinc-300 dark:text-body mx-1">·</span>
                             <button type="button" @onclick="@(() => Exec("insertUnorderedList"))" class="px-2 py-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700">• List</button>
                         </div>
                         <div @ref="_editorRef"
@@ -201,24 +201,24 @@
                              class="min-h-[220px] max-h-[40vh] overflow-auto px-4 py-3 text-sm focus:outline-none prose prose-sm dark:prose-invert max-w-none"
                              @oninput="OnEditorInput">@((MarkupString)_emailBody)</div>
                     </div>
-                    <p class="mt-1 text-[11px] text-zinc-400">
+                    <p class="mt-1 text-[11px] text-muted">
                         Tip: each recipient sees this same content — keep it general. The tenant's
                         first name is auto-personalized in the greeting.
                     </p>
                 </div>
             </div>
 
-            <div class="px-6 py-4 border-t border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60 flex items-center justify-end gap-2">
+            <div class="px-6 py-4 border-t border-line bg-surface-2 flex items-center justify-end gap-2">
                 @if (_sendError is not null)
                 {
                     <span class="text-xs text-rose-600 dark:text-rose-400 mr-auto">@_sendError</span>
                 }
                 <button @onclick="CloseModal"
-                        class="px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70">
+                        class="px-3 py-1.5 rounded-lg text-sm font-medium text-heading bg-surface border border-line hover:bg-surface-2">
                     Cancel
                 </button>
                 <button @onclick="SendAsync" disabled="@_sending"
-                        class="inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm disabled:opacity-50">
+                        class="inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary-hover shadow-sm disabled:opacity-50">
                     @(_sending ? "Sending…" : $"Send to {_selected.Count}")
                 </button>
             </div>

@@ -14,7 +14,7 @@
                 Admin
             </span>
         </div>
-        <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 max-w-2xl leading-relaxed">
+        <p class="mt-1.5 text-sm text-muted max-w-2xl leading-relaxed">
             Structured log stream from <code class="font-mono text-xs">DueMap.Worker</code> — sweep ticks,
             per-PM orchestrator runs, sync errors, notice dispatch, late-fee assessments, daily close emails.
             Rows are pivotable by PM, run id, severity, and free-text search.
@@ -22,35 +22,35 @@
     </div>
 
     @* FILTER BAR *@
-    <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
+    <div class="rounded-xl border border-line bg-surface shadow-sm p-4">
         <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
             <div class="sm:col-span-2">
-                <label class="block text-xs font-medium text-zinc-500 mb-1.5">Search message / exception</label>
+                <label class="block text-xs font-medium text-muted mb-1.5">Search message / exception</label>
                 <div class="relative">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                     <input type="search" placeholder="failure, timeout, exception..."
                            @bind="_search" @bind:event="oninput"
-                           class="w-full pl-9 pr-3 py-1.5 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" />
+                           class="w-full pl-9 pr-3 py-1.5 rounded-lg bg-surface text-sm border border-line focus:outline-none focus:border-primary focus:ring-2 focus:ring-indigo-500/20" />
                 </div>
             </div>
             <div>
-                <label class="block text-xs font-medium text-zinc-500 mb-1.5">Min severity</label>
+                <label class="block text-xs font-medium text-muted mb-1.5">Min severity</label>
                 <select @bind="_minLevel"
-                        class="w-full px-2.5 py-1.5 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                        class="w-full px-2.5 py-1.5 rounded-lg text-sm bg-surface border border-line">
                     <option value="">Information</option>
                     <option value="Warning">Warning+</option>
                     <option value="Error">Error+</option>
                 </select>
             </div>
             <div>
-                <label class="block text-xs font-medium text-zinc-500 mb-1.5">PM id (optional)</label>
+                <label class="block text-xs font-medium text-muted mb-1.5">PM id (optional)</label>
                 <input type="number" min="1" @bind="_pmFilter" placeholder="any"
-                       class="w-full px-2.5 py-1.5 rounded-lg text-sm tabular-nums bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700" />
+                       class="w-full px-2.5 py-1.5 rounded-lg text-sm tabular-nums bg-surface border border-line" />
             </div>
             <div>
-                <label class="block text-xs font-medium text-zinc-500 mb-1.5">Window</label>
+                <label class="block text-xs font-medium text-muted mb-1.5">Window</label>
                 <select @bind="_windowHours"
-                        class="w-full px-2.5 py-1.5 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                        class="w-full px-2.5 py-1.5 rounded-lg text-sm bg-surface border border-line">
                     <option value="1">Last 1 hour</option>
                     <option value="6">Last 6 hours</option>
                     <option value="24">Last 24 hours</option>
@@ -59,12 +59,12 @@
             </div>
         </div>
         <div class="mt-3 flex items-center justify-between">
-            <div class="text-xs text-zinc-500">
+            <div class="text-xs text-muted">
                 @if (!_loading) { @($"{_rows.Count} row{(_rows.Count == 1 ? "" : "s")} · newest first") }
                 else { @("Loading...") }
             </div>
             <button @onclick="LoadAsync" disabled="@_loading"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 transition-colors duration-150 disabled:opacity-50">
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-heading bg-surface border border-line hover:bg-surface-2 transition-colors duration-150 disabled:opacity-50">
                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
                 Refresh
             </button>
@@ -73,41 +73,41 @@
 
     @if (!_loading && _rows.Count == 0)
     {
-        <div class="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-white/40 dark:bg-zinc-900/40 p-12 text-center">
+        <div class="rounded-xl border border-dashed border-line bg-white/40 dark:bg-[rgb(49_58_70/0.35)] p-12 text-center">
             <p class="text-sm font-medium mb-1">No log rows match these filters</p>
-            <p class="text-sm text-zinc-500">Widen the window, lower the severity, or wait for the next worker tick to write fresh rows.</p>
+            <p class="text-sm text-muted">Widen the window, lower the severity, or wait for the next worker tick to write fresh rows.</p>
         </div>
     }
     else if (!_loading)
     {
-        <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+        <div class="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
-                    <thead class="bg-zinc-50/60 dark:bg-zinc-900/60">
+                    <thead class="bg-surface-2">
                         <tr class="text-left">
-                            <th class="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-44">Timestamp (UTC)</th>
-                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-20">Level</th>
-                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-20">PM</th>
-                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-28">Run</th>
-                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Message</th>
-                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-56">Source</th>
+                            <th class="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted w-44">Timestamp (UTC)</th>
+                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted w-20">Level</th>
+                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted w-20">PM</th>
+                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted w-28">Run</th>
+                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted">Message</th>
+                            <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted w-56">Source</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                    <tbody class="divide-y divide-[color:var(--line)]">
                         @foreach (var row in _rows)
                         {
-                            <tr class="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 transition-colors duration-100 cursor-pointer"
+                            <tr class="hover:bg-surface-2 transition-colors duration-100 cursor-pointer"
                                 @onclick="@(() => ToggleExpand(row.Id))">
-                                <td class="px-4 py-2.5 text-xs text-zinc-500 tabular-nums">@row.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                <td class="px-4 py-2.5 text-xs text-muted tabular-nums">@row.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
                                 <td class="px-3 py-2.5">
                                     <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium @LevelPill(row.Level)">
                                         @row.Level
                                     </span>
                                 </td>
-                                <td class="px-3 py-2.5 text-xs tabular-nums text-zinc-600 dark:text-zinc-300">
+                                <td class="px-3 py-2.5 text-xs tabular-nums text-body">
                                     @(row.PmId is int p ? $"#{p}" : "—")
                                 </td>
-                                <td class="px-3 py-2.5 text-xs tabular-nums text-zinc-500">
+                                <td class="px-3 py-2.5 text-xs tabular-nums text-muted">
                                     @(row.RunId is long r ? $"R{r}" : "—")
                                 </td>
                                 <td class="px-3 py-2.5 text-sm">
@@ -118,10 +118,10 @@
                                     }
                                     @if (_expanded.Contains(row.Id) && !string.IsNullOrEmpty(row.PropertiesJson))
                                     {
-                                        <pre class="mt-2 px-3 py-2 rounded bg-zinc-50 dark:bg-zinc-800/60 text-[11px] text-zinc-600 dark:text-zinc-300 overflow-x-auto font-mono whitespace-pre-wrap">@row.PropertiesJson</pre>
+                                        <pre class="mt-2 px-3 py-2 rounded bg-zinc-50 dark:bg-zinc-800/60 text-[11px] text-body overflow-x-auto font-mono whitespace-pre-wrap">@row.PropertiesJson</pre>
                                     }
                                 </td>
-                                <td class="px-3 py-2.5 text-[11px] text-zinc-500 font-mono truncate max-w-[16rem]" title="@row.SourceContext">
+                                <td class="px-3 py-2.5 text-[11px] text-muted font-mono truncate max-w-[16rem]" title="@row.SourceContext">
                                     @ShortenContext(row.SourceContext)
                                 </td>
                             </tr>
@@ -130,7 +130,7 @@
                 </table>
             </div>
         </div>
-        <p class="text-[11px] text-zinc-400 dark:text-zinc-500 px-2">
+        <p class="text-[11px] text-muted px-2">
             Click any row to expand its exception + JSON property bag. Timestamps are in UTC.
         </p>
     }
@@ -197,9 +197,9 @@
         "Fatal"       => "bg-rose-200 text-rose-900 dark:bg-rose-500/20 dark:text-rose-300 font-semibold",
         "Error"       => "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
         "Warning"     => "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
-        "Information" => "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
-        "Debug"       => "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
-        _             => "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+        "Information" => "bg-indigo-50 text-primary dark:bg-primary-soft dark:text-primary",
+        "Debug"       => "bg-zinc-100 text-body dark:bg-zinc-800 dark:text-muted",
+        _             => "bg-zinc-100 text-body dark:bg-zinc-800 dark:text-muted"
     };
 
     // Source contexts are usually fully-qualified type names — show the last

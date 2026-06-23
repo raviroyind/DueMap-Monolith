@@ -22,7 +22,7 @@
 
     <!-- BACK LINK -->
     <div>
-        <a href="leases" class="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+        <a href="leases" class="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-heading transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
             Back to leases
         </a>
@@ -30,7 +30,7 @@
 
     @if (_loading)
     {
-        <p class="text-zinc-500">Loading…</p>
+        <p class="text-muted">Loading…</p>
     }
     else if (_lease is null)
     {
@@ -56,39 +56,39 @@
                         <span class="w-1.5 h-1.5 rounded-full @StatusDot(_status)"></span>@StatusLabel()
                     </span>
                 </div>
-                <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
+                <p class="mt-1.5 text-sm text-muted">
                     Lease <span class="tabular-nums">#@_lease.Id</span>
-                    <span class="mx-1.5 text-zinc-300 dark:text-zinc-600">·</span>
-                    monthly rent <span class="tabular-nums font-medium text-zinc-700 dark:text-zinc-300">@_lease.MonthlyRent.ToString("C")</span>
+                    <span class="mx-1.5 text-zinc-300 dark:text-body">·</span>
+                    monthly rent <span class="tabular-nums font-medium text-heading">@_lease.MonthlyRent.ToString("C")</span>
                 </p>
             </div>
         </div>
 
         <!-- TENANT + LEASE FACTS -->
         <div class="grid md:grid-cols-2 gap-4">
-            <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-6">
-                <h3 class="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-3">Tenant</h3>
+            <section class="rounded-xl border border-line bg-surface shadow-sm p-6">
+                <h3 class="text-xs font-medium uppercase tracking-wider text-muted mb-3">Tenant</h3>
                 @if (_customer is null)
                 {
-                    <div class="text-sm text-zinc-500">
+                    <div class="text-sm text-muted">
                         No customer linked.
-                        <a href="link-customers" class="ml-1 font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300">Link a customer →</a>
+                        <a href="link-customers" class="ml-1 font-medium text-primary hover:text-primary">Link a customer →</a>
                     </div>
                 }
                 else
                 {
                     <div class="flex items-start gap-3">
-                        <div class="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-semibold text-zinc-600 dark:text-zinc-300 shrink-0">
+                        <div class="w-10 h-10 rounded-full bg-line flex items-center justify-center text-xs font-semibold text-body shrink-0">
                             @Initials(_customer.DisplayName)
                         </div>
                         <div class="min-w-0">
                             <div class="text-sm font-semibold">@_customer.DisplayName</div>
-                            <div class="mt-1 space-y-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                            <div class="mt-1 space-y-0.5 text-xs text-muted">
                                 @if (!string.IsNullOrEmpty(_customer.Email))
                                 {
                                     <div class="flex items-center gap-1.5">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-                                        <a href="mailto:@_customer.Email" class="hover:text-zinc-700 dark:hover:text-zinc-300 truncate">@_customer.Email</a>
+                                        <a href="mailto:@_customer.Email" class="hover:text-heading truncate">@_customer.Email</a>
                                     </div>
                                 }
                                 @if (!string.IsNullOrEmpty(_customer.Phone))
@@ -98,7 +98,7 @@
                                         <span>@_customer.Phone</span>
                                     </div>
                                 }
-                                <div class="flex items-center gap-1.5 pt-1 text-[10px] uppercase tracking-wider text-zinc-400">
+                                <div class="flex items-center gap-1.5 pt-1 text-[10px] uppercase tracking-wider text-muted">
                                     Preferred channel: @(string.IsNullOrEmpty(_customer.Email) ? "SMS" : "Email")
                                 </div>
                             </div>
@@ -107,64 +107,64 @@
                 }
             </section>
 
-            <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-6">
-                <h3 class="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-3">Lease</h3>
+            <section class="rounded-xl border border-line bg-surface shadow-sm p-6">
+                <h3 class="text-xs font-medium uppercase tracking-wider text-muted mb-3">Lease</h3>
                 <dl class="grid grid-cols-2 gap-y-2.5 text-sm">
-                    <dt class="text-zinc-500">Monthly rent</dt>
+                    <dt class="text-muted">Monthly rent</dt>
                     <dd class="tabular-nums font-medium text-right">@_lease.MonthlyRent.ToString("C")</dd>
 
-                    <dt class="text-zinc-500">Outstanding balance</dt>
+                    <dt class="text-muted">Outstanding balance</dt>
                     <dd class="tabular-nums font-medium text-right @(_balance > 0 ? "text-rose-700 dark:text-rose-400" : "")">@_balance.ToString("C")</dd>
 
-                    <dt class="text-zinc-500">Start date</dt>
+                    <dt class="text-muted">Start date</dt>
                     <dd class="tabular-nums text-right">@_lease.StartDate.ToString("MMM d, yyyy")</dd>
 
-                    <dt class="text-zinc-500">End date</dt>
+                    <dt class="text-muted">End date</dt>
                     <dd class="tabular-nums text-right">@(_lease.EndDate?.ToString("MMM d, yyyy") ?? "—")</dd>
                 </dl>
             </section>
         </div>
 
         <!-- NOTICE SETTINGS — read-only display with link to bulk editor -->
-        <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
-            <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between gap-3">
+        <section class="rounded-xl border border-line bg-surface shadow-sm">
+            <header class="px-6 py-4 border-b border-line flex items-center justify-between gap-3">
                 <div>
                     <h3 class="text-sm font-semibold">Notice settings</h3>
-                    <p class="text-xs text-zinc-500 mt-0.5">Empty values inherit your <a href="notice-preferences" class="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300">workspace defaults</a>.</p>
+                    <p class="text-xs text-muted mt-0.5">Empty values inherit your <a href="notice-preferences" class="font-medium text-primary hover:text-primary">workspace defaults</a>.</p>
                 </div>
-                <a href="leases" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 shadow-sm transition-colors">
+                <a href="leases" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-heading bg-surface border border-line hover:bg-surface-2 shadow-sm transition-colors">
                     Edit (bulk apply) →
                 </a>
             </header>
             <div class="px-6 py-5 grid sm:grid-cols-3 gap-6 text-sm">
                 <div>
-                    <div class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-1.5">Pre-due</div>
+                    <div class="text-xs uppercase tracking-wider font-medium text-muted mb-1.5">Pre-due</div>
                     <div class="font-medium">@SettingLabel(_settings.PreDueEnabled, _settings.PreDueDaysBefore, "days before")</div>
                 </div>
                 <div>
-                    <div class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-1.5">Due-date</div>
+                    <div class="text-xs uppercase tracking-wider font-medium text-muted mb-1.5">Due-date</div>
                     <div class="font-medium">@SettingLabel(_settings.DueDateEnabled, null, null)</div>
                 </div>
                 <div>
-                    <div class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-1.5">Post-due</div>
+                    <div class="text-xs uppercase tracking-wider font-medium text-muted mb-1.5">Post-due</div>
                     <div class="font-medium">@SettingLabel(_settings.PostDueEnabled, _settings.PostDueGraceDays, "days grace")</div>
                 </div>
             </div>
         </section>
 
         <!-- ACTIVITY TIMELINE — interleaved events from invoices, deliveries, assessments -->
-        <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
-            <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800">
+        <section class="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
+            <header class="px-6 py-4 border-b border-line">
                 <h3 class="text-sm font-semibold">Activity</h3>
-                <p class="text-xs text-zinc-500 mt-0.5">@_timeline.Count event@(_timeline.Count == 1 ? "" : "s") across invoices, notices, and late-fee assessments — newest first.</p>
+                <p class="text-xs text-muted mt-0.5">@_timeline.Count event@(_timeline.Count == 1 ? "" : "s") across invoices, notices, and late-fee assessments — newest first.</p>
             </header>
             @if (_timeline.Count == 0)
             {
-                <div class="px-6 py-12 text-center text-sm text-zinc-500">No activity yet for this lease.</div>
+                <div class="px-6 py-12 text-center text-sm text-muted">No activity yet for this lease.</div>
             }
             else
             {
-                <ol class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                <ol class="divide-y divide-[color:var(--line)]">
                     @foreach (var ev in _timeline)
                     {
                         <li class="px-6 py-4 flex items-start gap-4">
@@ -181,14 +181,14 @@
                                 </div>
                                 @if (!string.IsNullOrEmpty(ev.Detail))
                                 {
-                                    <div class="text-xs text-zinc-500 mt-0.5">@ev.Detail</div>
+                                    <div class="text-xs text-muted mt-0.5">@ev.Detail</div>
                                 }
-                                <div class="text-[11px] text-zinc-400 dark:text-zinc-500 tabular-nums mt-1">@ev.Timestamp.ToString("u")</div>
+                                <div class="text-[11px] text-muted tabular-nums mt-1">@ev.Timestamp.ToString("u")</div>
                             </div>
                             @if (ev.WaiveAssessmentId is int feeId)
                             {
                                 <button type="button" @onclick="@(() => OpenWaive(feeId))"
-                                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 transition-colors shrink-0">
+                                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-heading bg-surface border border-line hover:bg-surface-2 transition-colors shrink-0">
                                     Waive
                                 </button>
                             }
@@ -203,22 +203,22 @@
 @* WAIVE LATE FEE MODAL — requires a written reason so the audit trail is meaningful *@
 @if (_waiveFeeId is int)
 {
-    <div class="fixed inset-0 z-50 bg-zinc-900/40 backdrop-blur-sm flex items-center justify-center p-6"
+    <div class="fixed inset-0 z-50 bg-[rgb(49_58_70/0.35)] backdrop-blur-sm flex items-center justify-center p-6"
          @onclick="CloseWaive">
-        <div class="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 shadow-xl border border-zinc-200/80 dark:border-zinc-800"
+        <div class="w-full max-w-md rounded-2xl bg-surface shadow-xl border border-line"
              @onclick:stopPropagation="true">
-            <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800">
+            <header class="px-6 py-4 border-b border-line">
                 <h3 class="text-base font-semibold">Waive late fee</h3>
-                <p class="text-xs text-zinc-500 mt-1">The fee is marked reversed with the reason you provide; the original assessment row is preserved for audit.</p>
+                <p class="text-xs text-muted mt-1">The fee is marked reversed with the reason you provide; the original assessment row is preserved for audit.</p>
             </header>
             <div class="px-6 py-5">
-                <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Reason</label>
+                <label class="block text-sm font-medium text-heading mb-1.5">Reason</label>
                 <textarea rows="3" @bind="_waiveReason" maxlength="500"
                           placeholder="e.g. tenant payment delayed by bank holiday — first late payment"
-                          class="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"></textarea>
+                          class="w-full px-3 py-2 rounded-lg bg-surface text-sm border border-line focus:outline-none focus:border-primary focus:ring-2 focus:ring-indigo-500/20"></textarea>
             </div>
-            <footer class="px-6 py-3.5 border-t border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60 flex items-center justify-end gap-2">
-                <button class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            <footer class="px-6 py-3.5 border-t border-line bg-surface-2 flex items-center justify-end gap-2">
+                <button class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-heading hover:bg-surface-2 transition-colors"
                         @onclick="CloseWaive">Cancel</button>
                 <button class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 shadow-sm transition-colors disabled:opacity-50"
                         @onclick="WaiveAsync" disabled="@(_waiving || string.IsNullOrWhiteSpace(_waiveReason))">
@@ -351,7 +351,7 @@
             var pill = inv.Status switch
             {
                 RentInvoiceStatus.Paid   => ("Paid",   "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400"),
-                RentInvoiceStatus.Voided => ("Voided", "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"),
+                RentInvoiceStatus.Voided => ("Voided", "bg-zinc-100 text-body dark:bg-zinc-800 dark:text-muted"),
                 _                        => ("Open",   "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400")
             };
             events.Add(new TimelineEvent
@@ -361,8 +361,8 @@
                 Detail = $"due {inv.DueDate:yyyy-MM-dd} · balance {inv.Balance:C}",
                 Pill = pill.Item1,
                 PillClass = pill.Item2,
-                IconBg = "bg-zinc-100 dark:bg-zinc-800",
-                IconColor = "text-zinc-600 dark:text-zinc-300",
+                IconBg = "bg-surface-2",
+                IconColor = "text-body",
                 IconSvg = """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>"""
             });
         }
@@ -379,12 +379,12 @@
                 Pill = d.Status.ToString(),
                 PillClass = d.Status switch
                 {
-                    DeliveryStatus.Sent       => "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400",
+                    DeliveryStatus.Sent       => "bg-indigo-100 text-primary dark:bg-primary-soft dark:text-primary",
                     DeliveryStatus.Failed     => "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400",
-                    _                         => "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                    _                         => "bg-zinc-100 text-body dark:bg-zinc-800 dark:text-muted"
                 },
-                IconBg = d.Channel == NoticeChannel.Email ? "bg-indigo-50 dark:bg-indigo-500/10" : "bg-emerald-50 dark:bg-emerald-500/10",
-                IconColor = d.Channel == NoticeChannel.Email ? "text-indigo-600 dark:text-indigo-400" : "text-emerald-600 dark:text-emerald-400",
+                IconBg = d.Channel == NoticeChannel.Email ? "bg-primary-soft" : "bg-emerald-50 dark:bg-emerald-500/10",
+                IconColor = d.Channel == NoticeChannel.Email ? "text-primary" : "text-emerald-600 dark:text-emerald-400",
                 IconSvg = d.Channel == NoticeChannel.Email
                     ? """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>"""
                     : """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>"""
@@ -405,10 +405,10 @@
                     : $"for period {f.DueDate:yyyy-MM-dd} on {f.AssessmentDate:yyyy-MM-dd}",
                 Pill = reversed ? "Reversed" : "Assessed",
                 PillClass = reversed
-                    ? "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                    ? "bg-zinc-100 text-body dark:bg-zinc-800 dark:text-muted"
                     : "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400",
-                IconBg = reversed ? "bg-zinc-100 dark:bg-zinc-800" : "bg-rose-50 dark:bg-rose-500/10",
-                IconColor = reversed ? "text-zinc-500" : "text-rose-600 dark:text-rose-400",
+                IconBg = reversed ? "bg-surface-2" : "bg-rose-50 dark:bg-rose-500/10",
+                IconColor = reversed ? "text-muted" : "text-rose-600 dark:text-rose-400",
                 IconSvg = """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>""",
                 WaiveAssessmentId = reversed ? null : f.Id
             });
@@ -487,7 +487,7 @@
         LeaseStatus.InGrace       => "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
         LeaseStatus.Overdue       => "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400",
         LeaseStatus.LateFeePosted => "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300 font-semibold",
-        _                         => "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+        _                         => "bg-zinc-100 text-body dark:bg-zinc-800 dark:text-muted"
     };
 
     private static string StatusDot(LeaseStatus s) => s switch
