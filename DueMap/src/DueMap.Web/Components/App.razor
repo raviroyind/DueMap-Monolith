@@ -8,6 +8,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <title>DueMap</title>
+
+    @* Theme bootstrap FIRST — applies the saved light/dark class before paint
+       (no flash) and exposes window.DueMapTheme for the toggle. *@
+    <script src="js/theme.js"></script>
+
     <link rel="stylesheet" href="css/app.css" />
 
     @* Medium Editor — WYSIWYG body editor for the notice-template modal.
@@ -18,7 +23,6 @@
     <link rel="stylesheet" href="lib/medium-editor/css/default.min.css" />
     <link rel="stylesheet" href="lib/medium-editor/duemap-editor.css" />
 
-    <script src="js/theme.js"></script>
     <script src="js/template-editor.js"></script>
     <script src="lib/medium-editor/medium-editor.min.js"></script>
     <script src="js/medium-editor-interop.js"></script>
@@ -32,7 +36,9 @@
     <script src="js/duemap-tour.js"></script>
     <HeadOutlet @rendermode="InteractiveServer" />
 </head>
-<body class="h-full font-sans antialiased bg-stone-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
+@* Body colour + font come from the Osen base layer (bg-app / text-base / Inter);
+   no hard-coded palette here so the theme tokens own light↔dark. *@
+<body class="h-full antialiased">
     <Routes @rendermode="InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
 </body>
