@@ -32,27 +32,26 @@
 
 @if (_visible && _draft is not null)
 {
-    <div class="fixed inset-0 z-50 bg-zinc-900/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-6"
+    <div class="fixed inset-0 z-50 bg-[rgb(49_58_70/0.35)] backdrop-blur-sm flex items-center justify-center p-0 md:p-6"
          @onclick="Close">
         @* Editor width: full-screen on mobile, ~70% of the viewport on desktop,
            so the rich-text body has room to breathe. *@
-        <div class="w-full h-full md:h-auto md:w-[70vw] md:max-w-[70vw] bg-white dark:bg-zinc-900 md:rounded-2xl shadow-xl border border-zinc-200/80 dark:border-zinc-800 max-h-screen md:max-h-[90vh] flex flex-col"
+        <div class="card w-full h-full md:h-auto md:w-[70vw] md:max-w-[70vw] max-h-screen md:max-h-[90vh] shadow-modal flex flex-col"
              @onclick:stopPropagation="true">
 
             <!-- HEADER -->
-            <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between gap-3 shrink-0">
+            <header class="card-header flex items-center justify-between gap-3 shrink-0">
                 <div class="min-w-0">
-                    <h3 class="text-base font-semibold">Edit template</h3>
-                    <p class="text-xs text-zinc-500 mt-0.5">@_friendlyName · applies across your portfolio</p>
+                    <h3 class="card-title">Edit template</h3>
+                    <p class="card-subtitle">@_friendlyName · applies across your portfolio</p>
                 </div>
-                <button class="p-1.5 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors duration-150"
-                        @onclick="Close" aria-label="Close">
+                <button class="btn btn-icon btn-sm btn-ghost" @onclick="Close" aria-label="Close">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                 </button>
             </header>
 
             <!-- BODY (scrolls if content exceeds modal height) -->
-            <div class="px-6 py-5 space-y-5 overflow-y-auto">
+            <div class="px-6 py-5 space-y-5 overflow-y-auto flex-1 min-h-0">
 
                 @* Type + State pickers — only when the caller asked for them
                    (Templates page). When opened from NoticePreferences the type
@@ -61,9 +60,9 @@
                 {
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Notice type</label>
+                            <label class="form-label">Notice type</label>
                             <select value="@_draft.NoticeTypeId" @onchange="OnNoticeTypeChangedAsync" disabled="@(_draft.Id != 0)"
-                                    class="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60 disabled:cursor-not-allowed transition-shadow duration-150">
+                                    class="form-select disabled:opacity-60 disabled:cursor-not-allowed">
                                 @foreach (var t in _noticeTypes)
                                 {
                                     <option value="@t.Id">@t.DisplayName (@t.Code)</option>
@@ -71,9 +70,9 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">State (optional)</label>
+                            <label class="form-label">State (optional)</label>
                             <select value="@(_draft.StateId?.ToString() ?? "")" @onchange="OnStateChangedAsync" disabled="@(_draft.Id != 0)"
-                                    class="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60 disabled:cursor-not-allowed transition-shadow duration-150">
+                                    class="form-select disabled:opacity-60 disabled:cursor-not-allowed">
                                 <option value="">All states (generic)</option>
                                 @foreach (var s in _states)
                                 {
@@ -86,24 +85,22 @@
 
                 @if (!string.IsNullOrEmpty(_hint))
                 {
-                    <div class="rounded-lg border border-indigo-200/60 dark:border-indigo-500/15 bg-indigo-50/40 dark:bg-indigo-500/[0.06] px-3.5 py-2.5 flex items-start justify-between gap-3">
+                    <div class="alert alert-primary items-start justify-between">
                         <div class="flex items-start gap-2.5 min-w-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-600 dark:text-indigo-400 mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                            <div class="text-xs text-indigo-900 dark:text-indigo-200 leading-relaxed">@_hint</div>
+                            <svg class="alert-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                            <div class="text-xs leading-relaxed">@_hint</div>
                         </div>
-                        <button type="button" @onclick="ResetToDefaultAsync"
-                                class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shrink-0">
+                        <button type="button" @onclick="ResetToDefaultAsync" class="btn-link text-xs shrink-0">
                             Reset to default
                         </button>
                     </div>
                 }
 
                 <div>
-                    <label for="tpl-subject" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Subject</label>
+                    <label for="tpl-subject" class="form-label">Subject</label>
                     <input id="tpl-subject" type="text" @bind="_draft.Subject" @bind:event="oninput"
                            @onfocus="@(() => _focusedFieldId = "tpl-subject")"
-                           maxlength="400"
-                           class="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150" />
+                           maxlength="400" class="form-control" />
                 </div>
 
                 @* Theme picker — swatches drive the Preview tab's chrome. v1 is
@@ -112,8 +109,8 @@
                    sends is a follow-up (schema + renderer change). *@
                 <div>
                     <div class="flex items-center justify-between mb-1.5">
-                        <label class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Email design</label>
-                        <span class="text-[10px] uppercase tracking-wider font-medium text-zinc-400">Preview only</span>
+                        <label class="form-label mb-0">Email design</label>
+                        <span class="text-[10px] uppercase tracking-wider font-medium text-muted">Preview only</span>
                     </div>
                     <div class="flex items-center gap-2 flex-wrap">
                         @foreach (var theme in EmailThemes.All)
@@ -123,9 +120,9 @@
                                     @onclick="@(() => _themeKey = theme.Key)"
                                     title="@theme.Label"
                                     class="@(selected
-                                        ? "ring-2 ring-offset-2 dark:ring-offset-zinc-900 ring-indigo-500"
-                                        : "ring-1 ring-zinc-200 dark:ring-zinc-700 hover:ring-zinc-300 dark:hover:ring-zinc-600")
-                                        inline-flex items-center gap-2 h-9 px-3 rounded-lg text-xs font-medium bg-white dark:bg-zinc-800 transition-shadow duration-150">
+                                        ? "ring-2 ring-offset-2 ring-primary"
+                                        : "ring-1 ring-[color:var(--line)] hover:ring-2")
+                                        inline-flex items-center gap-2 h-9 px-3 rounded-field text-xs font-medium bg-surface text-heading transition-shadow duration-150">
                                 <span class="w-4 h-4 rounded-full shrink-0" style="background:@theme.AccentHex"></span>
                                 <span>@theme.Label</span>
                             </button>
@@ -134,24 +131,24 @@
                 </div>
 
                 <div>
-                    <label for="tpl-html-body" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">HTML body</label>
+                    <label for="tpl-html-body" class="form-label mb-2">HTML body</label>
 
                     @* Underline-style tabs: a shared bottom rule with the active
-                       tab marked by an indigo underline that overlaps the rule
+                       tab marked by a primary underline that overlaps the rule
                        (-mb-px). Reads as classic tabs rather than a pill toggle. *@
-                    <div class="flex items-center gap-1 border-b border-zinc-200 dark:border-zinc-700 mb-3">
+                    <div class="flex items-center gap-1 border-b border-line mb-3">
                         <button type="button" @onclick="@(() => _htmlTab = HtmlTab.Design)"
                                 class="@(_htmlTab == HtmlTab.Design
-                                    ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
-                                    : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600")
+                                    ? "border-primary text-primary"
+                                    : "border-transparent text-muted hover:text-heading")
                                     inline-flex items-center gap-2 px-4 py-2.5 -mb-px border-b-2 font-semibold text-sm transition-colors duration-150">
                             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
                             Design
                         </button>
                         <button type="button" @onclick="ShowPreviewAsync"
                                 class="@(_htmlTab == HtmlTab.Preview
-                                    ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
-                                    : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600")
+                                    ? "border-primary text-primary"
+                                    : "border-transparent text-muted hover:text-heading")
                                     inline-flex items-center gap-2 px-4 py-2.5 -mb-px border-b-2 font-semibold text-sm transition-colors duration-150">
                             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
                             Preview
@@ -167,7 +164,7 @@
                                just without the WYSIWYG niceties. *@
                             <textarea id="@BodyEditorId" @bind="_draft.BodyHtml" @bind:event="oninput"
                                       @onfocus="@(() => _focusedFieldId = BodyEditorId)"
-                                      class="w-full min-h-[45vh] md:min-h-[55vh] px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm font-mono border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150 resize-y"></textarea>
+                                      class="form-textarea w-full min-h-[45vh] md:min-h-[55vh] font-mono resize-y"></textarea>
                         }
                         else
                         {
@@ -175,9 +172,9 @@
                                appears on selection, which isn't discoverable on its
                                own. This bar tells the PM the surface is rich-text and
                                how to summon the toolbar. *@
-                            <div class="flex items-start gap-2.5 mb-2 px-3.5 py-2.5 rounded-lg bg-indigo-50/70 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-600 dark:text-indigo-400 mt-0.5 shrink-0"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>
-                                <p class="text-xs text-indigo-900 dark:text-indigo-200 leading-relaxed">
+                            <div class="alert alert-primary mb-2">
+                                <svg class="alert-icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>
+                                <p class="text-xs leading-relaxed">
                                     <span class="font-semibold">Highlight any text</span> to format it — a toolbar pops up with bold, italic, links, headings and lists.
                                 </p>
                             </div>
@@ -188,20 +185,20 @@
                                reads the value back via the OnBodyHtmlChanged callback
                                and pulls a final copy on save. *@
                             <div id="@BodyEditorId"
-                                 class="rt-editor w-full min-h-[45vh] md:min-h-[55vh] px-3.5 py-3 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150"
+                                 class="rt-editor w-full min-h-[45vh] md:min-h-[55vh] px-3.5 py-3 rounded-field bg-surface text-sm border border-line transition-shadow duration-150"
                                  @onfocus="@(() => _focusedFieldId = BodyEditorId)"></div>
                         }
                     }
                     else
                     {
                         @* Email-style preview pane: the chosen theme's chrome wraps
-                           the rendered body with sample data substituted. The light
+                           the rendered body with sample data substituted. The inset
                            backdrop simulates the inbox surround so the chrome's own
                            shadow + radius are visible. *@
-                        <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-950/60 p-4 min-h-[280px]">
+                        <div class="rounded-field border border-line bg-surface-2 p-4 min-h-[280px]">
                             @if (string.IsNullOrWhiteSpace(_draft.BodyHtml))
                             {
-                                <p class="text-sm text-zinc-400 italic px-4 py-12 text-center">Nothing to preview yet.</p>
+                                <p class="text-sm text-muted italic px-4 py-12 text-center">Nothing to preview yet.</p>
                             }
                             else
                             {
@@ -209,7 +206,7 @@
                                     @((MarkupString)EmailThemes.Wrap(RenderPreview(_draft.BodyHtml), EmailThemes.Resolve(_themeKey)))
                                 </div>
                             }
-                            <p class="text-[11px] text-zinc-500 mt-3 px-1 text-center">
+                            <p class="text-[11px] text-muted mt-3 px-1 text-center">
                                 Sample data: <span class="font-medium">Jane Smith</span> · <span class="font-medium">$1,250.00</span> · <span class="font-medium">@SampleDueDate</span>. Real notices use the lease's actual values at send time.
                             </p>
                         </div>
@@ -217,26 +214,26 @@
                 </div>
 
                 <div class="flex items-start gap-2 flex-wrap">
-                    <span class="text-xs text-zinc-500 dark:text-zinc-400 pt-1 shrink-0">Insert placeholder:</span>
+                    <span class="text-xs text-muted pt-1 shrink-0">Insert placeholder:</span>
                     @foreach (var p in Placeholders)
                     {
                         <button type="button"
                                 @onclick="@(() => InsertPlaceholderAsync(p.Token, asHtml: false))"
                                 title="@p.Description — inserts at cursor in the last focused field"
-                                class="var-pill cursor-pointer hover:brightness-110 transition">
+                                class="badge badge-primary cursor-pointer hover:brightness-105 transition">
                             @p.Label
                         </button>
                     }
                 </div>
 
                 <div class="flex items-start gap-2 flex-wrap">
-                    <span class="text-xs text-zinc-500 dark:text-zinc-400 pt-1 shrink-0">Insert snippet:</span>
+                    <span class="text-xs text-muted pt-1 shrink-0">Insert snippet:</span>
                     @foreach (var s in Snippets)
                     {
                         <button type="button"
                                 @onclick="@(() => InsertPlaceholderAsync(s.Html, asHtml: true))"
                                 title="@s.Description"
-                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition-colors duration-150">
+                                class="btn btn-sm btn-primary">
                             <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
                             @s.Label
                         </button>
@@ -245,11 +242,9 @@
             </div>
 
             <!-- FOOTER -->
-            <footer class="px-6 py-3.5 border-t border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60 flex items-center justify-end gap-2 shrink-0">
-                <button class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors duration-150"
-                        @onclick="Close">Cancel</button>
-                <button class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-colors duration-150 disabled:opacity-50"
-                        @onclick="SaveAsync" disabled="@_saving">
+            <footer class="card-footer flex items-center justify-end gap-2 shrink-0">
+                <button class="btn btn-ghost" @onclick="Close">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
                     @(_saving ? "Saving…" : "Save template")
                 </button>
             </footer>
