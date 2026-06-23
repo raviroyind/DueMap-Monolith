@@ -34,14 +34,14 @@
                     </span>
                     <div class="min-w-0">
                         <div class="@PillLabelClass(done, current) text-xs sm:text-sm font-medium truncate">@s.Label</div>
-                        <div class="hidden sm:block text-[11px] text-zinc-400 dark:text-zinc-500 truncate">@s.Hint</div>
+                        <div class="hidden sm:block text-[11px] text-muted truncate">@s.Hint</div>
                     </div>
                 </div>
 
                 @* Connector to next pill (not after the last one) *@
                 @if (i < _steps.Length - 1)
                 {
-                    <div class="flex-1 h-[2px] rounded-full @(done ? "bg-emerald-400 dark:bg-emerald-500" : "bg-zinc-200 dark:bg-zinc-700")"></div>
+                    <div class="flex-1 h-[2px] rounded-full @(done ? "bg-success" : "bg-line")"></div>
                 }
             </li>
         }
@@ -61,12 +61,12 @@
 
     private static string PillCircleClass(bool done, bool current) =>
         "w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-full flex items-center justify-center transition-colors duration-150 " +
-        (done    ? "bg-emerald-500 text-white shadow-sm"
-       : current ? "bg-indigo-600 text-white shadow-sm ring-4 ring-indigo-500/15"
-                 : "bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400");
+        (done    ? "bg-success text-white shadow-sm"
+       : current ? "bg-primary text-white shadow-sm ring-4 ring-primary/15"
+                 : "bg-surface-2 text-muted");
 
     private static string PillLabelClass(bool done, bool current) =>
-        done    ? "text-emerald-700 dark:text-emerald-400"
-      : current ? "text-indigo-700 dark:text-indigo-300"
-                : "text-zinc-500 dark:text-zinc-400";
+        done    ? "text-success"
+      : current ? "text-primary"
+                : "text-muted";
 }
