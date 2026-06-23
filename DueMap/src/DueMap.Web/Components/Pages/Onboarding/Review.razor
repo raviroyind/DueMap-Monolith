@@ -16,7 +16,7 @@
 
     <div>
         <h2 class="text-2xl font-semibold tracking-tight">Here's everything we set up</h2>
-        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-2xl">
+        <p class="mt-2 text-sm text-muted leading-relaxed max-w-2xl">
             We configured your late fees, reminders, templates, and daily close automatically —
             staying inside your state's legal limits. Nothing is charged yet. Review below, then
             send your tenants a heads-up and go live.
@@ -25,7 +25,7 @@
 
     @if (_loading)
     {
-        <p class="text-sm text-zinc-500">Loading your setup…</p>
+        <p class="text-sm text-muted">Loading your setup…</p>
     }
     else if (_disabled)
     {
@@ -37,9 +37,9 @@
     }
     else if (_summary is null)
     {
-        <div class="rounded-xl border border-zinc-300 dark:border-zinc-700 border-dashed bg-white/40 dark:bg-zinc-900/40 p-10 text-center">
+        <div class="rounded-xl border border-line border-dashed bg-white/40 dark:bg-[rgb(49_58_70/0.35)] p-10 text-center">
             <p class="text-sm font-medium mb-1">We haven't auto-configured your account yet.</p>
-            <p class="text-sm text-zinc-500">
+            <p class="text-sm text-muted">
                 Connect your accounting system and finish the sync — auto-setup runs right after,
                 then this page will show what we prepared.
             </p>
@@ -49,18 +49,18 @@
     {
         @* ---- "What we set up" cards ---- *@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
-                <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Late fees</div>
+            <div class="rounded-xl border border-line bg-surface shadow-sm p-4">
+                <div class="text-xs font-medium uppercase tracking-wider text-muted">Late fees</div>
                 <div class="mt-1.5 text-2xl font-semibold tabular-nums">@_summary.LeasesProcessed</div>
-                <p class="mt-1 text-xs text-zinc-500">
+                <p class="mt-1 text-xs text-muted">
                     lease@(_summary.LeasesProcessed == 1 ? "" : "s") staged with a compliant late-fee profile.
                     @if (_summary.LeasesSkipped > 0) { <span>@_summary.LeasesSkipped need a closer look (below).</span> }
                 </p>
             </div>
-            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
-                <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Reminders &amp; templates</div>
+            <div class="rounded-xl border border-line bg-surface shadow-sm p-4">
+                <div class="text-xs font-medium uppercase tracking-wider text-muted">Reminders &amp; templates</div>
                 <div class="mt-1.5 text-2xl font-semibold">On</div>
-                <p class="mt-1 text-xs text-zinc-500">
+                <p class="mt-1 text-xs text-muted">
                     Pre-due, due-date, and past-due reminders are enabled with branded email templates.
                 </p>
             </div>
@@ -80,7 +80,7 @@
                             <div class="text-zinc-800 dark:text-zinc-100">@f.Message</div>
                             @if (!string.IsNullOrWhiteSpace(f.CompliantFix))
                             {
-                                <div class="mt-0.5 text-xs text-zinc-500">Suggested: @f.CompliantFix (lease #@f.LeaseId)</div>
+                                <div class="mt-0.5 text-xs text-muted">Suggested: @f.CompliantFix (lease #@f.LeaseId)</div>
                             }
                         </li>
                     }
@@ -97,22 +97,22 @@
         @* ---- Actions ---- *@
         <div class="flex flex-wrap items-center gap-3 pt-2">
             <button @onclick="LooksGood"
-                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm">
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary-hover shadow-sm">
                 Looks good — notify my tenants →
             </button>
             <button @onclick="ToggleEdit"
-                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-heading bg-surface border border-line hover:bg-surface-2">
                 Edit a step
             </button>
         </div>
 
         @if (_editOpen)
         {
-            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                <a href="/leases" class="px-3 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200/70 dark:border-zinc-700">Late fees &amp; tenants →</a>
-                <a href="/onboarding/notice-preferences" class="px-3 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200/70 dark:border-zinc-700">Reminders →</a>
-                <a href="/templates" class="px-3 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200/70 dark:border-zinc-700">Templates →</a>
-                <a href="/onboarding/close-settings" class="px-3 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200/70 dark:border-zinc-700">Daily close →</a>
+            <div class="rounded-xl border border-line bg-surface shadow-sm p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <a href="/leases" class="px-3 py-2 rounded-lg hover:bg-surface-2 border border-line">Late fees &amp; tenants →</a>
+                <a href="/onboarding/notice-preferences" class="px-3 py-2 rounded-lg hover:bg-surface-2 border border-line">Reminders →</a>
+                <a href="/templates" class="px-3 py-2 rounded-lg hover:bg-surface-2 border border-line">Templates →</a>
+                <a href="/onboarding/close-settings" class="px-3 py-2 rounded-lg hover:bg-surface-2 border border-line">Daily close →</a>
             </div>
         }
     }

@@ -16,33 +16,33 @@
 
     @if (_loading)
     {
-        <p class="text-sm text-zinc-500">Loading…</p>
+        <p class="text-sm text-muted">Loading…</p>
     }
     else if (_session is null)
     {
         @* Auth gate is also re-checked here in case the cookie expired
            between layout render and page load. *@
-        <p class="text-sm text-zinc-500">Redirecting to sign-in…</p>
+        <p class="text-sm text-muted">Redirecting to sign-in…</p>
     }
     else
     {
         <div>
             <h1 class="text-2xl font-semibold tracking-tight">Hi @FirstName(_session.DisplayName) 👋</h1>
-            <p class="mt-1 text-sm text-zinc-500">Here's where your rent stands today.</p>
+            <p class="mt-1 text-sm text-muted">Here's where your rent stands today.</p>
         </div>
 
         @* CURRENT BALANCE HERO *@
-        <section class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+        <section class="rounded-2xl border border-line bg-surface shadow-sm overflow-hidden">
             <div class="px-6 py-6 flex items-start justify-between gap-6 flex-wrap">
                 <div>
-                    <div class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-1">Outstanding balance</div>
+                    <div class="text-xs uppercase tracking-wider font-medium text-muted mb-1">Outstanding balance</div>
                     <div class="text-4xl font-semibold tabular-nums">
                         @FormatMoney(_outstanding, _currency)
                     </div>
                     @if (_nextDueDate is DateOnly next)
                     {
-                        <div class="mt-2 text-sm text-zinc-500">
-                            Next payment due <span class="font-medium text-zinc-700 dark:text-zinc-300">@next.ToString("MMMM d, yyyy")</span>
+                        <div class="mt-2 text-sm text-muted">
+                            Next payment due <span class="font-medium text-heading">@next.ToString("MMMM d, yyyy")</span>
                         </div>
                     }
                 </div>
@@ -50,7 +50,7 @@
                 @if (!string.IsNullOrEmpty(_currentPayUrl) && _outstanding > 0)
                 {
                     <a href="@_currentPayUrl" target="_blank" rel="noopener"
-                       class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm">
+                       class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary-hover shadow-sm">
                         Pay now
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
                     </a>
@@ -59,19 +59,19 @@
 
             @if (_lease is not null)
             {
-                <div class="px-6 py-4 border-t border-zinc-200/80 dark:border-zinc-800 grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                <div class="px-6 py-4 border-t border-line grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
                     <div>
-                        <div class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-0.5">Monthly rent</div>
+                        <div class="text-xs uppercase tracking-wider font-medium text-muted mb-0.5">Monthly rent</div>
                         <div class="font-medium tabular-nums">@FormatMoney(_lease.MonthlyRent, _currency)</div>
                     </div>
                     <div>
-                        <div class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-0.5">Lease start</div>
+                        <div class="text-xs uppercase tracking-wider font-medium text-muted mb-0.5">Lease start</div>
                         <div class="font-medium tabular-nums">@_lease.StartDate.ToString("MMM d, yyyy")</div>
                     </div>
                     @if (_lease.EndDate is DateOnly end)
                     {
                         <div>
-                            <div class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-0.5">Lease end</div>
+                            <div class="text-xs uppercase tracking-wider font-medium text-muted mb-0.5">Lease end</div>
                             <div class="font-medium tabular-nums">@end.ToString("MMM d, yyyy")</div>
                         </div>
                     }
@@ -80,7 +80,7 @@
         </section>
 
         <div class="text-sm">
-            <a href="/t/invoices" class="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300">
+            <a href="/t/invoices" class="inline-flex items-center gap-1 text-primary hover:text-primary">
                 See all invoices
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
             </a>

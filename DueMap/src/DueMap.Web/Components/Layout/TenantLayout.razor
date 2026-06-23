@@ -18,26 +18,24 @@
     no session is present.
 *@
 
-<div class="min-h-screen flex flex-col bg-stone-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+<div class="min-h-screen flex flex-col bg-app">
 
-    <header class="border-b border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+    <header class="border-b border-line bg-surface">
         <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
             <div class="flex items-center gap-3 min-w-0">
-                <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center shadow-sm shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a2 2 0 0 1-2 2h-4v-7h-6v7H5a2 2 0 0 1-2-2z"/></svg>
-                </div>
-                <span class="text-sm font-semibold tracking-tight truncate" title="@_workspaceName">@_workspaceName</span>
+                <span class="brand-mark w-7 h-7 shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a2 2 0 0 1-2 2h-4v-7h-6v7H5a2 2 0 0 1-2-2z"/></svg>
+                </span>
+                <span class="text-sm font-semibold tracking-tight text-heading truncate" title="@_workspaceName">@_workspaceName</span>
             </div>
             @if (_signedIn)
             {
                 <nav class="flex items-center gap-1 text-sm">
-                    <a href="/t" class="px-3 py-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800">Home</a>
-                    <a href="/t/invoices" class="px-3 py-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800">Invoices</a>
-                    <a href="/t/profile" class="px-3 py-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800">Profile</a>
+                    <a href="/t" class="menu-item h-9">Home</a>
+                    <a href="/t/invoices" class="menu-item h-9">Invoices</a>
+                    <a href="/t/profile" class="menu-item h-9">Profile</a>
                     <form method="post" action="/t/logout" class="inline">
-                        <button type="submit" class="px-3 py-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
-                            Sign out
-                        </button>
+                        <button type="submit" class="btn btn-sm btn-ghost">Sign out</button>
                     </form>
                 </nav>
             }
@@ -48,11 +46,11 @@
         @Body
     </main>
 
-    <footer class="border-t border-zinc-200/80 dark:border-zinc-800 bg-white/40 dark:bg-zinc-900/40">
-        <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between text-[11px] text-zinc-500">
+    <footer class="border-t border-line bg-surface">
+        <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between text-[11px] text-muted">
             <span>© @DateTime.UtcNow.Year @_workspaceName</span>
-            <span class="text-zinc-400 dark:text-zinc-500">
-                Powered by <a href="https://duemap.com" class="hover:text-indigo-600 dark:hover:text-indigo-400">DueMap</a>
+            <span class="text-muted">
+                Powered by <a href="https://duemap.com" class="text-primary">DueMap</a>
             </span>
         </div>
     </footer>

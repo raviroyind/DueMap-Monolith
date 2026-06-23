@@ -17,7 +17,7 @@
                     Admin
                 </span>
             </div>
-            <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 max-w-2xl leading-relaxed">
+            <p class="mt-1.5 text-sm text-muted max-w-2xl leading-relaxed">
                 Every PM whose accounting OAuth is currently <strong>Degraded</strong> or <strong>Broken</strong>.
                 A broken connection silently pauses the nightly worker for that PM (when the
                 <code class="font-mono text-xs">ops.connection_health</code> feature flag is on).
@@ -25,7 +25,7 @@
             </p>
         </div>
         <button @onclick="LoadAsync" disabled="@_loading"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 shadow-sm transition-colors duration-150 disabled:opacity-50">
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-heading bg-surface border border-line hover:bg-surface-2 shadow-sm transition-colors duration-150 disabled:opacity-50">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
             Refresh
         </button>
@@ -51,33 +51,33 @@
 
     @if (_loading)
     {
-        <p class="text-sm text-zinc-500">Loading…</p>
+        <p class="text-sm text-muted">Loading…</p>
     }
     else if (_rows.Count == 0)
     {
-        <div class="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-white/40 dark:bg-zinc-900/40 p-10 text-center">
+        <div class="rounded-xl border border-dashed border-line bg-white/40 dark:bg-[rgb(49_58_70/0.35)] p-10 text-center">
             <p class="text-sm font-medium mb-1">Every connection is healthy.</p>
-            <p class="text-sm text-zinc-500">Nothing to do here. The list refreshes on demand — no auto-poll.</p>
+            <p class="text-sm text-muted">Nothing to do here. The list refreshes on demand — no auto-poll.</p>
         </div>
     }
     else
     {
-        <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+        <div class="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
             <table class="w-full text-sm">
-                <thead class="bg-zinc-50/60 dark:bg-zinc-900/60 text-left">
+                <thead class="bg-surface-2 text-left">
                     <tr>
-                        <th class="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-20">PM</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-28">Provider</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-28">Status</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Reason</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-44">Last check (UTC)</th>
-                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 w-32 text-right">Action</th>
+                        <th class="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted w-20">PM</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted w-28">Provider</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted w-28">Status</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted">Reason</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted w-44">Last check (UTC)</th>
+                        <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted w-32 text-right">Action</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                <tbody class="divide-y divide-[color:var(--line)]">
                     @foreach (var row in _rows)
                     {
-                        <tr class="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30">
+                        <tr class="hover:bg-surface-2">
                             <td class="px-4 py-2.5 text-xs tabular-nums">#@row.PropertyManagerId</td>
                             <td class="px-3 py-2.5 text-xs">@row.Provider</td>
                             <td class="px-3 py-2.5">
@@ -85,15 +85,15 @@
                                     @row.HealthStatus
                                 </span>
                             </td>
-                            <td class="px-3 py-2.5 text-xs text-zinc-600 dark:text-zinc-300">
+                            <td class="px-3 py-2.5 text-xs text-body">
                                 @(row.PausedReason ?? "—")
                             </td>
-                            <td class="px-3 py-2.5 text-xs text-zinc-500 tabular-nums">
+                            <td class="px-3 py-2.5 text-xs text-muted tabular-nums">
                                 @(row.LastHealthCheck?.ToString("yyyy-MM-dd HH:mm:ss") ?? "—")
                             </td>
                             <td class="px-3 py-2.5 text-right">
                                 <a href="@($"/oauth/{ProviderSlug(row.Provider)}/connect/{row.PropertyManagerId}")"
-                                   class="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+                                   class="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium text-white bg-primary hover:bg-primary-hover">
                                     Reconnect
                                 </a>
                             </td>
@@ -102,7 +102,7 @@
                 </tbody>
             </table>
         </div>
-        <p class="text-[11px] text-zinc-400 dark:text-zinc-500 px-2">
+        <p class="text-[11px] text-muted px-2">
             The Reconnect link kicks the standard OAuth flow as if the PM clicked Connect themselves.
             On successful return, the connection is automatically restored to Healthy and the orchestrator
             resumes processing that PM at the next sweep.
@@ -140,7 +140,7 @@
         ConnectionHealthStatus.Healthy  => "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
         ConnectionHealthStatus.Degraded => "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
         ConnectionHealthStatus.Broken   => "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400",
-        _                               => "bg-zinc-100 text-zinc-500"
+        _                               => "bg-zinc-100 text-muted"
     };
 
     /// <summary>Routes match the existing /oauth/{provider}/connect/{pmId} endpoint.</summary>

@@ -25,6 +25,10 @@ public sealed class LoginModel : PageModel
 
     public string? ErrorMessage { get; set; }
 
+    /// <summary>Set when login was blocked because the email isn't confirmed yet,
+    /// so the view can offer a "resend confirmation" link for this address.</summary>
+    public bool NeedsConfirmation { get; set; }
+
     public sealed class InputModel
     {
         [Required, EmailAddress]
@@ -59,6 +63,14 @@ public sealed class LoginModel : PageModel
         if (result.IsLockedOut)
         {
             ErrorMessage = "Account locked. Try again later.";
+            return Page();
+        }
+        if (result.IsNotAllowed)
+        {
+            // Credentials were valid but the account isn't activated — the email
+            // confirmation link hasn't been clicked yet. Offer a resend.
+            NeedsConfirmation = true;
+            ErrorMessage = "Confirm your email before signing in. Check your inbox for the activation link.";
             return Page();
         }
 

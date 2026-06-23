@@ -17,46 +17,46 @@
 
     <div>
         <h1 class="text-2xl font-semibold tracking-tight">Profile</h1>
-        <p class="mt-1 text-sm text-zinc-500">
+        <p class="mt-1 text-sm text-muted">
             Your contact information and lease details. To request a change, use the link below.
         </p>
     </div>
 
     @if (_loading)
     {
-        <p class="text-sm text-zinc-500">Loading…</p>
+        <p class="text-sm text-muted">Loading…</p>
     }
     else if (_session is null || _customer is null)
     {
-        <p class="text-sm text-zinc-500">Redirecting to sign-in…</p>
+        <p class="text-sm text-muted">Redirecting to sign-in…</p>
     }
     else
     {
         @* CONTACT *@
-        <section class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
-            <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800">
+        <section class="rounded-2xl border border-line bg-surface shadow-sm overflow-hidden">
+            <header class="px-6 py-4 border-b border-line">
                 <div class="text-sm font-semibold">Contact</div>
             </header>
             <dl class="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
                 <div>
-                    <dt class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-1">Name</dt>
+                    <dt class="text-xs uppercase tracking-wider font-medium text-muted mb-1">Name</dt>
                     <dd>@_customer.DisplayName</dd>
                 </div>
                 <div>
-                    <dt class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-1">Email</dt>
+                    <dt class="text-xs uppercase tracking-wider font-medium text-muted mb-1">Email</dt>
                     <dd class="break-all">@(_customer.Email ?? "—")</dd>
                 </div>
                 <div>
-                    <dt class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-1">Phone</dt>
+                    <dt class="text-xs uppercase tracking-wider font-medium text-muted mb-1">Phone</dt>
                     <dd>@(_customer.Phone ?? "—")</dd>
                 </div>
             </dl>
-            <footer class="px-6 py-3 border-t border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60 text-xs text-zinc-500 flex items-center justify-between gap-2 flex-wrap">
+            <footer class="px-6 py-3 border-t border-line bg-surface-2 text-xs text-muted flex items-center justify-between gap-2 flex-wrap">
                 <span>To update, ask your property manager.</span>
                 @if (!string.IsNullOrEmpty(_pmContactMailto))
                 {
                     <a href="@_pmContactMailto"
-                       class="inline-flex items-center gap-1 px-2 py-1 rounded-md font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10">
+                       class="inline-flex items-center gap-1 px-2 py-1 rounded-md font-medium text-primary hover:bg-indigo-50 dark:hover:bg-primary-soft">
                         Request a change →
                     </a>
                 }
@@ -66,25 +66,25 @@
         @* LEASE *@
         @if (_lease is not null)
         {
-            <section class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
-                <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800">
+            <section class="rounded-2xl border border-line bg-surface shadow-sm overflow-hidden">
+                <header class="px-6 py-4 border-b border-line">
                     <div class="text-sm font-semibold">Lease</div>
                 </header>
                 <dl class="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
                     <div>
-                        <dt class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-1">Monthly rent</dt>
+                        <dt class="text-xs uppercase tracking-wider font-medium text-muted mb-1">Monthly rent</dt>
                         <dd class="tabular-nums">@_lease.MonthlyRent.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("en-US"))</dd>
                     </div>
                     <div>
-                        <dt class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-1">Unit</dt>
+                        <dt class="text-xs uppercase tracking-wider font-medium text-muted mb-1">Unit</dt>
                         <dd>@(_lease.UnitLabel ?? "—")</dd>
                     </div>
                     <div>
-                        <dt class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-1">Lease start</dt>
+                        <dt class="text-xs uppercase tracking-wider font-medium text-muted mb-1">Lease start</dt>
                         <dd class="tabular-nums">@_lease.StartDate.ToString("MMM d, yyyy")</dd>
                     </div>
                     <div>
-                        <dt class="text-xs uppercase tracking-wider font-medium text-zinc-500 mb-1">Lease end</dt>
+                        <dt class="text-xs uppercase tracking-wider font-medium text-muted mb-1">Lease end</dt>
                         <dd class="tabular-nums">@(_lease.EndDate is DateOnly d ? d.ToString("MMM d, yyyy") : "Open-ended")</dd>
                     </div>
                 </dl>
@@ -92,21 +92,21 @@
         }
 
         @* SIGN-IN OPTIONS *@
-        <section class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
-            <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800">
+        <section class="rounded-2xl border border-line bg-surface shadow-sm overflow-hidden">
+            <header class="px-6 py-4 border-b border-line">
                 <div class="text-sm font-semibold">Sign-in</div>
             </header>
             <div class="px-6 py-5 text-sm flex items-center justify-between gap-4">
                 <div>
                     <div class="font-medium">@(_session.HasPassword ? "Password is set" : "Magic link only")</div>
-                    <p class="text-xs text-zinc-500 mt-1">
+                    <p class="text-xs text-muted mt-1">
                         @(_session.HasPassword
                             ? "You can sign in with either your password or by requesting a magic link."
                             : "Each sign-in sends a one-time link to your email. Set a password if you'd prefer faster repeat sign-ins.")
                     </p>
                 </div>
                 <a href="/t/set-password"
-                   class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70">
+                   class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-heading bg-surface border border-line hover:bg-surface-2">
                     @(_session.HasPassword ? "Change password" : "Set a password")
                 </a>
             </div>

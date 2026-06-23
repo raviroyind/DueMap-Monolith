@@ -8,18 +8,18 @@
 
 <PageTitle>Invoices — DueMap</PageTitle>
 
-<div class="max-w-7xl mx-auto px-8 py-8 space-y-5">
+<div class="max-w-7xl mx-auto px-6 md:px-8 py-8 space-y-5">
 
     <div>
-        <h2 class="text-2xl font-semibold tracking-tight">Invoices</h2>
-        <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-2xl">
-            Synced from your accounting provider on the daily sweep. Open rows drive the next reminder; overdue rows are candidates for late-fee assessment per your <a href="notice-preferences" class="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300">notice preferences</a>.
+        <h2 class="page-title">Invoices</h2>
+        <p class="mt-1.5 text-sm text-muted leading-relaxed max-w-2xl">
+            Synced from your accounting provider on the daily sweep. Open rows drive the next reminder; overdue rows are candidates for late-fee assessment per your <a href="notice-preferences" class="font-medium text-primary">notice preferences</a>.
         </p>
     </div>
 
     @if (_loading)
     {
-        <p class="text-zinc-500">Loading…</p>
+        <p class="text-muted">Loading…</p>
     }
     else
     {
@@ -28,20 +28,17 @@
            pipeline so counts update live as the user types. *@
         <div class="flex flex-wrap items-center gap-3">
             <div class="relative flex-1 min-w-[280px] max-w-md">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none z-10"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                 <input type="search" placeholder="Search customer name or invoice #"
                        @bind="_search" @bind:event="oninput"
-                       class="w-full pl-9 pr-3 py-2 rounded-lg bg-white dark:bg-zinc-900 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150" />
+                       class="form-control pl-9" />
             </div>
             <div class="flex items-center gap-1.5 flex-wrap">
                 @foreach (var f in _filters)
                 {
                     var active = _activeFilter == f.Key;
                     <button type="button" @onclick="@(() => SelectFilter(f.Key))"
-                            class="@(active
-                                ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                                : "bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800")
-                                inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors duration-150">
+                            class="@(active ? "btn btn-sm btn-primary" : "btn btn-sm btn-secondary")">
                         @f.Label
                         <span class="text-[11px] tabular-nums opacity-80">@CountFor(f.Key)</span>
                     </button>
@@ -51,21 +48,21 @@
 
         @if (_displayed.Count == 0)
         {
-            <div class="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-white/40 dark:bg-zinc-900/40 p-12 text-center">
-                <p class="text-sm font-medium mb-1">
+            <div class="rounded-card border border-dashed border-line p-12 text-center">
+                <p class="text-sm font-medium text-heading mb-1">
                     @if (!string.IsNullOrEmpty(_search)) { @($"No invoices match \"{_search}\".") }
                     else { @("No invoices match this filter.") }
                 </p>
-                <p class="text-sm text-zinc-500">Clear the filter or wait for the next sync to pull fresh data.</p>
+                <p class="text-sm text-muted">Clear the filter or wait for the next sync to pull fresh data.</p>
             </div>
         }
         else
         {
-            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+            <div class="card">
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-zinc-50/60 dark:bg-zinc-900/60">
-                            <tr class="text-left">
+                    <table class="table">
+                        <thead>
+                            <tr>
                                 @SortTh("Invoice #",  SortColumn.InvoiceNumber, "px-6 py-3", false)
                                 @SortTh("Customer",   SortColumn.Customer,      "px-3 py-3", false)
                                 @SortTh("Due",        SortColumn.DueDate,       "px-3 py-3", false)
@@ -75,30 +72,26 @@
                                 @SortTh("Lease",      SortColumn.Lease,         "px-6 py-3", false)
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                        <tbody>
                             @foreach (var inv in _displayed)
                             {
-                                <tr class="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 transition-colors duration-100">
-                                    <td class="px-6 py-3 font-mono text-xs">@(inv.ExternalDocNumber ?? $"#{inv.Id}")</td>
-                                    <td class="px-3 py-3">
-                                        <div class="text-sm font-medium">@CustomerName(inv.CustomerId)</div>
+                                <tr>
+                                    <td class="px-6 cell-strong font-mono text-xs">@(inv.ExternalDocNumber ?? $"#{inv.Id}")</td>
+                                    <td class="px-3 cell-strong">@CustomerName(inv.CustomerId)</td>
+                                    <td class="px-3 text-muted tabular">@inv.DueDate.ToString("yyyy-MM-dd")</td>
+                                    <td class="px-3 text-right tabular">@inv.TotalAmount.ToString("C")</td>
+                                    <td class="px-3 text-right tabular cell-strong">@inv.Balance.ToString("C")</td>
+                                    <td class="px-3">
+                                        <span class="badge @StatusBadge(inv)"><span class="dot"></span>@StatusLabel(inv)</span>
                                     </td>
-                                    <td class="px-3 py-3 text-xs text-zinc-500 tabular-nums">@inv.DueDate.ToString("yyyy-MM-dd")</td>
-                                    <td class="px-3 py-3 text-right tabular-nums">@inv.TotalAmount.ToString("C")</td>
-                                    <td class="px-3 py-3 text-right tabular-nums font-medium">@inv.Balance.ToString("C")</td>
-                                    <td class="px-3 py-3">
-                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium @StatusPill(inv)">
-                                            <span class="w-1.5 h-1.5 rounded-full @StatusDot(inv)"></span>@StatusLabel(inv)
-                                        </span>
-                                    </td>
-                                    <td class="px-6 py-3 text-xs text-zinc-500">
+                                    <td class="px-6 text-xs">
                                         @if (inv.LeaseId is int leaseId)
                                         {
-                                            <a href="@($"/leases/{leaseId}")" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 tabular-nums">L-@leaseId</a>
+                                            <a href="@($"/leases/{leaseId}")" class="text-primary tabular">L-@leaseId</a>
                                         }
                                         else
                                         {
-                                            <a href="link-customers" class="text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300">unlinked</a>
+                                            <a href="link-customers" class="text-warning">unlinked</a>
                                         }
                                     </td>
                                 </tr>
@@ -125,7 +118,7 @@
 
         builder.OpenElement(0, "th");
         builder.AddAttribute(1, "class",
-            $"{padding} text-[11px] font-medium uppercase tracking-wider text-zinc-500 cursor-pointer select-none hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors {alignClass}");
+            $"{padding} cursor-pointer select-none hover:text-heading transition-colors {alignClass}");
         builder.AddAttribute(2, "onclick",
             Microsoft.AspNetCore.Components.EventCallback.Factory.Create(this, () => ToggleSort(col)));
 
@@ -145,7 +138,7 @@
             builder.AddAttribute(13, "stroke-width", "3");
             builder.AddAttribute(14, "stroke-linecap", "round");
             builder.AddAttribute(15, "stroke-linejoin", "round");
-            builder.AddAttribute(16, "class", "text-indigo-500");
+            builder.AddAttribute(16, "class", "text-primary");
             builder.OpenElement(17, "path");
             builder.AddAttribute(18, "d", _sortDirection == SortDirection.Asc ? "m18 15-6-6-6 6" : "m6 9 6 6 6-6");
             builder.CloseElement();
@@ -284,22 +277,14 @@
     private string CustomerName(int id) =>
         _customerNames.TryGetValue(id, out var n) ? n : $"Customer #{id}";
 
-    private string StatusPill(RentInvoice i)
+    // Maps an invoice to an Osen badge family (the .dot inherits currentColor).
+    private string StatusBadge(RentInvoice i)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        if (i.Status == RentInvoiceStatus.Paid)   return "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400";
-        if (i.Status == RentInvoiceStatus.Voided) return "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
-        if (i.DueDate < today)                    return "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400";
-        return "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400";
-    }
-
-    private string StatusDot(RentInvoice i)
-    {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        if (i.Status == RentInvoiceStatus.Paid)   return "bg-emerald-500";
-        if (i.Status == RentInvoiceStatus.Voided) return "bg-zinc-400";
-        if (i.DueDate < today)                    return "bg-rose-500";
-        return "bg-amber-500";
+        if (i.Status == RentInvoiceStatus.Paid)   return "badge-success";
+        if (i.Status == RentInvoiceStatus.Voided) return "badge-neutral";
+        if (i.DueDate < today)                    return "badge-danger";
+        return "badge-warning";
     }
 
     private string StatusLabel(RentInvoice i)

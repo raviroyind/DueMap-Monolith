@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text;
 using DueMap.Identity.Domain;
 using DueMap.Integrations.Notices;
 using DueMap.Tenancy;
@@ -7,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 
 namespace DueMap.Web.Pages.Account;
@@ -111,51 +113,31 @@ public sealed partial class RegisterModel : PageModel
             return Page();
         }
 
-        await _signIn.SignInAsync(user, isPersistent: false);
+        // The account is created but INACTIVE (EmailConfirmed=false). We do NOT
+        // sign the user in — they must click the confirmation link first
+        // (SignIn.RequireConfirmedAccount blocks password login until then).
+        var confirmUrl = await BuildConfirmationUrlAsync(user);
 
-        // Welcome email — best-effort. A SendGrid failure must NOT block the
-        // user from entering the app (they're already authenticated). Logged
-        // for diagnosis; the dev fallback in SendGridEmailSender keeps this
-        // path working with no real SendGrid setup.
-        try { await SendWelcomeEmailAsync(user.Email!, placeholderName, ct); }
-        catch (Exception ex) { LogWelcomeFailed(_logger, ex, pm.Id); }
+        // Confirmation email — best-effort send, but always route the user to the
+        // "check your email" page. If SendGrid is down they can hit Resend there.
+        // The dev fallback in SendGridEmailSender logs the link so local dev works
+        // with no real SendGrid setup.
+        try { await AccountEmails.SendConfirmationAsync(_email, user.Email!, placeholderName, confirmUrl, ct); }
+        catch (Exception ex) { LogConfirmationFailed(_logger, ex, pm.Id); }
 
-        return LocalRedirect("/");
+        return RedirectToPage("RegisterConfirmation", new { email = Input.Email });
     }
 
-    private async Task SendWelcomeEmailAsync(string toEmail, string workspaceName, CancellationToken ct)
+    // Generates a single-use email-confirmation token and packs it (URL-safe
+    // base64, since the raw token contains characters that don't survive a query
+    // string) into a link to the ConfirmEmail page.
+    private async Task<string> BuildConfirmationUrlAsync(ApplicationUser user)
     {
-        var connectUrl = $"{Request.Scheme}://{Request.Host}/onboarding/connect";
-
-        var branded = TransactionalEmailBuilder.Build(new TransactionalEmailRequest(
-            Subject: "Welcome to DueMap — let's set up your workspace",
-            Headline: $"Welcome, {workspaceName} 👋",
-            IntroParagraph:
-                "Your DueMap account is ready. We'll help you automate rent reminders, " +
-                "state-compliant late fees, and the daily close — all on top of the accounting " +
-                "system you already use.",
-            AdditionalParagraphs: new[]
-            {
-                "There are three quick steps before we can start working for you:",
-                "<strong>1.</strong> Connect QuickBooks or Xero so we can read your tenants and invoices.<br/>" +
-                "<strong>2.</strong> Confirm your daily-close email preferences (timezone, send time).<br/>" +
-                "<strong>3.</strong> Review your reminder &amp; late-fee defaults, and (optionally) " +
-                "introduce DueMap to your tenants."
-            },
-            PrimaryCtaLabel: "Connect your accounting →",
-            PrimaryCtaUrl: connectUrl,
-            FooterNote: "Questions? Just reply — a human reads every message during the trial.",
-            WorkspaceName: null,                    // intentionally — this email IS from DueMap, not a PM
-            Preheader: "Three quick steps to get DueMap working for you."));
-
-        await _email.SendAsync(new DispatchRequest(
-            Channel: DispatchChannel.Email,
-            To: toEmail,
-            ToDisplayName: workspaceName,
-            Subject: branded.Subject,
-            BodyHtml: branded.BodyHtml,
-            BodyText: branded.BodyText), ct);
+        var token = await _users.GenerateEmailConfirmationTokenAsync(user);
+        var encoded = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
+        return $"{Request.Scheme}://{Request.Host}/Account/ConfirmEmail?userId={user.Id}&token={encoded}";
     }
+
 
     // Sign-up via Intuit / Xero. Same shape as Login.OnPostExternalSignIn —
     // the callback page distinguishes new vs returning users by looking up
@@ -231,6 +213,6 @@ public sealed partial class RegisterModel : PageModel
     static partial void LogUserCreateThrew(ILogger logger, Exception ex, int propertyManagerId);
 
     [LoggerMessage(EventId = 8003, Level = LogLevel.Warning,
-        Message = "Welcome email failed to send for newly-registered PM id={PropertyManagerId} — user already in app, not retried.")]
-    static partial void LogWelcomeFailed(ILogger logger, Exception ex, int propertyManagerId);
+        Message = "Confirmation email failed to send for newly-registered PM id={PropertyManagerId} — user routed to the check-your-email page where they can resend.")]
+    static partial void LogConfirmationFailed(ILogger logger, Exception ex, int propertyManagerId);
 }

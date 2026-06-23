@@ -17,7 +17,7 @@
 
     <div>
         <h2 class="text-2xl font-semibold tracking-tight">Ready to go live</h2>
-        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-2xl">
+        <p class="mt-2 text-sm text-muted leading-relaxed max-w-2xl">
             This is the switch. Until now your late-fee profiles have been <strong>staged</strong> —
             recorded but never charged. When you go live, DueMap starts sending reminders and
             assessing late fees on the schedule below, beginning with the next daily run.
@@ -26,7 +26,7 @@
 
     @if (_loading)
     {
-        <p class="text-sm text-zinc-500">Loading…</p>
+        <p class="text-sm text-muted">Loading…</p>
     }
     else if (_disabled)
     {
@@ -52,26 +52,26 @@
     {
         @if (_staged.Count == 0)
         {
-            <div class="rounded-xl border border-zinc-300 dark:border-zinc-700 border-dashed bg-white/40 dark:bg-zinc-900/40 p-8 text-center text-sm text-zinc-500">
+            <div class="rounded-xl border border-line border-dashed bg-white/40 dark:bg-[rgb(49_58_70/0.35)] p-8 text-center text-sm text-muted">
                 No staged leases found. Either you're already live, or auto-setup hasn't run yet.
             </div>
         }
         else
         {
-            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
-                <div class="px-4 py-2.5 border-b border-zinc-200/80 dark:border-zinc-800 text-sm font-semibold">
+            <div class="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
+                <div class="px-4 py-2.5 border-b border-line text-sm font-semibold">
                     What goes live (@_staged.Count lease@(_staged.Count == 1 ? "" : "s"))
                 </div>
                 <table class="w-full text-sm">
-                    <thead class="bg-zinc-50/60 dark:bg-zinc-900/60 text-left">
+                    <thead class="bg-surface-2 text-left">
                         <tr>
-                            <th class="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Lease</th>
-                            <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Rent</th>
-                            <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Late fee</th>
-                            <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Grace</th>
+                            <th class="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-muted">Lease</th>
+                            <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-muted">Rent</th>
+                            <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-muted">Late fee</th>
+                            <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-muted">Grace</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                    <tbody class="divide-y divide-[color:var(--line)]">
                         @foreach (var l in _staged)
                         {
                             <tr>
@@ -91,7 +91,7 @@
                 </table>
             </div>
 
-            <div class="rounded-lg bg-zinc-50 dark:bg-zinc-800/40 px-4 py-3 text-xs text-zinc-500">
+            <div class="rounded-lg bg-zinc-50 dark:bg-zinc-800/40 px-4 py-3 text-xs text-muted">
                 After you go live you can preview any PM's exact daily plan from the admin dry-run, and
                 watch every action on the activity timeline. Fees only ever assess within your state's
                 legal limits.
@@ -102,7 +102,7 @@
                         class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm disabled:opacity-50">
                     @(_busy ? "Going live…" : "Go live")
                 </button>
-                <a href="/onboarding/review" class="text-sm text-zinc-500 hover:underline">Back to review</a>
+                <a href="/onboarding/review" class="text-sm text-muted hover:underline">Back to review</a>
                 @if (_error is not null)
                 {
                     <span class="text-xs text-rose-600 dark:text-rose-400">@_error</span>

@@ -6,19 +6,17 @@
     parent can call into the shared EditTemplateModal.
 *@
 
-<div class="px-6 py-4 flex items-center justify-between gap-6 border-b border-zinc-100 dark:border-zinc-800/60 last:border-b-0">
+<div class="template-row px-6 py-4 flex items-center justify-between gap-6 border-b border-line last:border-b-0">
     <div class="flex items-center gap-3 flex-1 min-w-0">
-        <div class="w-7 h-7 rounded-md bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 shrink-0">
+        <div class="w-7 h-7 rounded-md bg-surface-2 text-muted flex items-center justify-center shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
         </div>
         <div class="min-w-0">
-            <div class="text-sm font-medium">Email template</div>
-            <p class="text-xs text-zinc-500 mt-0.5 truncate">@(Hint ?? Label)</p>
+            <div class="text-sm font-medium text-heading">Email template</div>
+            <p class="text-xs text-muted mt-0.5 truncate">@(Hint ?? Label)</p>
         </div>
     </div>
-    <button type="button"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 shadow-sm transition-colors duration-150 shrink-0"
-            @onclick="OnEditClicked">
+    <button type="button" class="btn btn-sm btn-secondary shrink-0" @onclick="OnEditClicked">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
         Edit template
     </button>

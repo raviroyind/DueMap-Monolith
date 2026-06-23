@@ -14,18 +14,18 @@
 
 <PageTitle>DueMap — Dashboard</PageTitle>
 
-<div class="max-w-7xl mx-auto px-8 py-8 space-y-6">
+<div class="max-w-7xl mx-auto px-6 md:px-8 py-8 space-y-6">
 
     @if (_loading)
     {
-        <p class="text-zinc-500">Loading…</p>
+        <p class="text-muted">Loading…</p>
     }
     else if (_conn is null)
     {
         @* The gate normally redirects, but render a fallback in case the redirect
            is suppressed (e.g., user has the page open in a second tab). *@
-        <p class="text-zinc-500">No accounting connection on file.
-            <a href="connections?onboarding=1" class="text-indigo-600 dark:text-indigo-400 font-medium">Connect QuickBooks or Xero →</a>
+        <p class="text-muted">No accounting connection on file.
+            <a href="connections?onboarding=1" class="text-primary font-medium">Connect QuickBooks or Xero →</a>
         </p>
     }
     else
@@ -33,7 +33,7 @@
         <!-- PAGE HEADER -->
         <div class="flex items-end justify-between gap-4 flex-wrap">
             <div class="min-w-0">
-                <h2 class="text-2xl font-semibold tracking-tight">Portfolio overview</h2>
+                <h2 class="page-title">Portfolio overview</h2>
                 <div class="mt-2 flex items-center gap-2 flex-wrap">
 
                     @* Brand-coloured connection chip — QuickBooks green or Xero blue.
@@ -42,41 +42,36 @@
                     @if (_conn.Provider == AccountingProvider.QuickBooks)
                     {
                         <a href="connections" data-tour="connection-pill"
-                           class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-medium text-white shadow-sm transition-opacity hover:opacity-90"
+                           class="badge badge-solid-success text-white"
                            style="background:#2CA01C">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                <circle cx="12" cy="12" r="10"/>
-                            </svg>
+                            <span class="dot"></span>
                             <span>Connected to QuickBooks</span>
                         </a>
                     }
                     else
                     {
                         <a href="connections" data-tour="connection-pill"
-                           class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-medium text-white shadow-sm transition-opacity hover:opacity-90"
+                           class="badge text-white"
                            style="background:#13B5EA">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                <circle cx="12" cy="12" r="10"/>
-                            </svg>
+                            <span class="dot"></span>
                             <span>Connected to Xero</span>
                         </a>
                     }
 
-                    <span class="text-sm text-zinc-500 dark:text-zinc-400">
+                    <span class="text-sm text-muted">
                         @* TODO: replace with conn.CompanyName once fetched from /companyinfo (task #61). *@
-                        <span class="font-medium text-zinc-700 dark:text-zinc-300">@WorkspaceLabel(_conn)</span>
-                        <span class="mx-1.5 text-zinc-300 dark:text-zinc-600">·</span>
+                        <span class="font-medium text-heading">@WorkspaceLabel(_conn)</span>
+                        <span class="mx-1.5 text-muted">·</span>
                         last sync @(_conn.LastSyncAt?.ToString("u") ?? "pending")
                     </span>
                 </div>
             </div>
             <div class="flex items-center gap-2">
-                <button type="button" @onclick="StartTourAsync"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 shadow-sm transition-colors duration-150">
+                <button type="button" @onclick="StartTourAsync" class="btn btn-sm btn-secondary">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
                     Take a tour
                 </button>
-                <a href="connections" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 shadow-sm transition-colors duration-150">
+                <a href="connections" class="btn btn-sm btn-secondary">
                     Manage connection
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
                 </a>
@@ -86,85 +81,83 @@
         <!-- KPI ROW — each tile drills into the matching detail page -->
         <div data-tour="kpi-tiles" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
-            <a href="link-customers" class="block group rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-sm hover:shadow-md hover:border-indigo-300/60 dark:hover:border-indigo-500/30 transition-all duration-200">
+            <a href="link-customers" class="card-link group">
                 <div class="flex items-center justify-between mb-3">
-                    <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Customers</div>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400 group-hover:text-indigo-500 transition-colors"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+                    <div class="text-xs font-medium uppercase tracking-wider text-muted">Customers</div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted group-hover:text-primary transition-colors"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
                 </div>
-                <div class="text-3xl font-semibold tracking-tight tabular-nums">@_customerCount</div>
-                <div class="mt-2 text-xs text-zinc-500">@CustomerCaption(_customerCount, _unlinkedCount)</div>
+                <div class="text-3xl font-semibold tracking-tight tabular-nums text-heading">@_customerCount</div>
+                <div class="mt-2 text-xs text-muted">@CustomerCaption(_customerCount, _unlinkedCount)</div>
             </a>
 
-            <a href="invoices" class="block group rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-sm hover:shadow-md hover:border-indigo-300/60 dark:hover:border-indigo-500/30 transition-all duration-200">
+            <a href="invoices" class="card-link group">
                 <div class="flex items-center justify-between mb-3">
-                    <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Open invoices</div>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400 group-hover:text-indigo-500 transition-colors"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                    <div class="text-xs font-medium uppercase tracking-wider text-muted">Open invoices</div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted group-hover:text-primary transition-colors"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
                 </div>
-                <div class="text-3xl font-semibold tracking-tight tabular-nums">@_openCount</div>
-                <div class="mt-2 text-xs text-zinc-500">@_openSumLabel outstanding</div>
+                <div class="text-3xl font-semibold tracking-tight tabular-nums text-heading">@_openCount</div>
+                <div class="mt-2 text-xs text-muted">@_openSumLabel outstanding</div>
             </a>
 
-            <a href="invoices" class="block group rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-sm hover:shadow-md hover:border-rose-300/60 dark:hover:border-rose-500/30 transition-all duration-200">
+            <a href="invoices" class="card-link group">
                 <div class="flex items-center justify-between mb-3">
-                    <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Overdue</div>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400 group-hover:text-rose-500 transition-colors"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                    <div class="text-xs font-medium uppercase tracking-wider text-muted">Overdue</div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted group-hover:text-danger transition-colors"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
                 </div>
-                <div class="text-3xl font-semibold tracking-tight tabular-nums @(_overdueCount > 0 ? "text-rose-700 dark:text-rose-400" : "")">@_overdueCount</div>
-                <div class="mt-2 text-xs text-zinc-500">@(_overdueCount == 0 ? "all caught up" : "candidates for late fee")</div>
+                <div class="text-3xl font-semibold tracking-tight tabular-nums @(_overdueCount > 0 ? "text-danger" : "text-heading")">@_overdueCount</div>
+                <div class="mt-2 text-xs text-muted">@(_overdueCount == 0 ? "all caught up" : "candidates for late fee")</div>
             </a>
 
-            <a href="leases" class="block group rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-sm hover:shadow-md hover:border-indigo-300/60 dark:hover:border-indigo-500/30 transition-all duration-200">
+            <a href="leases" class="card-link group">
                 <div class="flex items-center justify-between mb-3">
-                    <div class="text-xs font-medium uppercase tracking-wider text-zinc-500">Active leases</div>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400 group-hover:text-indigo-500 transition-colors"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/></svg>
+                    <div class="text-xs font-medium uppercase tracking-wider text-muted">Active leases</div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted group-hover:text-primary transition-colors"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/></svg>
                 </div>
-                <div class="text-3xl font-semibold tracking-tight tabular-nums">@_leaseCount</div>
-                <div class="mt-2 text-xs text-zinc-500">in your portfolio</div>
+                <div class="text-3xl font-semibold tracking-tight tabular-nums text-heading">@_leaseCount</div>
+                <div class="mt-2 text-xs text-muted">in your portfolio</div>
             </a>
         </div>
 
         @* RECENT INVOICES — top 6 most recent, with a "View all" link.
            Doubles as a sanity check that data is actually flowing. *@
-        <section data-tour="recent-invoices" class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
-            <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between gap-3">
+        <section data-tour="recent-invoices" class="card">
+            <header class="card-header flex items-center justify-between gap-3">
                 <div>
-                    <div class="text-sm font-semibold">Recent invoices</div>
-                    <div class="text-xs text-zinc-500 mt-0.5">Latest @Math.Min(6, _recentInvoices.Count) of @_allInvoices.Count synced</div>
+                    <div class="card-title">Recent invoices</div>
+                    <div class="card-subtitle">Latest @Math.Min(6, _recentInvoices.Count) of @_allInvoices.Count synced</div>
                 </div>
-                <a href="invoices" class="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">View all →</a>
+                <a href="invoices" class="btn-link text-sm">View all →</a>
             </header>
 
             @if (_recentInvoices.Count == 0)
             {
                 <div class="px-6 py-10 text-center">
-                    <p class="text-sm text-zinc-500">No invoices yet. They'll appear here as soon as the next sync runs.</p>
+                    <p class="text-sm text-muted">No invoices yet. They'll appear here as soon as the next sync runs.</p>
                 </div>
             }
             else
             {
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-zinc-50/40 dark:bg-zinc-900/40">
-                            <tr class="text-left">
-                                <th class="px-6 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Invoice #</th>
-                                <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Customer</th>
-                                <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Due</th>
-                                <th class="px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500 text-right">Balance</th>
-                                <th class="px-6 py-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Status</th>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Invoice #</th>
+                                <th>Customer</th>
+                                <th>Due</th>
+                                <th class="text-right">Balance</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                        <tbody>
                             @foreach (var inv in _recentInvoices)
                             {
-                                <tr class="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 transition-colors duration-100">
-                                    <td class="px-6 py-3 font-mono text-xs">@(inv.ExternalDocNumber ?? $"#{inv.Id}")</td>
-                                    <td class="px-3 py-3 text-sm">@CustomerName(inv.CustomerId)</td>
-                                    <td class="px-3 py-3 text-xs text-zinc-500 tabular-nums">@inv.DueDate.ToString("yyyy-MM-dd")</td>
-                                    <td class="px-3 py-3 text-right tabular-nums font-medium">@inv.Balance.ToString("C")</td>
-                                    <td class="px-6 py-3">
-                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium @StatusPill(inv)">
-                                            <span class="w-1.5 h-1.5 rounded-full @StatusDot(inv)"></span>@StatusLabel(inv)
-                                        </span>
+                                <tr>
+                                    <td class="cell-strong font-mono text-xs">@(inv.ExternalDocNumber ?? $"#{inv.Id}")</td>
+                                    <td>@CustomerName(inv.CustomerId)</td>
+                                    <td class="text-muted tabular">@inv.DueDate.ToString("yyyy-MM-dd")</td>
+                                    <td class="text-right tabular cell-strong">@inv.Balance.ToString("C")</td>
+                                    <td>
+                                        <span class="badge @StatusBadge(inv)"><span class="dot"></span>@StatusLabel(inv)</span>
                                     </td>
                                 </tr>
                             }
@@ -176,49 +169,49 @@
 
         <!-- QUICK LINKS — secondary navigation -->
         <div class="grid lg:grid-cols-2 gap-4">
-            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-6">
-                <h3 class="text-sm font-semibold mb-3">Setup</h3>
-                <ul class="space-y-1">
+            <div class="card card-body">
+                <h3 class="card-title mb-3">Setup</h3>
+                <ul class="space-y-0.5">
                     <li>
-                        <a href="notice-preferences" class="group flex items-center justify-between gap-2 -mx-2 px-2 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">
+                        <a href="notice-preferences" class="menu-item justify-between">
                             <span class="flex items-center gap-2.5">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-500"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
-                                <span class="text-sm">Notice preferences</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
+                                Notice preferences
                             </span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="m9 18 6-6-6-6"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
                         </a>
                     </li>
                     <li>
-                        <a href="templates" class="group flex items-center justify-between gap-2 -mx-2 px-2 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">
+                        <a href="templates" class="menu-item justify-between">
                             <span class="flex items-center gap-2.5">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-500"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
-                                <span class="text-sm">Templates</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                                Templates
                             </span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="m9 18 6-6-6-6"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
                         </a>
                     </li>
                 </ul>
             </div>
 
-            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-6">
-                <h3 class="text-sm font-semibold mb-3">Portfolio</h3>
-                <ul class="space-y-1">
+            <div class="card card-body">
+                <h3 class="card-title mb-3">Portfolio</h3>
+                <ul class="space-y-0.5">
                     <li>
-                        <a href="link-customers" class="group flex items-center justify-between gap-2 -mx-2 px-2 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">
+                        <a href="link-customers" class="menu-item justify-between">
                             <span class="flex items-center gap-2.5">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-500"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
-                                <span class="text-sm">Link customers to leases</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+                                Link customers to leases
                             </span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="m9 18 6-6-6-6"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
                         </a>
                     </li>
                     <li>
-                        <a href="processing-status" class="group flex items-center justify-between gap-2 -mx-2 px-2 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">
+                        <a href="processing-status" class="menu-item justify-between">
                             <span class="flex items-center gap-2.5">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-500"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.5.5 0 0 1-.96 0L9.24 3.18a.5.5 0 0 0-.96 0l-2.35 8.36A2 2 0 0 1 4 13H2"/></svg>
-                                <span class="text-sm">Processing status — daily runs</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.5.5 0 0 1-.96 0L9.24 3.18a.5.5 0 0 0-.96 0l-2.35 8.36A2 2 0 0 1 4 13H2"/></svg>
+                                Processing status — daily runs
                             </span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="m9 18 6-6-6-6"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
                         </a>
                     </li>
                 </ul>
@@ -313,22 +306,14 @@
         return $"{unlinkedInvoices} invoice{(unlinkedInvoices == 1 ? "" : "s")} awaiting link";
     }
 
-    private static string StatusPill(RentInvoice i)
+    // Maps an invoice to an Osen badge family (the .dot inherits currentColor).
+    private static string StatusBadge(RentInvoice i)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        if (i.Status == RentInvoiceStatus.Paid)   return "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400";
-        if (i.Status == RentInvoiceStatus.Voided) return "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
-        if (i.DueDate < today)                    return "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400";
-        return "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400";
-    }
-
-    private static string StatusDot(RentInvoice i)
-    {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        if (i.Status == RentInvoiceStatus.Paid)   return "bg-emerald-500";
-        if (i.Status == RentInvoiceStatus.Voided) return "bg-zinc-400";
-        if (i.DueDate < today)                    return "bg-rose-500";
-        return "bg-amber-500";
+        if (i.Status == RentInvoiceStatus.Paid)   return "badge-success";
+        if (i.Status == RentInvoiceStatus.Voided) return "badge-neutral";
+        if (i.DueDate < today)                    return "badge-danger";
+        return "badge-warning";
     }
 
     private static string StatusLabel(RentInvoice i)

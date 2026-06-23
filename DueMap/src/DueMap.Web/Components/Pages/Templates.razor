@@ -12,43 +12,40 @@
 
 <PageTitle>Templates — DueMap</PageTitle>
 
-<div class="max-w-5xl mx-auto px-8 py-8 space-y-6">
+<div class="max-w-5xl mx-auto px-6 md:px-8 py-8 space-y-6">
 
     <div>
-        <h2 class="text-2xl font-semibold tracking-tight">Templates</h2>
-        <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 max-w-2xl leading-relaxed">
+        <h2 class="page-title">Templates</h2>
+        <p class="mt-1.5 text-sm text-muted max-w-2xl leading-relaxed">
             Custom subject/body per notice type. Layered:
-            <strong class="font-medium text-zinc-700 dark:text-zinc-300">state-specific override</strong>
-            <span class="text-zinc-400">›</span>
-            <strong class="font-medium text-zinc-700 dark:text-zinc-300">generic PM override</strong>
-            <span class="text-zinc-400">›</span>
-            <strong class="font-medium text-zinc-700 dark:text-zinc-300">system default</strong>.
+            <strong class="font-medium text-heading">state-specific override</strong>
+            <span class="text-muted">›</span>
+            <strong class="font-medium text-heading">generic PM override</strong>
+            <span class="text-muted">›</span>
+            <strong class="font-medium text-heading">system default</strong>.
             Required legal placeholders stay enforced — you can rewrite copy but cannot drop them.
         </p>
     </div>
 
     @if (_pmId is null)
     {
-        <p class="text-zinc-500">Loading…</p>
+        <p class="text-muted">Loading…</p>
     }
     else
     {
         @if (_toast is not null)
         {
-            <div class="rounded-xl border border-emerald-200/70 dark:border-emerald-500/20 bg-emerald-50/60 dark:bg-emerald-500/5 px-4 py-3 text-sm text-emerald-900 dark:text-emerald-200">
-                @_toast
-            </div>
+            <div class="alert alert-success">@_toast</div>
         }
 
         <!-- LIST -->
-        <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
-            <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between gap-3">
+        <section class="card">
+            <header class="card-header flex items-center justify-between gap-3">
                 <div>
-                    <div class="text-sm font-semibold">Existing overrides</div>
-                    <div class="text-xs text-zinc-500 mt-0.5">Active customizations across notice types and states.</div>
+                    <div class="card-title">Existing overrides</div>
+                    <div class="card-subtitle">Active customizations across notice types and states.</div>
                 </div>
-                <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all duration-200 ease-out"
-                        @onclick="OpenNewAsync">
+                <button class="btn btn-sm btn-primary" @onclick="OpenNewAsync">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
                     New override
                 </button>
@@ -57,35 +54,33 @@
             @if (_existing.Count == 0)
             {
                 <div class="px-6 py-12 text-center">
-                    <p class="text-sm text-zinc-500 dark:text-zinc-400">No overrides yet — system templates will be used for all notices.</p>
+                    <p class="text-sm text-muted">No overrides yet — system templates will be used for all notices.</p>
                 </div>
             }
             else
             {
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-zinc-50/60 dark:bg-zinc-900/60">
-                            <tr class="text-left">
-                                <th class="px-6 py-3 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Notice type</th>
-                                <th class="px-3 py-3 text-[11px] font-medium uppercase tracking-wider text-zinc-500">State</th>
-                                <th class="px-3 py-3 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Subject</th>
-                                <th class="px-3 py-3 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Updated</th>
-                                <th class="w-40 px-6 py-3"></th>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Notice type</th>
+                                <th>State</th>
+                                <th>Subject</th>
+                                <th>Updated</th>
+                                <th class="w-40"></th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                        <tbody>
                             @foreach (var o in _existing)
                             {
-                                <tr class="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 transition-colors duration-100">
-                                    <td class="px-6 py-3.5 text-sm font-medium">@TypeName(o.NoticeTypeId)</td>
-                                    <td class="px-3 py-3.5 text-zinc-600 dark:text-zinc-300">@(o.StateId.HasValue ? StateCode(o.StateId.Value) : "All states")</td>
-                                    <td class="px-3 py-3.5 text-zinc-600 dark:text-zinc-300 font-mono text-xs">@Truncate(o.Subject, 60)</td>
-                                    <td class="px-3 py-3.5 text-xs text-zinc-500 tabular-nums">@o.UpdatedAt.ToString("u")</td>
-                                    <td class="px-6 py-3.5 text-right">
-                                        <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 shadow-sm transition-colors duration-150"
-                                                @onclick="@(() => OpenExistingAsync(o))">Edit</button>
-                                        <button class="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10 transition-colors duration-150"
-                                                @onclick="@(() => Deactivate(o.Id))">Remove</button>
+                                <tr>
+                                    <td class="cell-strong">@TypeName(o.NoticeTypeId)</td>
+                                    <td>@(o.StateId.HasValue ? StateCode(o.StateId.Value) : "All states")</td>
+                                    <td class="font-mono text-xs">@Truncate(o.Subject, 60)</td>
+                                    <td class="text-muted tabular">@o.UpdatedAt.ToString("u")</td>
+                                    <td class="text-right">
+                                        <button class="btn btn-sm btn-secondary" @onclick="@(() => OpenExistingAsync(o))">Edit</button>
+                                        <button class="btn btn-sm btn-link text-danger" @onclick="@(() => Deactivate(o.Id))">Remove</button>
                                     </td>
                                 </tr>
                             }

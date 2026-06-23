@@ -16,7 +16,7 @@
 
     <div>
         <h2 class="text-2xl font-semibold tracking-tight">Daily Close email</h2>
-        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-2xl">
+        <p class="mt-2 text-sm text-muted leading-relaxed max-w-2xl">
             At the end of each business day we'll email you a summary of what DueMap did:
             reminders sent, late fees assessed, dispatch failures.
             Pick your timezone, when you want it in your inbox, and who else should be copied.
@@ -25,25 +25,25 @@
 
     @if (_loading)
     {
-        <p class="text-sm text-zinc-500">Loading…</p>
+        <p class="text-sm text-muted">Loading…</p>
     }
     else
     {
         <EditForm Model="_form" OnValidSubmit="SaveAsync" class="space-y-6">
             <DataAnnotationsValidator />
 
-            <section class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+            <section class="rounded-2xl border border-line bg-surface shadow-sm overflow-hidden">
 
                 @* ENABLED *@
-                <div class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-start gap-4">
+                <div class="px-6 py-4 border-b border-line flex items-start gap-4">
                     <div class="flex-1 min-w-0">
                         <div class="text-sm font-semibold">Send a daily close email</div>
-                        <div class="text-xs text-zinc-500 mt-0.5">You can always turn this off later from workspace settings.</div>
+                        <div class="text-xs text-muted mt-0.5">You can always turn this off later from workspace settings.</div>
                     </div>
                     <label class="inline-flex items-center cursor-pointer select-none">
                         <input type="checkbox" @bind="_form.Enabled" class="sr-only peer" />
-                        <span class="w-11 h-6 rounded-full bg-zinc-200 dark:bg-zinc-700 relative
-                                     peer-checked:bg-indigo-600 transition-colors duration-150
+                        <span class="w-11 h-6 rounded-full bg-line relative
+                                     peer-checked:bg-primary transition-colors duration-150
                                      after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5
                                      after:rounded-full after:bg-white after:shadow
                                      peer-checked:after:translate-x-5 after:transition-transform after:duration-150"></span>
@@ -51,9 +51,9 @@
                 </div>
 
                 @* TIMEZONE + HOUR *@
-                <div class="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-5 border-b border-zinc-200/80 dark:border-zinc-800">
+                <div class="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-5 border-b border-line">
                     <div>
-                        <label class="block text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-2">
+                        <label class="block text-xs font-medium text-muted mb-1.5 flex items-center gap-2">
                             <span>Your timezone</span>
                             @if (_tzSuggestion is not null)
                             {
@@ -65,13 +65,13 @@
                         </label>
                         <select @bind="_form.TimeZoneId"
                                 disabled="@(!_form.Enabled)"
-                                class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 disabled:opacity-50">
+                                class="w-full px-3 py-2 rounded-lg text-sm bg-surface border border-line disabled:opacity-50">
                             @foreach (var tz in _commonTimezones)
                             {
                                 <option value="@tz.Id">@tz.Label</option>
                             }
                         </select>
-                        <p class="mt-1 text-[11px] text-zinc-400">
+                        <p class="mt-1 text-[11px] text-muted">
                             @if (_tzSuggestion is not null)
                             {
                                 <span>Picked from your @_tzSuggestion.Source company profile — override if needed.</span>
@@ -83,10 +83,10 @@
                         </p>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-zinc-500 mb-1.5">Send at (local time)</label>
+                        <label class="block text-xs font-medium text-muted mb-1.5">Send at (local time)</label>
                         <select @bind="_form.SendHourLocal"
                                 disabled="@(!_form.Enabled)"
-                                class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 disabled:opacity-50">
+                                class="w-full px-3 py-2 rounded-lg text-sm bg-surface border border-line disabled:opacity-50">
                             @for (var h = 0; h < 24; h++)
                             {
                                 <option value="@h">@FormatHour(h)</option>
@@ -98,18 +98,18 @@
                 @* RECIPIENTS *@
                 <div class="px-6 py-5 space-y-4">
                     <div>
-                        <label class="block text-xs font-medium text-zinc-500 mb-1.5">Send to (override)</label>
+                        <label class="block text-xs font-medium text-muted mb-1.5">Send to (override)</label>
                         <input type="email" @bind="_form.RecipientOverride"
                                disabled="@(!_form.Enabled)"
                                placeholder="leave blank to use your account email"
-                               class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 disabled:opacity-50" />
+                               class="w-full px-3 py-2 rounded-lg text-sm bg-surface border border-line disabled:opacity-50" />
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-zinc-500 mb-1.5">CC (comma-separated)</label>
+                        <label class="block text-xs font-medium text-muted mb-1.5">CC (comma-separated)</label>
                         <input type="text" @bind="_form.CcList"
                                disabled="@(!_form.Enabled)"
                                placeholder="bookkeeper@example.com, partner@example.com"
-                               class="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 disabled:opacity-50" />
+                               class="w-full px-3 py-2 rounded-lg text-sm bg-surface border border-line disabled:opacity-50" />
                     </div>
                 </div>
             </section>
@@ -120,7 +120,7 @@
                     <span class="text-sm text-rose-600 dark:text-rose-400">@_error</span>
                 }
                 <button type="submit" disabled="@_saving"
-                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-colors duration-150 disabled:opacity-50">
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary-hover shadow-sm transition-colors duration-150 disabled:opacity-50">
                     @(_saving ? "Saving…" : "Save and continue →")
                 </button>
             </div>

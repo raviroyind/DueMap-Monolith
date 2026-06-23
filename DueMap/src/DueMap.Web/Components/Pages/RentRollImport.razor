@@ -18,7 +18,7 @@
 
     <div>
         <h2 class="text-2xl font-semibold tracking-tight">Import rent roll</h2>
-        <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 max-w-2xl leading-relaxed">
+        <p class="mt-1.5 text-sm text-muted max-w-2xl leading-relaxed">
             Upload your existing rent-roll spreadsheet — Excel (.xlsx) or CSV.
             We'll detect the columns, let you confirm the mapping, then create or update lease rows.
             We do our best to match tenant names against your synced QuickBooks/Xero customers.
@@ -28,28 +28,28 @@
     @* STAGE 1 — file upload *@
     @if (_stage == Stage.Upload)
     {
-        <section class="rounded-2xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 bg-white/40 dark:bg-zinc-900/40 p-10 text-center">
-            <div class="inline-flex w-14 h-14 rounded-2xl bg-indigo-100 dark:bg-indigo-500/15 items-center justify-center text-indigo-600 dark:text-indigo-400 mb-4">
+        <section class="rounded-2xl border-2 border-dashed border-line bg-white/40 dark:bg-[rgb(49_58_70/0.35)] p-10 text-center">
+            <div class="inline-flex w-14 h-14 rounded-2xl bg-primary-soft items-center justify-center text-primary mb-4">
                 <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
             </div>
             <div class="text-sm font-semibold mb-1">Drop your rent roll here</div>
-            <p class="text-xs text-zinc-500 mb-5">.xlsx or .csv · up to 5 MB</p>
+            <p class="text-xs text-muted mb-5">.xlsx or .csv · up to 5 MB</p>
             <InputFile OnChange="OnFilePicked" accept=".xlsx,.csv"
-                       class="inline-block px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm cursor-pointer transition-colors duration-150" />
+                       class="inline-block px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary-hover shadow-sm cursor-pointer transition-colors duration-150" />
 
             @* Sample downloads — same five-row fixture as either format so PMs
                can see exactly what shape we accept before they touch their own data. *@
             <div class="mt-6 flex items-center justify-center gap-2 text-xs">
-                <span class="text-zinc-500">Need a template?</span>
+                <span class="text-muted">Need a template?</span>
                 <a href="/samples/duemap-rent-roll-sample.xlsx"
-                   class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+                   class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-medium text-primary hover:bg-indigo-50 dark:hover:bg-primary-soft transition-colors"
                    download>
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
                     Sample .xlsx
                 </a>
-                <span class="text-zinc-300 dark:text-zinc-600">·</span>
+                <span class="text-zinc-300 dark:text-body">·</span>
                 <a href="/samples/duemap-rent-roll-sample.csv"
-                   class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+                   class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-medium text-primary hover:bg-indigo-50 dark:hover:bg-primary-soft transition-colors"
                    download>
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
                     Sample .csv
@@ -63,34 +63,34 @@
         </section>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
-                <div class="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-3">What we'll do with your file</div>
-                <ul class="space-y-2 text-sm text-zinc-600 dark:text-zinc-300">
-                    <li class="flex items-start gap-2"><span class="text-indigo-500 mt-0.5">①</span>Detect column headers and let you confirm which DueMap field each maps to.</li>
-                    <li class="flex items-start gap-2"><span class="text-indigo-500 mt-0.5">②</span>For each row, try to match the tenant name (and email if present) against your synced customers.</li>
-                    <li class="flex items-start gap-2"><span class="text-indigo-500 mt-0.5">③</span>Create new lease rows for unmatched tenants, or link to existing customers.</li>
-                    <li class="flex items-start gap-2"><span class="text-indigo-500 mt-0.5">④</span>Show you exactly what changed — nothing is written until you click Commit.</li>
+            <div class="rounded-xl border border-line bg-surface p-5">
+                <div class="text-xs font-medium uppercase tracking-wider text-muted mb-3">What we'll do with your file</div>
+                <ul class="space-y-2 text-sm text-body">
+                    <li class="flex items-start gap-2"><span class="text-primary mt-0.5">①</span>Detect column headers and let you confirm which DueMap field each maps to.</li>
+                    <li class="flex items-start gap-2"><span class="text-primary mt-0.5">②</span>For each row, try to match the tenant name (and email if present) against your synced customers.</li>
+                    <li class="flex items-start gap-2"><span class="text-primary mt-0.5">③</span>Create new lease rows for unmatched tenants, or link to existing customers.</li>
+                    <li class="flex items-start gap-2"><span class="text-primary mt-0.5">④</span>Show you exactly what changed — nothing is written until you click Commit.</li>
                 </ul>
             </div>
 
             @* Column mapping reference — single source of truth lives in
                RentRollParser.GuessField; this panel just documents what's
                in code so PMs know what header names will auto-map. *@
-            <div class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
-                <div class="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-3">How we map your columns</div>
-                <p class="text-xs text-zinc-500 mb-3 leading-relaxed">
+            <div class="rounded-xl border border-line bg-surface p-5">
+                <div class="text-xs font-medium uppercase tracking-wider text-muted mb-3">How we map your columns</div>
+                <p class="text-xs text-muted mb-3 leading-relaxed">
                     We auto-match column headers by keyword (case-insensitive). Anything we can't guess you can map manually in the next step.
                 </p>
-                <ul class="space-y-1.5 text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                    <li><span class="inline-block w-32 font-medium text-zinc-700 dark:text-zinc-200">Tenant Name *</span> <span class="text-zinc-500">contains</span> <code class="font-mono">tenant</code>, <code class="font-mono">name</code>, <code class="font-mono">resident</code></li>
-                    <li><span class="inline-block w-32 font-medium text-zinc-700 dark:text-zinc-200">Monthly Rent *</span> <span class="text-zinc-500">contains</span> <code class="font-mono">rent</code>, <code class="font-mono">amount</code>, <code class="font-mono">monthly</code></li>
-                    <li><span class="inline-block w-32 font-medium text-zinc-700 dark:text-zinc-200">Start Date *</span> <span class="text-zinc-500">contains</span> <code class="font-mono">start</code>, <code class="font-mono">move in</code>, <code class="font-mono">lease start</code>, <code class="font-mono">begin</code></li>
-                    <li><span class="inline-block w-32 font-medium text-zinc-700 dark:text-zinc-200">Unit</span> <span class="text-zinc-500">contains</span> <code class="font-mono">unit</code>, <code class="font-mono">apt</code>, <code class="font-mono">apartment</code>, <code class="font-mono">suite</code></li>
-                    <li><span class="inline-block w-32 font-medium text-zinc-700 dark:text-zinc-200">End Date</span> <span class="text-zinc-500">contains</span> <code class="font-mono">end</code>, <code class="font-mono">move out</code>, <code class="font-mono">lease end</code></li>
-                    <li><span class="inline-block w-32 font-medium text-zinc-700 dark:text-zinc-200">State</span> <span class="text-zinc-500">exactly</span> <code class="font-mono">state</code> or <code class="font-mono">st</code> (2-letter code)</li>
-                    <li><span class="inline-block w-32 font-medium text-zinc-700 dark:text-zinc-200">Email</span> <span class="text-zinc-500">contains</span> <code class="font-mono">email</code> — used for tenant matching</li>
+                <ul class="space-y-1.5 text-xs text-body leading-relaxed">
+                    <li><span class="inline-block w-32 font-medium text-heading">Tenant Name *</span> <span class="text-muted">contains</span> <code class="font-mono">tenant</code>, <code class="font-mono">name</code>, <code class="font-mono">resident</code></li>
+                    <li><span class="inline-block w-32 font-medium text-heading">Monthly Rent *</span> <span class="text-muted">contains</span> <code class="font-mono">rent</code>, <code class="font-mono">amount</code>, <code class="font-mono">monthly</code></li>
+                    <li><span class="inline-block w-32 font-medium text-heading">Start Date *</span> <span class="text-muted">contains</span> <code class="font-mono">start</code>, <code class="font-mono">move in</code>, <code class="font-mono">lease start</code>, <code class="font-mono">begin</code></li>
+                    <li><span class="inline-block w-32 font-medium text-heading">Unit</span> <span class="text-muted">contains</span> <code class="font-mono">unit</code>, <code class="font-mono">apt</code>, <code class="font-mono">apartment</code>, <code class="font-mono">suite</code></li>
+                    <li><span class="inline-block w-32 font-medium text-heading">End Date</span> <span class="text-muted">contains</span> <code class="font-mono">end</code>, <code class="font-mono">move out</code>, <code class="font-mono">lease end</code></li>
+                    <li><span class="inline-block w-32 font-medium text-heading">State</span> <span class="text-muted">exactly</span> <code class="font-mono">state</code> or <code class="font-mono">st</code> (2-letter code)</li>
+                    <li><span class="inline-block w-32 font-medium text-heading">Email</span> <span class="text-muted">contains</span> <code class="font-mono">email</code> — used for tenant matching</li>
                 </ul>
-                <p class="text-[11px] text-zinc-400 mt-3 leading-relaxed">
+                <p class="text-[11px] text-muted mt-3 leading-relaxed">
                     * required. Rent accepts <code class="font-mono">$1,250</code>, <code class="font-mono">1250.00</code>, etc. Dates accept M/D/YYYY, MM/DD/YYYY, YYYY-MM-DD, and most common formats.
                 </p>
             </div>
@@ -100,30 +100,30 @@
     @* STAGE 2 — preview + mapping *@
     @if (_stage == Stage.Preview && _parsed is not null)
     {
-        <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
-            <header class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between gap-3 flex-wrap">
+        <section class="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
+            <header class="px-6 py-4 border-b border-line flex items-center justify-between gap-3 flex-wrap">
                 <div>
                     <div class="text-sm font-semibold">@_fileName</div>
-                    <div class="text-xs text-zinc-500 mt-0.5">@_parsed.Rows.Count row@(_parsed.Rows.Count == 1 ? "" : "s") detected · showing first @Math.Min(_parsed.Rows.Count, 5)</div>
+                    <div class="text-xs text-muted mt-0.5">@_parsed.Rows.Count row@(_parsed.Rows.Count == 1 ? "" : "s") detected · showing first @Math.Min(_parsed.Rows.Count, 5)</div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    <button class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-heading hover:bg-surface-2 transition-colors"
                             @onclick="ResetUpload">Use a different file</button>
                 </div>
             </header>
 
             @* Column mapping row — one dropdown per detected header *@
-            <div class="px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-900/40">
-                <div class="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-3">Map columns</div>
+            <div class="px-6 py-4 border-b border-line bg-surface-2">
+                <div class="text-xs font-medium uppercase tracking-wider text-muted mb-3">Map columns</div>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     @for (int i = 0; i < _parsed.Headers.Count; i++)
                     {
                         var idx = i;
                         var header = _parsed.Headers[i];
                         <div>
-                            <div class="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1 truncate" title="@header">@header</div>
+                            <div class="text-xs font-medium text-heading mb-1 truncate" title="@header">@header</div>
                             <select value="@_mapping[idx]" @onchange="@(e => UpdateMapping(idx, e))"
-                                    class="w-full px-3 py-1.5 rounded-lg text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                                    class="w-full px-3 py-1.5 rounded-lg text-sm bg-surface border border-line focus:outline-none focus:border-primary focus:ring-2 focus:ring-indigo-500/20">
                                 @foreach (var opt in Enum.GetValues<RentRollField>())
                                 {
                                     <option value="@opt">@FieldLabel(opt)</option>
@@ -137,16 +137,16 @@
             @* Preview table *@
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
-                    <thead class="bg-zinc-50/40 dark:bg-zinc-900/40">
+                    <thead class="bg-surface-2">
                         <tr class="text-left">
                             @for (int i = 0; i < _parsed.Headers.Count; i++)
                             {
                                 var f = _mapping[i];
-                                <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider @(f == RentRollField.Skip ? "text-zinc-400 line-through" : "text-zinc-500")">@_parsed.Headers[i]</th>
+                                <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider @(f == RentRollField.Skip ? "text-muted line-through" : "text-muted")">@_parsed.Headers[i]</th>
                             }
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                    <tbody class="divide-y divide-[color:var(--line)]">
                         @foreach (var row in _parsed.Rows.Take(5))
                         {
                             <tr>
@@ -154,7 +154,7 @@
                                 {
                                     var f = _mapping[i];
                                     var cell = i < row.Length ? row[i] : "";
-                                    <td class="px-3 py-2 text-sm @(f == RentRollField.Skip ? "text-zinc-400" : "")">@cell</td>
+                                    <td class="px-3 py-2 text-sm @(f == RentRollField.Skip ? "text-muted" : "")">@cell</td>
                                 }
                             </tr>
                         }
@@ -163,13 +163,13 @@
             </div>
 
             @* Mapping validation summary *@
-            <div class="px-6 py-4 border-t border-zinc-200/80 dark:border-zinc-800 flex items-start gap-3 flex-wrap">
+            <div class="px-6 py-4 border-t border-line flex items-start gap-3 flex-wrap">
                 <div class="flex items-start gap-2.5 flex-1 min-w-[280px]">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="@(MappingValid ? "text-emerald-500" : "text-amber-500") mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
                     <div class="text-xs">
                         @if (MappingValid)
                         {
-                            <span class="text-zinc-600 dark:text-zinc-300">Required fields mapped: Tenant Name, Monthly Rent, Start Date. Ready to preview.</span>
+                            <span class="text-body">Required fields mapped: Tenant Name, Monthly Rent, Start Date. Ready to preview.</span>
                         }
                         else
                         {
@@ -185,16 +185,16 @@
                 </div>
                 <div class="flex items-center gap-2">
                     <div>
-                        <label class="text-xs text-zinc-500 mr-2">Default state for rows missing one:</label>
+                        <label class="text-xs text-muted mr-2">Default state for rows missing one:</label>
                         <select @bind="_defaultStateId"
-                                class="px-2.5 py-1 rounded-md text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                                class="px-2.5 py-1 rounded-md text-xs bg-surface border border-line">
                             @foreach (var s in _states)
                             {
                                 <option value="@s.Id">@s.Code</option>
                             }
                         </select>
                     </div>
-                    <button class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                    <button class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary-hover shadow-sm transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                             @onclick="CommitAsync" disabled="@(!MappingValid || _committing)">
                         @(_committing ? "Importing…" : $"Import {_parsed.Rows.Count} lease(s)")
                     </button>
@@ -213,26 +213,26 @@
             <h3 class="text-xl font-semibold tracking-tight">Import complete</h3>
             <dl class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl">
                 <div>
-                    <dt class="text-xs uppercase tracking-wider font-medium text-zinc-500">Created</dt>
+                    <dt class="text-xs uppercase tracking-wider font-medium text-muted">Created</dt>
                     <dd class="text-2xl font-semibold tabular-nums">@_result.Created</dd>
                 </div>
                 <div>
-                    <dt class="text-xs uppercase tracking-wider font-medium text-zinc-500">Matched to customer</dt>
+                    <dt class="text-xs uppercase tracking-wider font-medium text-muted">Matched to customer</dt>
                     <dd class="text-2xl font-semibold tabular-nums">@_result.MatchedToCustomer</dd>
                 </div>
                 <div>
-                    <dt class="text-xs uppercase tracking-wider font-medium text-zinc-500">Unmatched</dt>
+                    <dt class="text-xs uppercase tracking-wider font-medium text-muted">Unmatched</dt>
                     <dd class="text-2xl font-semibold tabular-nums">@_result.UnmatchedRows</dd>
                 </div>
                 <div>
-                    <dt class="text-xs uppercase tracking-wider font-medium text-zinc-500">Skipped</dt>
+                    <dt class="text-xs uppercase tracking-wider font-medium text-muted">Skipped</dt>
                     <dd class="text-2xl font-semibold tabular-nums text-rose-600 dark:text-rose-400">@_result.Errors.Count</dd>
                 </div>
             </dl>
             @if (_result.Errors.Count > 0)
             {
                 <details class="mt-4 text-xs">
-                    <summary class="cursor-pointer text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">Show @_result.Errors.Count error@(_result.Errors.Count == 1 ? "" : "s")</summary>
+                    <summary class="cursor-pointer text-muted hover:text-heading">Show @_result.Errors.Count error@(_result.Errors.Count == 1 ? "" : "s")</summary>
                     <ul class="mt-2 space-y-1 text-rose-700 dark:text-rose-400">
                         @foreach (var err in _result.Errors.Take(20))
                         {
@@ -240,17 +240,17 @@
                         }
                         @if (_result.Errors.Count > 20)
                         {
-                            <li class="text-zinc-500 italic">…and @(_result.Errors.Count - 20) more.</li>
+                            <li class="text-muted italic">…and @(_result.Errors.Count - 20) more.</li>
                         }
                     </ul>
                 </details>
             }
             <div class="mt-6 flex gap-2">
-                <a href="leases" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-colors">
+                <a href="leases" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary-hover shadow-sm transition-colors">
                     View leases
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                 </a>
-                <button class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                <button class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-heading bg-surface border border-line hover:bg-surface-2 transition-colors"
                         @onclick="ResetUpload">Import another file</button>
             </div>
         </section>
