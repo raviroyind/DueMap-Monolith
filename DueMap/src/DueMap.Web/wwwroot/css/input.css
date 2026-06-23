@@ -496,8 +496,10 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Card-body dim when [data-disabled="true"] on parent — used by NoticePreferences */
-[data-disabled="true"] .card-body { opacity: 0.45; pointer-events: none; }
+/* Dim a section body when [data-disabled="true"] on the parent card — used by
+   NoticePreferences when a master toggle is off. (.pref-body is a no-padding
+   wrapper so it doesn't collide with Osen's padded .card-body.) */
+[data-disabled="true"] .pref-body { opacity: 0.45; pointer-events: none; }
 [data-disabled="true"] .template-row { opacity: 0.45; pointer-events: none; }
 
 /* "Set this" rows in bulk-apply modal */

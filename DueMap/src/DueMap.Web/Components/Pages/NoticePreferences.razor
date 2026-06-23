@@ -8,76 +8,74 @@
 
 <PageTitle>Notice preferences — DueMap</PageTitle>
 
-<div class="max-w-3xl mx-auto px-8 py-8 pb-32 space-y-6">
+<div class="max-w-3xl mx-auto px-6 md:px-8 py-8 pb-32 space-y-6">
 
     <div>
-        <h2 class="text-2xl font-semibold tracking-tight">Notice preferences</h2>
-        <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
+        <h2 class="page-title">Notice preferences</h2>
+        <p class="mt-1.5 text-sm text-muted leading-relaxed">
             Master toggles and defaults that apply across your portfolio. Override per lease on the
-            <a href="leases" class="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">Leases page</a>.
+            <a href="leases" class="font-medium text-primary">Leases page</a>.
             When a master is off, no notice of that kind goes out, period — per-lease settings can't override.
         </p>
     </div>
 
     @if (_pmId is null || _model is null)
     {
-        <p class="text-zinc-500">Loading…</p>
+        <p class="text-muted">Loading…</p>
     }
     else
     {
         @if (_savedAt is not null)
         {
-            <div class="rounded-xl border border-emerald-200/70 dark:border-emerald-500/20 bg-emerald-50/60 dark:bg-emerald-500/5 px-4 py-3 flex items-start gap-3">
-                <span class="mt-0.5 inline-flex w-5 h-5 items-center justify-center rounded-full bg-emerald-500 text-white shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                </span>
+            <div class="alert alert-success">
+                <svg class="alert-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
                 <div class="flex-1 min-w-0">
-                    <div class="text-sm font-medium text-emerald-900 dark:text-emerald-200">Saved</div>
-                    <div class="text-xs text-emerald-800/80 dark:text-emerald-300/70 mt-0.5">@_savedAt.Value.ToString("HH:mm:ss")</div>
+                    <div class="alert-title">Saved</div>
+                    <div class="text-xs mt-0.5">@_savedAt.Value.ToString("HH:mm:ss")</div>
                 </div>
             </div>
         }
 
         <!-- PRE-DUE -->
-        <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden" data-disabled="@((!_model.PreDueMasterEnabled).ToString().ToLowerInvariant())">
-            <header class="px-6 py-5 flex items-start justify-between gap-4 border-b border-zinc-200/80 dark:border-zinc-800">
+        <section class="card" data-disabled="@((!_model.PreDueMasterEnabled).ToString().ToLowerInvariant())">
+            <header class="card-header flex items-start justify-between gap-4">
                 <div class="flex items-start gap-3 min-w-0">
-                    <div class="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 shrink-0">
+                    <div class="w-9 h-9 rounded-field bg-primary-soft text-primary-soft-fg flex items-center justify-center shrink-0">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M4 2C2.8 3.7 2 5.7 2 8"/><path d="M22 8c0-2.3-.8-4.3-2-6"/></svg>
                     </div>
                     <div class="min-w-0">
-                        <h3 class="text-base font-semibold">Pre-due reminder</h3>
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">A friendly nudge before the rent due date.</p>
+                        <h3 class="text-base font-semibold text-heading">Pre-due reminder</h3>
+                        <p class="text-sm text-muted mt-0.5">A friendly nudge before the rent due date.</p>
                     </div>
                 </div>
-                <label class="toggle-switch shrink-0">
+                <label class="form-switch shrink-0">
                     <input type="checkbox" @bind="_model.PreDueMasterEnabled" aria-label="Master enable" />
-                    <span class="toggle-track"></span>
+                    <span class="track"></span><span class="thumb"></span>
                 </label>
             </header>
-            <div class="card-body">
-                <div class="px-6 py-5 border-b border-zinc-100 dark:border-zinc-800/60 flex items-start justify-between gap-6">
+            <div class="pref-body">
+                <div class="px-6 py-5 border-b border-line flex items-start justify-between gap-6">
                     <div class="flex-1 min-w-0">
-                        <div class="text-sm font-medium">Days before due date</div>
-                        <p class="text-xs text-zinc-500 mt-0.5">Tenants receive the reminder this many calendar days before rent is due.</p>
+                        <div class="text-sm font-medium text-heading">Days before due date</div>
+                        <p class="text-xs text-muted mt-0.5">Tenants receive the reminder this many calendar days before rent is due.</p>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                         <input type="number" min="1" max="60" @bind="_model.PreDueDefaultDaysBefore"
-                               class="w-20 px-3 py-2 rounded-lg text-sm font-medium tabular-nums text-right bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150" />
-                        <span class="text-sm text-zinc-500">days</span>
+                               class="form-control w-20 text-right tabular" />
+                        <span class="text-sm text-muted">days</span>
                     </div>
                 </div>
                 <div class="px-6 py-4 flex items-center justify-between gap-6">
                     <div class="flex items-center gap-3 flex-1 min-w-0">
-                        <div class="w-7 h-7 rounded-md bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 shrink-0">
+                        <div class="w-7 h-7 rounded-md bg-surface-2 text-muted flex items-center justify-center shrink-0">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
                         </div>
                         <div class="min-w-0">
-                            <div class="text-sm font-medium">Email template</div>
-                            <p class="text-xs text-zinc-500 mt-0.5 truncate">Pre-due reminder</p>
+                            <div class="text-sm font-medium text-heading">Email template</div>
+                            <p class="text-xs text-muted mt-0.5 truncate">Pre-due reminder</p>
                         </div>
                     </div>
-                    <button type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 shadow-sm transition-colors duration-150 shrink-0"
+                    <button type="button" class="btn btn-sm btn-secondary shrink-0"
                             @onclick="@(() => OpenTemplateAsync("pre_due_reminder", "Pre-due reminder"))">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
                         Edit template
@@ -87,37 +85,37 @@
         </section>
 
         <!-- DUE-DATE -->
-        <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden" data-disabled="@((!_model.DueDateMasterEnabled).ToString().ToLowerInvariant())">
-            <header class="px-6 py-5 flex items-start justify-between gap-4 border-b border-zinc-200/80 dark:border-zinc-800">
+        <section class="card" data-disabled="@((!_model.DueDateMasterEnabled).ToString().ToLowerInvariant())">
+            <header class="card-header flex items-start justify-between gap-4">
                 <div class="flex items-start gap-3 min-w-0">
-                    <div class="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 shrink-0">
+                    <div class="w-9 h-9 rounded-field bg-primary-soft text-primary-soft-fg flex items-center justify-center shrink-0">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/></svg>
                     </div>
                     <div class="min-w-0">
-                        <h3 class="text-base font-semibold">Due-date reminder</h3>
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Sent on the day rent is due.</p>
+                        <h3 class="text-base font-semibold text-heading">Due-date reminder</h3>
+                        <p class="text-sm text-muted mt-0.5">Sent on the day rent is due.</p>
                     </div>
                 </div>
-                <label class="toggle-switch shrink-0">
+                <label class="form-switch shrink-0">
                     <input type="checkbox" @bind="_model.DueDateMasterEnabled" aria-label="Master enable" />
-                    <span class="toggle-track"></span>
+                    <span class="track"></span><span class="thumb"></span>
                 </label>
             </header>
-            <div class="card-body">
-                <div class="px-6 py-5 border-b border-zinc-100 dark:border-zinc-800/60">
-                    <p class="text-xs text-zinc-500 dark:text-zinc-400">When enabled, a reminder is sent the morning rent is due. No additional settings.</p>
+            <div class="pref-body">
+                <div class="px-6 py-5 border-b border-line">
+                    <p class="text-xs text-muted">When enabled, a reminder is sent the morning rent is due. No additional settings.</p>
                 </div>
                 <div class="px-6 py-4 flex items-center justify-between gap-6">
                     <div class="flex items-center gap-3 flex-1 min-w-0">
-                        <div class="w-7 h-7 rounded-md bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 shrink-0">
+                        <div class="w-7 h-7 rounded-md bg-surface-2 text-muted flex items-center justify-center shrink-0">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
                         </div>
                         <div class="min-w-0">
-                            <div class="text-sm font-medium">Email template</div>
-                            <p class="text-xs text-zinc-500 mt-0.5 truncate">Due-date reminder</p>
+                            <div class="text-sm font-medium text-heading">Email template</div>
+                            <p class="text-xs text-muted mt-0.5 truncate">Due-date reminder</p>
                         </div>
                     </div>
-                    <button type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 shadow-sm transition-colors duration-150 shrink-0"
+                    <button type="button" class="btn btn-sm btn-secondary shrink-0"
                             @onclick="@(() => OpenTemplateAsync("due_date_reminder", "Due-date reminder"))">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
                         Edit template
@@ -127,28 +125,27 @@
         </section>
 
         <!-- POST-DUE -->
-        <section class="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden" data-disabled="@((!_model.PostDueMasterEnabled).ToString().ToLowerInvariant())">
-            <header class="px-6 py-5 flex items-start justify-between gap-4 border-b border-zinc-200/80 dark:border-zinc-800">
+        <section class="card" data-disabled="@((!_model.PostDueMasterEnabled).ToString().ToLowerInvariant())">
+            <header class="card-header flex items-start justify-between gap-4">
                 <div class="flex items-start gap-3 min-w-0">
-                    <div class="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 shrink-0">
+                    <div class="w-9 h-9 rounded-field bg-primary-soft text-primary-soft-fg flex items-center justify-center shrink-0">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v3"/><path d="M12 18h.01"/></svg>
                     </div>
                     <div class="min-w-0">
-                        <h3 class="text-base font-semibold">Post-due handling</h3>
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">What happens when rent isn't paid on time.</p>
+                        <h3 class="text-base font-semibold text-heading">Post-due handling</h3>
+                        <p class="text-sm text-muted mt-0.5">What happens when rent isn't paid on time.</p>
                     </div>
                 </div>
-                <label class="toggle-switch shrink-0">
+                <label class="form-switch shrink-0">
                     <input type="checkbox" @bind="_model.PostDueMasterEnabled" aria-label="Master enable" />
-                    <span class="toggle-track"></span>
+                    <span class="track"></span><span class="thumb"></span>
                 </label>
             </header>
-            <div class="card-body">
-                <div class="px-6 py-5 space-y-5 border-b border-zinc-100 dark:border-zinc-800/60">
+            <div class="pref-body">
+                <div class="px-6 py-5 space-y-5 border-b border-line">
                     <div>
-                        <div class="text-sm font-medium mb-2">Mode</div>
-                        <select @bind="_model.PostDueDefaultMode"
-                                class="w-full max-w-sm px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 text-sm border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150">
+                        <div class="text-sm font-medium text-heading mb-2">Mode</div>
+                        <select @bind="_model.PostDueDefaultMode" class="form-select max-w-sm">
                             <option value="@PostDueMode.GracePeriod">Grace period (reminder + later late fee)</option>
                             <option value="@PostDueMode.ImmediateLateFee">Immediate late fee (no grace reminder)</option>
                         </select>
@@ -157,20 +154,18 @@
                     <div>
                         <div class="flex items-start justify-between gap-6">
                             <div class="flex-1 min-w-0">
-                                <div class="text-sm font-medium">Grace period</div>
-                                <p class="text-xs text-zinc-500 mt-0.5">Days the tenant has to pay before a late fee is assessed.</p>
+                                <div class="text-sm font-medium text-heading">Grace period</div>
+                                <p class="text-xs text-muted mt-0.5">Days the tenant has to pay before a late fee is assessed.</p>
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
                                 <input type="number" min="0" max="60" @bind="_model.PostDueDefaultGraceDays"
-                                       class="w-20 px-3 py-2 rounded-lg text-sm font-medium tabular-nums text-right bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow duration-150" />
-                                <span class="text-sm text-zinc-500">days</span>
+                                       class="form-control w-20 text-right tabular" />
+                                <span class="text-sm text-muted">days</span>
                             </div>
                         </div>
-                        <div class="mt-3 rounded-lg border border-amber-200/60 dark:border-amber-500/15 bg-amber-50/40 dark:bg-amber-500/5 px-3.5 py-2.5 flex items-start gap-2.5">
-                            <span class="inline-flex w-5 h-5 items-center justify-center rounded-full bg-amber-500 text-white shrink-0 mt-0.5">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
-                            </span>
-                            <div class="text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
+                        <div class="alert alert-warning mt-3">
+                            <svg class="alert-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+                            <div class="leading-relaxed">
                                 State law sets a minimum grace period for each lease. If your value is lower, DueMap automatically uses the state's minimum.
                             </div>
                         </div>
@@ -180,17 +175,17 @@
                 @* Grace reminder template (only shown when mode = GracePeriod) *@
                 @if (_model.PostDueDefaultMode == PostDueMode.GracePeriod)
                 {
-                    <div class="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between gap-6">
+                    <div class="px-6 py-4 border-b border-line flex items-center justify-between gap-6">
                         <div class="flex items-center gap-3 flex-1 min-w-0">
-                            <div class="w-7 h-7 rounded-md bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 shrink-0">
+                            <div class="w-7 h-7 rounded-md bg-surface-2 text-muted flex items-center justify-center shrink-0">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
                             </div>
                             <div class="min-w-0">
-                                <div class="text-sm font-medium">Grace reminder template</div>
-                                <p class="text-xs text-zinc-500 mt-0.5 truncate">Sent the morning after the due date</p>
+                                <div class="text-sm font-medium text-heading">Grace reminder template</div>
+                                <p class="text-xs text-muted mt-0.5 truncate">Sent the morning after the due date</p>
                             </div>
                         </div>
-                        <button type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 shadow-sm transition-colors duration-150 shrink-0"
+                        <button type="button" class="btn btn-sm btn-secondary shrink-0"
                                 @onclick="@(() => OpenTemplateAsync("grace_period_reminder", "Grace-period reminder"))">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
                             Edit template
@@ -201,15 +196,15 @@
                 @* Late-fee notice template (always shown) *@
                 <div class="px-6 py-4 flex items-center justify-between gap-6">
                     <div class="flex items-center gap-3 flex-1 min-w-0">
-                        <div class="w-7 h-7 rounded-md bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 shrink-0">
+                        <div class="w-7 h-7 rounded-md bg-surface-2 text-muted flex items-center justify-center shrink-0">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
                         </div>
                         <div class="min-w-0">
-                            <div class="text-sm font-medium">Late-fee notice template</div>
-                            <p class="text-xs text-zinc-500 mt-0.5 truncate">Sent when a late fee is assessed</p>
+                            <div class="text-sm font-medium text-heading">Late-fee notice template</div>
+                            <p class="text-xs text-muted mt-0.5 truncate">Sent when a late fee is assessed</p>
                         </div>
                     </div>
-                    <button type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/70 shadow-sm transition-colors duration-150 shrink-0"
+                    <button type="button" class="btn btn-sm btn-secondary shrink-0"
                             @onclick="@(() => OpenTemplateAsync("late_fee_notice", "Late-fee notice"))">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
                         Edit template
@@ -220,8 +215,7 @@
 
         <!-- ACTIONS -->
         <div class="flex items-center justify-end gap-2 pt-2">
-            <button class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed"
-                    @onclick="Save" disabled="@_saving">
+            <button class="btn btn-primary" @onclick="Save" disabled="@_saving">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
                 @(_saving ? "Saving…" : "Save preferences")
             </button>
