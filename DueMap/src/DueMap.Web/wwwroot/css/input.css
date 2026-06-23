@@ -1,32 +1,17 @@
-/* DueMap — Tailwind v4 entry CSS  ·  Osen theme
- * Compiled to wwwroot/css/app.css on `dotnet build` (see DueMap.Web.csproj target).
- *
- * Visual language: Coderthemes "Osen" admin — Inter, 14px base, 600 headings,
- * the signature palette (primary #727cf5, success #0acf97, info #39afd1,
- * warning #ffbc00, danger #fa5c7c), soft cool-slate neutrals, and cards lifted
- * by the 0 0 35px rgba(154,161,171,.15) glow rather than hard borders.
- *
- * Structure:
- *   1. @import tailwindcss            — the engine
- *   2. @import Inter                  — typeface (zero-config; self-host for prod)
- *   3. @source                        — content roots for class scanning
- *   4. @custom-variant dark           — class-based dark mode (toggle, not OS pref)
- *   5. :root / .dark                  — semantic tokens that flip light↔dark
- *   6. @theme inline                  — expose tokens as Tailwind utilities
- *   7. @layer base                    — body, headings, focus ring, scrollbars
- *   8. @layer components              — Osen .btn/.card/.form-*/.badge/.table/…
- *   9. App-specific component classes — toggle, checkbox, kind pills, rt-editor,
- *                                       SSO brand buttons, etc. (preserved)
- *
- * RE-SKIN: change the single `--primary` value in :root below — hover/soft
- * shades derive from it via color-mix, so the whole app re-skins in one line.
- */
+/* DueMap Tailwind v4 entry (Osen theme). Compiled to wwwroot/css/app.css by the
+   DueMap.Web.csproj build target. Re-skin the whole app by changing the single
+   --primary value in :root below; hover/soft shades derive from it via color-mix.
+   NOTE: keep this header plain ASCII with no at-rule keywords -- Tailwind v4's
+   directive pre-scan can misread a leading comment that contains them, which
+   silently drops preflight and all utilities from the output. */
 
 @import "tailwindcss";
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
-@source "../../Components/**/*.{razor,cshtml}";
-@source "../../Pages/**/*.{razor,cshtml}";
+@source "../../Components/**/*.razor";
+@source "../../Components/**/*.cshtml";
+@source "../../Pages/**/*.razor";
+@source "../../Pages/**/*.cshtml";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
