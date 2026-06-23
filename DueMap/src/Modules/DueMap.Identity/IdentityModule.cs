@@ -39,7 +39,10 @@ public sealed class IdentityModule : IModule
                 o.Password.RequireLowercase       = true;
                 o.Password.RequireNonAlphanumeric = opts.RequireNonAlphanumeric;
                 o.User.RequireUniqueEmail         = true;
-                o.SignIn.RequireConfirmedAccount  = false;   // email confirmation deferred
+                // Email/password sign-ups must confirm their address before they
+                // can sign in. SSO (Intuit/Xero) and the demo seeder create users
+                // with EmailConfirmed=true, so they're unaffected by this gate.
+                o.SignIn.RequireConfirmedAccount  = true;
             })
             .AddEntityFrameworkStores<AppIdentityDbContext>()
             .AddDefaultTokenProviders();
