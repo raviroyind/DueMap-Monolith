@@ -3,6 +3,18 @@
 @{
     ViewData["Title"] = "Create account";
     ViewData["Subtitle"] = "Set up your property manager workspace";
+
+    // Build the password checklist from the real Identity policy so the live
+    // (client-side) feedback can never claim "valid" for something the server
+    // would reject. Each entry: (rule key the JS validator uses, label, length).
+    var pw = Model.Password;
+    var pwRules = new List<(string Key, string Label, int Len)>();
+    if (pw.RequiredLength > 0)        pwRules.Add(("len",     $"At least {pw.RequiredLength} characters", pw.RequiredLength));
+    if (pw.RequireUppercase)          pwRules.Add(("upper",   "One uppercase letter", 0));
+    if (pw.RequireLowercase)          pwRules.Add(("lower",   "One lowercase letter", 0));
+    if (pw.RequireDigit)              pwRules.Add(("digit",   "One number", 0));
+    if (pw.RequireNonAlphanumeric)    pwRules.Add(("special", "One special character", 0));
+    if (pw.RequiredUniqueChars > 1)   pwRules.Add(("unique",  $"{pw.RequiredUniqueChars} different characters", pw.RequiredUniqueChars));
 }
 
 @if (TempData["SsoNotice"] is string ssoNotice)
@@ -34,16 +46,28 @@
 
     <div>
         <label for="password" class="form-label">Password</label>
-        <input id="password" type="password" asp-for="Input.Password" required class="form-control" />
-        <p class="form-hint">At least 8 characters with one uppercase letter and one number.</p>
+        <input id="password" type="password" asp-for="Input.Password" required class="form-control" autocomplete="new-password" />
+        <ul id="pw-rules" class="mt-2 space-y-1.5" aria-live="polite">
+            @foreach (var r in pwRules)
+            {
+                <li class="pw-rule flex items-center gap-2 text-xs text-muted transition-colors" data-rule="@r.Key" data-len="@r.Len">
+                    <span class="pw-ico inline-flex w-4 h-4 items-center justify-center shrink-0"></span>
+                    <span>@r.Label</span>
+                </li>
+            }
+        </ul>
     </div>
 
     <div>
         <label for="confirm" class="form-label">Confirm password</label>
-        <input id="confirm" type="password" asp-for="Input.ConfirmPassword" required class="form-control" />
+        <input id="confirm" type="password" asp-for="Input.ConfirmPassword" required class="form-control" autocomplete="new-password" />
+        <p id="pw-match" class="pw-rule mt-2 flex items-center gap-2 text-xs text-muted transition-colors" data-rule="match" style="display:none">
+            <span class="pw-ico inline-flex w-4 h-4 items-center justify-center shrink-0"></span>
+            <span>Passwords match</span>
+        </p>
     </div>
 
-    <button type="submit" class="btn btn-primary w-full">
+    <button id="pw-submit" type="submit" class="btn btn-primary w-full">
         Create account
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
     </button>
@@ -60,3 +84,5 @@
     Already have an account?
     <a asp-page="/Account/Login" class="font-medium text-primary">Sign in</a>
 </p>
+
+<script src="/js/password-checklist.js"></script>

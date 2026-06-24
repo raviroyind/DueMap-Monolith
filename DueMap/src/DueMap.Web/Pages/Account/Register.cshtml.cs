@@ -29,6 +29,7 @@ public sealed partial class RegisterModel : PageModel
         IPropertyManagerWriter pmWriter,
         SsoProviderRegistry sso,
         IEmailSender email,
+        Microsoft.Extensions.Options.IOptions<IdentityOptions> identityOptions,
         ILogger<RegisterModel> logger)
     {
         _users = users;
@@ -37,7 +38,12 @@ public sealed partial class RegisterModel : PageModel
         _sso = sso;
         _email = email;
         _logger = logger;
+        Password = identityOptions.Value.Password;
     }
+
+    /// <summary>The live password policy, so the client-side checklist on the
+    /// form mirrors exactly what the server will enforce.</summary>
+    public PasswordOptions Password { get; }
 
     [BindProperty]
     public InputModel Input { get; set; } = new();
