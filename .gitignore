@@ -2,3 +2,7 @@
 ## Project-wide settings live in DueMap/.claude/settings.json instead.
 .claude/settings.local.json
 /DueMap/README.md
+
+## Transient dev-run logs (captured app stdout/stderr when running locally)
+/run.log
+/run.err.log
