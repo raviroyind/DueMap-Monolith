@@ -241,10 +241,10 @@ internal sealed partial class ActionExecutor : IActionExecutor
             return new ActionExecutionResult(ActionOutcome.Executed, $"preview channel={channel}", preview);
         }
 
-        // Late-fee notices get the QBO/Xero-rendered invoice PDF attached so
-        // the tenant has the authoritative document with the updated balance.
-        // Fetcher returns null on any failure (no connection, no invoice,
-        // provider 404, transient error) — we still send the email.
+        // Late-fee warnings attach the tenant's existing overdue invoice PDF
+        // (QBO/Xero-rendered) for reference — DueMap doesn't post a new late-fee
+        // invoice (notify-only). Fetcher returns null on any failure (no
+        // connection, no invoice, provider 404, transient error); we still send.
         IReadOnlyList<DispatchAttachment>? attachments = null;
         if (channel == DispatchChannel.Email
             && string.Equals(action.NoticeTypeCode, LateFeeNoticeCode, StringComparison.OrdinalIgnoreCase))

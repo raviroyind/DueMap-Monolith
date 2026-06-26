@@ -87,8 +87,8 @@
             <section class="rounded-2xl border border-line bg-surface shadow-sm overflow-hidden">
                 <header class="px-6 py-4 flex items-start justify-between gap-4 border-b border-line">
                     <div>
-                        <div class="text-sm font-semibold">Post-due notice + late fee</div>
-                        <div class="text-xs text-muted mt-0.5">Sent after the configured grace period. May include a state-compliant late fee.</div>
+                        <div class="text-sm font-semibold">Post-due reminders + late-fee warning</div>
+                        <div class="text-xs text-muted mt-0.5">Sent after the grace period. DueMap warns the tenant a late fee may apply — it doesn't post the fee to QuickBooks or Xero.</div>
                     </div>
                     <label class="inline-flex items-center cursor-pointer select-none">
                         <input type="checkbox" @bind="_form.PostDueMasterEnabled" class="sr-only peer" />
@@ -114,7 +114,7 @@
                 @* Both grace-reminder + late-fee templates surface here so PMs can
                    tune both in onboarding without leaving the wizard. *@
                 <TemplateRow Code="grace_period_reminder" Label="Grace-period reminder" Hint="Sent the morning after the due date" OnEdit="OpenTemplateAsync" />
-                <TemplateRow Code="late_fee_notice"        Label="Late-fee notice"        Hint="Sent when a late fee is assessed"   OnEdit="OpenTemplateAsync" />
+                <TemplateRow Code="late_fee_notice"        Label="Late-fee warning"       Hint="Warns the tenant a late fee may apply" OnEdit="OpenTemplateAsync" />
             </section>
 
             <p class="text-xs text-muted">
