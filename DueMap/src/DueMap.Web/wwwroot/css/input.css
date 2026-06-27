@@ -311,8 +311,11 @@
 }
 
 /* -------------------------------------------------------------------------- */
-/* Osen dark sidebar (matches the Coderthemes Osen index demo). Deep navy that */
-/* stays dark in both light and dark app themes, with a light 70px topbar.     */
+/* Osen sidebar palette.                                                       */
+/* Light theme: deep navy (the classic Osen index look) against a light app.   */
+/* Dark theme: the navy would clash with the cold near-black app bg, so the    */
+/* .dark block below retunes it to a harmonized navy-slate that sits a step     */
+/* above --app (#16191f) and reads as an elevated panel.                        */
 /* -------------------------------------------------------------------------- */
 :root {
   --sidebar-bg:         #232e51;
@@ -324,6 +327,17 @@
   --sidebar-hover-bg:   #2f3a5f;
   --sidebar-active:     #ffffff;
   --sidebar-active-bg:  #2f3a5f;
+}
+
+.dark {
+  --sidebar-bg:         #1c2030;   /* one step above --app (#16191f), navy-tinted */
+  --sidebar-border:     #2c3346;
+  --sidebar-title:      #707d92;
+  --sidebar-item:       #9aa4b8;
+  --sidebar-item-hover: #ffffff;
+  --sidebar-hover-bg:   #272d40;
+  --sidebar-active:     #ffffff;
+  --sidebar-active-bg:  #272d40;
 }
 
 .app-sidebar { background: var(--sidebar-bg); color: var(--sidebar-item); }
@@ -344,13 +358,28 @@
   color: var(--sidebar-item);
   transition: background-color .15s ease, color .15s ease;
 }
-.side-link svg { width: 1.15rem; height: 1.15rem; opacity: .85; }
+.side-link svg { width: 1.15rem; height: 1.15rem; color: var(--icon-color, var(--sidebar-item)); }
 .side-link:hover { background: var(--sidebar-hover-bg); color: var(--sidebar-item-hover); }
 .side-link.active {
   background: var(--sidebar-active-bg); color: var(--sidebar-active);
   font-weight: 600; box-shadow: inset 3px 0 0 var(--primary);
 }
-.side-link.active svg { opacity: 1; color: var(--primary); }
+
+/* Per-item icon accents. Each nav item carries its own --icon-color so the
+   sidebar icons read as colourful (not flat grey) on BOTH sidebars — the navy
+   light one and the slate dark one — since both are dark backgrounds. Items
+   without an ic-* class fall back to the muted --sidebar-item colour. The
+   colour persists in the active state (the active row is already cued by the
+   filled bg, bold label and inset primary bar). */
+.side-link.ic-dashboard  { --icon-color: #727cf5; } /* indigo */
+.side-link.ic-accounting { --icon-color: #39afd1; } /* cyan   */
+.side-link.ic-notice     { --icon-color: #ffbc00; } /* amber  */
+.side-link.ic-templates  { --icon-color: #a78bfa; } /* violet */
+.side-link.ic-tenants    { --icon-color: #0acf97; } /* teal   */
+.side-link.ic-leases     { --icon-color: #0acf97; } /* teal   */
+.side-link.ic-invoices   { --icon-color: #4f9cf9; } /* blue   */
+.side-link.ic-customers  { --icon-color: #fa5c7c; } /* pink   */
+.side-link.ic-processing { --icon-color: #f7944d; } /* orange */
 
 /* -------------------------------------------------------------------------- */
 /* Apple-style sliding toggle                                                 */
