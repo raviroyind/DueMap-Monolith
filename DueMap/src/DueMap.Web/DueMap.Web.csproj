@@ -20,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Anthropic" Version="12.35.1" />
     <PackageReference Include="ClosedXML" Version="0.104.1" />
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.14" />
     <PackageReference Include="Hangfire.SqlServer" Version="1.8.14" />
@@ -39,17 +40,12 @@
   <!-- Compile Tailwind CSS before the .NET build copies content to bin/.
        Skipped if the input file is missing (e.g. fresh checkout without
        `npm install`); a warning is emitted instead of a build break. -->
-  <Target Name="BuildTailwindCss"
-          BeforeTargets="GenerateBuildDependencyFile;Build"
-          Inputs="@(TailwindInput)"
-          Outputs="wwwroot/css/app.css">
+  <Target Name="BuildTailwindCss" BeforeTargets="GenerateBuildDependencyFile;Build" Inputs="@(TailwindInput)" Outputs="wwwroot/css/app.css">
     <PropertyGroup>
       <SolutionRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../'))</SolutionRoot>
     </PropertyGroup>
     <Message Text="Compiling Tailwind CSS (input.css → app.css)…" Importance="high" />
-    <Exec Command="npx @tailwindcss/cli -i src/DueMap.Web/wwwroot/css/input.css -o src/DueMap.Web/wwwroot/css/app.css --minify"
-          WorkingDirectory="$(SolutionRoot)"
-          ContinueOnError="WarnAndContinue" />
+    <Exec Command="npx @tailwindcss/cli -i src/DueMap.Web/wwwroot/css/input.css -o src/DueMap.Web/wwwroot/css/app.css --minify" WorkingDirectory="$(SolutionRoot)" ContinueOnError="WarnAndContinue" />
   </Target>
 
 </Project>

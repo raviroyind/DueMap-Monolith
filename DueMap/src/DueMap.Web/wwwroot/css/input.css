@@ -372,6 +372,7 @@
    colour persists in the active state (the active row is already cued by the
    filled bg, bold label and inset primary bar). */
 .side-link.ic-dashboard  { --icon-color: #727cf5; } /* indigo */
+.side-link.ic-assistant  { --icon-color: #e879f9; } /* fuchsia */
 .side-link.ic-accounting { --icon-color: #39afd1; } /* cyan   */
 .side-link.ic-notice     { --icon-color: #ffbc00; } /* amber  */
 .side-link.ic-templates  { --icon-color: #a78bfa; } /* violet */

@@ -83,6 +83,16 @@ builder.Services.AddScoped<DueMap.Web.Services.WorkerLogReader>();
 // against tenant_sessions on every authenticated /t/* render.
 builder.Services.AddScoped<DueMap.Web.Services.TenantContext>();
 
+// AI assistant chat (Claude). The singleton provider holds the SDK client;
+// AssistantService is scoped so each Blazor circuit keeps its own
+// conversation history. Missing Anthropic:ApiKey renders a friendly
+// "not configured" notice on /assistant instead of failing at startup.
+builder.Services.AddOptions<DueMap.Web.Services.Assistant.AssistantOptions>()
+    .Bind(builder.Configuration.GetSection(DueMap.Web.Services.Assistant.AssistantOptions.SectionName));
+builder.Services.AddSingleton<DueMap.Web.Services.Assistant.AnthropicClientProvider>();
+builder.Services.AddScoped<DueMap.Web.Services.Assistant.AssistantDataTools>();
+builder.Services.AddScoped<DueMap.Web.Services.Assistant.AssistantService>();
+
 // Feature flags (P0-1): "ship dark, enable per-PM." Web and Worker share
 // the same ops.feature_flags table so a toggle takes effect in both
 // processes within ~60s. Default is OFF for unknown keys — fail-safe.
