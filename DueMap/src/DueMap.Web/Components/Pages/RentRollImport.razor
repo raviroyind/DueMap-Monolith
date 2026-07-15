@@ -68,8 +68,8 @@
                 <ul class="space-y-2 text-sm text-body">
                     <li class="flex items-start gap-2"><span class="text-primary mt-0.5">①</span>Detect column headers and let you confirm which DueMap field each maps to.</li>
                     <li class="flex items-start gap-2"><span class="text-primary mt-0.5">②</span>For each row, try to match the tenant name (and email if present) against your synced customers.</li>
-                    <li class="flex items-start gap-2"><span class="text-primary mt-0.5">③</span>Create new lease rows for unmatched tenants, or link to existing customers.</li>
-                    <li class="flex items-start gap-2"><span class="text-primary mt-0.5">④</span>Show you exactly what changed — nothing is written until you click Commit.</li>
+                    <li class="flex items-start gap-2"><span class="text-primary mt-0.5">③</span>Flag rows with problems (missing name, bad rent, unreadable dates) so you can fix or skip them.</li>
+                    <li class="flex items-start gap-2"><span class="text-primary mt-0.5">④</span>Show you exactly what will be created — nothing is written until you click Commit.</li>
                 </ul>
             </div>
 
@@ -97,8 +97,8 @@
         </div>
     }
 
-    @* STAGE 2 — preview + mapping *@
-    @if (_stage == Stage.Preview && _parsed is not null)
+    @* STAGE 2 — column mapping *@
+    @if (_stage == Stage.Map && _parsed is not null)
     {
         <section class="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
             <header class="px-6 py-4 border-b border-line flex items-center justify-between gap-3 flex-wrap">
@@ -132,9 +132,15 @@
                         </div>
                     }
                 </div>
+                @if (DuplicateMappedFields.Any())
+                {
+                    <div class="mt-3 text-xs text-amber-700 dark:text-amber-400">
+                        Heads up: @string.Join(", ", DuplicateMappedFields.Select(FieldLabel)) is mapped to more than one column — the left-most column is used.
+                    </div>
+                }
             </div>
 
-            @* Preview table *@
+            @* Raw-value preview table *@
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-surface-2">
@@ -169,7 +175,7 @@
                     <div class="text-xs">
                         @if (MappingValid)
                         {
-                            <span class="text-body">Required fields mapped: Tenant Name, Monthly Rent, Start Date. Ready to preview.</span>
+                            <span class="text-body">Required fields mapped: Tenant Name, Monthly Rent, Start Date. Nothing is imported yet — the next step shows a full preview.</span>
                         }
                         else
                         {
@@ -195,15 +201,132 @@
                         </select>
                     </div>
                     <button class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary-hover shadow-sm transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-                            @onclick="CommitAsync" disabled="@(!MappingValid || _committing)">
-                        @(_committing ? "Importing…" : $"Import {_parsed.Rows.Count} lease(s)")
+                            @onclick="BuildReview" disabled="@(!MappingValid)">
+                        Preview import
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                     </button>
                 </div>
             </div>
         </section>
     }
 
-    @* STAGE 3 — result summary *@
+    @* STAGE 3 — review + commit. THE dry-run: every row validated, nothing
+       written until the Commit button below. Invalid rows are flagged and
+       can't be selected; valid rows can be deselected. *@
+    @if (_stage == Stage.Review)
+    {
+        <section class="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
+            <header class="px-6 py-4 border-b border-line flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                    <div class="text-sm font-semibold">Review before committing</div>
+                    <div class="text-xs text-muted mt-0.5">
+                        @_fileName ·
+                        <span class="text-emerald-600 dark:text-emerald-400 font-medium">@_plan.Count(p => p.IsValid) importable</span>
+                        @if (_plan.Any(p => !p.IsValid))
+                        {
+                            <span> · </span><span class="text-rose-600 dark:text-rose-400 font-medium">@_plan.Count(p => !p.IsValid) with errors</span>
+                        }
+                        @if (_plan.Any(p => p.IsValid && p.Warnings.Count > 0))
+                        {
+                            <span> · </span><span class="text-amber-600 dark:text-amber-400 font-medium">@_plan.Count(p => p.IsValid && p.Warnings.Count > 0) with warnings</span>
+                        }
+                    </div>
+                </div>
+                <button class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-heading hover:bg-surface-2 transition-colors"
+                        @onclick="BackToMapping">← Back to mapping</button>
+            </header>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-surface-2">
+                        <tr class="text-left">
+                            <th class="px-3 py-2 w-8"></th>
+                            <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-muted">Row</th>
+                            <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-muted">Tenant</th>
+                            <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-muted">Unit</th>
+                            <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-muted text-right">Rent / mo</th>
+                            <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-muted">Start</th>
+                            <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-muted">State</th>
+                            <th class="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-muted">Result</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[color:var(--line)]">
+                        @foreach (var r in _plan)
+                        {
+                            var row = r;
+                            <tr class="@(row.IsValid ? "" : "bg-rose-50/50 dark:bg-rose-500/[0.06]")">
+                                <td class="px-3 py-2.5 align-top">
+                                    <input type="checkbox" class="checkbox" checked="@row.Selected" disabled="@(!row.IsValid)"
+                                           @onchange="@(e => row.Selected = e.Value is true)" />
+                                </td>
+                                <td class="px-3 py-2.5 align-top text-xs text-muted tabular-nums">@row.RowNumber</td>
+                                <td class="px-3 py-2.5 align-top">
+                                    @if (string.IsNullOrEmpty(row.TenantName))
+                                    {
+                                        <span class="text-muted italic">— blank —</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="font-medium text-heading">@row.TenantName</span>
+                                    }
+                                </td>
+                                <td class="px-3 py-2.5 align-top text-body">@row.UnitLabel</td>
+                                <td class="px-3 py-2.5 align-top text-right tabular-nums @(row.Rent is null or <= 0 ? "text-rose-600 dark:text-rose-400" : "")">
+                                    @(row.Rent?.ToString("0.##") ?? row.RawRent)
+                                </td>
+                                <td class="px-3 py-2.5 align-top tabular-nums">@(row.Start?.ToString("MM/dd/yyyy") ?? row.RawStart)</td>
+                                <td class="px-3 py-2.5 align-top">@row.StateCode</td>
+                                <td class="px-3 py-2.5 align-top">
+                                    @if (!row.IsValid)
+                                    {
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400">Can't import</span>
+                                    }
+                                    else if (row.Match is not null)
+                                    {
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400" title="Matched by @(row.MatchedByEmail ? "email" : "name")">Link to @row.Match.DisplayName</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">Create (no customer match)</span>
+                                    }
+                                    @foreach (var err in row.Errors)
+                                    {
+                                        <div class="mt-1 text-[11px] text-rose-700 dark:text-rose-400">@err</div>
+                                    }
+                                    @foreach (var warn in row.Warnings)
+                                    {
+                                        <div class="mt-1 text-[11px] text-amber-700 dark:text-amber-400">@warn</div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (!string.IsNullOrEmpty(_commitError))
+            {
+                <div class="mx-6 mt-4 alert alert-danger">
+                    <div>
+                        <div class="alert-title">Import failed</div>
+                        <div>@_commitError Nothing may have been written — check the Leases page before retrying.</div>
+                    </div>
+                </div>
+            }
+
+            <div class="px-6 py-4 border-t border-line flex items-center justify-between gap-3 flex-wrap">
+                <div class="text-xs text-muted">
+                    Nothing has been written yet. Committing creates <span class="font-semibold text-heading">@SelectedCount</span> lease@(SelectedCount == 1 ? "" : "s")@(_plan.Count(p => !p.IsValid) > 0 ? $" — {_plan.Count(p => !p.IsValid)} row(s) with errors will be skipped" : "").
+                </div>
+                <button class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary-hover shadow-sm transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                        @onclick="CommitAsync" disabled="@(SelectedCount == 0 || _committing)">
+                    @(_committing ? "Committing…" : $"Commit {SelectedCount} lease(s)")
+                </button>
+            </div>
+        </section>
+    }
+
+    @* STAGE 4 — result summary *@
     @if (_stage == Stage.Done && _result is not null)
     {
         <section class="rounded-2xl border border-emerald-200/70 dark:border-emerald-500/20 bg-emerald-50/40 dark:bg-emerald-500/[0.06] p-8">
@@ -226,13 +349,13 @@
                 </div>
                 <div>
                     <dt class="text-xs uppercase tracking-wider font-medium text-muted">Skipped</dt>
-                    <dd class="text-2xl font-semibold tabular-nums text-rose-600 dark:text-rose-400">@_result.Errors.Count</dd>
+                    <dd class="text-2xl font-semibold tabular-nums text-rose-600 dark:text-rose-400">@_result.Skipped</dd>
                 </div>
             </dl>
             @if (_result.Errors.Count > 0)
             {
                 <details class="mt-4 text-xs">
-                    <summary class="cursor-pointer text-muted hover:text-heading">Show @_result.Errors.Count error@(_result.Errors.Count == 1 ? "" : "s")</summary>
+                    <summary class="cursor-pointer text-muted hover:text-heading">Show @_result.Errors.Count skipped row@(_result.Errors.Count == 1 ? "" : "s")</summary>
                     <ul class="mt-2 space-y-1 text-rose-700 dark:text-rose-400">
                         @foreach (var err in _result.Errors.Take(20))
                         {
@@ -258,10 +381,11 @@
 </div>
 
 @code {
-    private enum Stage { Upload, Preview, Done }
+    private enum Stage { Upload, Map, Review, Done }
 
     private Stage _stage = Stage.Upload;
     private string _uploadError = string.Empty;
+    private string _commitError = string.Empty;
     private string _fileName = string.Empty;
     private ParsedTable? _parsed;
     private RentRollField[] _mapping = Array.Empty<RentRollField>();
@@ -269,13 +393,39 @@
     private int _defaultStateId;
     private List<Customer> _customers = new();
     private bool _committing;
+    private List<PlanRow> _plan = new();
     private ImportResult? _result;
+
+    /// <summary>
+    /// One validated row of the dry-run plan. Errors block import (checkbox
+    /// disabled); warnings don't. Selected defaults to IsValid.
+    /// </summary>
+    private sealed class PlanRow
+    {
+        public int RowNumber;                 // spreadsheet row (header = row 1)
+        public bool Selected;
+        public string TenantName = "";
+        public string? UnitLabel;
+        public decimal? Rent;
+        public string RawRent = "";
+        public DateOnly? Start;
+        public string RawStart = "";
+        public DateOnly? End;
+        public string StateCode = "";
+        public int StateId;
+        public Customer? Match;
+        public bool MatchedByEmail;
+        public List<string> Errors { get; } = new();
+        public List<string> Warnings { get; } = new();
+        public bool IsValid => Errors.Count == 0;
+    }
 
     private sealed class ImportResult
     {
         public int Created { get; set; }
         public int MatchedToCustomer { get; set; }
         public int UnmatchedRows { get; set; }
+        public int Skipped { get; set; }
         public List<(int RowNumber, string Message)> Errors { get; } = new();
     }
 
@@ -321,7 +471,7 @@
                 .Select(h => RentRollParser.GuessField(h) ?? RentRollField.Skip)
                 .ToArray();
 
-            _stage = Stage.Preview;
+            _stage = Stage.Map;
         }
         catch (Exception ex)
         {
@@ -343,82 +493,221 @@
         && HasField(RentRollField.MonthlyRent)
         && HasField(RentRollField.StartDate);
 
-    private async Task CommitAsync()
+    private IEnumerable<RentRollField> DuplicateMappedFields =>
+        _mapping.Where(f => f != RentRollField.Skip)
+                .GroupBy(f => f)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key);
+
+    private int SelectedCount => _plan.Count(p => p.Selected && p.IsValid);
+
+    private void BackToMapping()
+    {
+        _stage = Stage.Map;
+        _commitError = string.Empty;
+    }
+
+    /// <summary>
+    /// Dry run. Validates every row and computes the exact plan (create /
+    /// link / skip) WITHOUT writing anything. Any unexpected failure surfaces
+    /// as an upload-stage error instead of killing the circuit.
+    /// </summary>
+    private void BuildReview()
     {
         if (_parsed is null || !MappingValid) return;
+        _commitError = string.Empty;
+
+        try
+        {
+            // Duplicate-safe lookups. Synced books routinely contain customers
+            // sharing an email (QB sub-customers inherit the parent's) — a plain
+            // ToDictionary throws on the first duplicate and used to take the
+            // whole circuit down with it. First occurrence wins; that's fine
+            // for best-effort matching.
+            var customersByName = new Dictionary<string, Customer>();
+            var customersByEmail = new Dictionary<string, Customer>(StringComparer.OrdinalIgnoreCase);
+            foreach (var c in _customers)
+            {
+                customersByName.TryAdd(Normalize(c.DisplayName), c);
+                if (!string.IsNullOrWhiteSpace(c.Email))
+                {
+                    customersByEmail.TryAdd(c.Email.Trim(), c);
+                }
+            }
+
+            // First matching column wins for each field (mapping duplicates
+            // are warned about on the mapping stage).
+            var idxOf = new Dictionary<RentRollField, int>();
+            for (int i = 0; i < _mapping.Length; i++) idxOf.TryAdd(_mapping[i], i);
+
+            var defaultState = _states.FirstOrDefault(s => s.Id == _defaultStateId);
+            var plan = new List<PlanRow>();
+
+            for (int rowIdx = 0; rowIdx < _parsed.Rows.Count; rowIdx++)
+            {
+                var row = _parsed.Rows[rowIdx];
+                string Cell(RentRollField f) => idxOf.TryGetValue(f, out var i) && i < row.Length ? row[i] : "";
+
+                var p = new PlanRow { RowNumber = rowIdx + 2 };   // +2: 1-based + header row
+
+                p.TenantName = Cell(RentRollField.TenantName).Trim();
+                if (string.IsNullOrEmpty(p.TenantName))
+                {
+                    p.Errors.Add("Tenant name is blank.");
+                }
+
+                p.RawRent = Cell(RentRollField.MonthlyRent).Trim();
+                p.Rent = RentRollParser.ParseDecimal(p.RawRent);
+                if (p.Rent is null)
+                {
+                    p.Errors.Add(string.IsNullOrEmpty(p.RawRent)
+                        ? "Monthly rent is blank."
+                        : $"Monthly rent \"{p.RawRent}\" isn't a number.");
+                }
+                else if (p.Rent <= 0)
+                {
+                    p.Errors.Add($"Monthly rent must be greater than zero (got {p.Rent}).");
+                }
+
+                p.RawStart = Cell(RentRollField.StartDate).Trim();
+                p.Start = RentRollParser.ParseDate(p.RawStart);
+                if (p.Start is null)
+                {
+                    p.Errors.Add(string.IsNullOrEmpty(p.RawStart)
+                        ? "Start date is blank."
+                        : $"Start date \"{p.RawStart}\" is unreadable.");
+                }
+
+                var rawEnd = Cell(RentRollField.EndDate).Trim();
+                p.End = RentRollParser.ParseDate(rawEnd);
+                if (!string.IsNullOrEmpty(rawEnd) && p.End is null)
+                {
+                    p.Warnings.Add($"End date \"{rawEnd}\" is unreadable — it will be left blank.");
+                }
+                if (p.End is not null && p.Start is not null && p.End < p.Start)
+                {
+                    p.Errors.Add("End date is before the start date.");
+                }
+
+                p.UnitLabel = Cell(RentRollField.UnitLabel).Trim();
+
+                // State: row value if recognized, else the PM-selected default.
+                var rawState = Cell(RentRollField.State).Trim().ToUpperInvariant();
+                var rowState = _states.FirstOrDefault(s => s.Code == rawState);
+                if (rowState is not null)
+                {
+                    p.StateId = rowState.Id;
+                    p.StateCode = rowState.Code;
+                }
+                else
+                {
+                    if (!string.IsNullOrEmpty(rawState))
+                    {
+                        p.Warnings.Add($"Unknown state \"{rawState}\" — using default {defaultState?.Code ?? "?"}.");
+                    }
+                    if (defaultState is null)
+                    {
+                        p.Errors.Add("No state on row and no default state selected.");
+                    }
+                    else
+                    {
+                        p.StateId = defaultState.Id;
+                        p.StateCode = defaultState.Code;
+                    }
+                }
+
+                // Tenant match — email first (high confidence), then name.
+                var email = Cell(RentRollField.Email).Trim();
+                if (!string.IsNullOrEmpty(email) && !System.Net.Mail.MailAddress.TryCreate(email, out _))
+                {
+                    p.Warnings.Add($"Email \"{email}\" looks invalid — ignored for matching.");
+                    email = "";
+                }
+                if (!string.IsNullOrEmpty(email) && customersByEmail.TryGetValue(email, out var byEmail))
+                {
+                    p.Match = byEmail;
+                    p.MatchedByEmail = true;
+                }
+                else if (!string.IsNullOrEmpty(p.TenantName) && customersByName.TryGetValue(Normalize(p.TenantName), out var byName))
+                {
+                    p.Match = byName;
+                }
+
+                p.Selected = p.IsValid;
+                plan.Add(p);
+            }
+
+            _plan = plan;
+            _stage = Stage.Review;
+        }
+        catch (Exception ex)
+        {
+            // Never let a preview failure escape to the circuit.
+            _commitError = string.Empty;
+            _uploadError = $"Couldn't build the preview: {ex.Message}";
+            _stage = Stage.Upload;
+        }
+    }
+
+    /// <summary>
+    /// Writes the selected, valid plan rows. Row failures are collected, not
+    /// thrown; a wholesale failure is surfaced inline. The circuit survives
+    /// either way.
+    /// </summary>
+    private async Task CommitAsync()
+    {
+        if (_stage != Stage.Review || SelectedCount == 0) return;
         _committing = true;
-        _result = new ImportResult();
+        _commitError = string.Empty;
+        var result = new ImportResult();
         try
         {
             var pmId = await Pm.GetPmIdAsync();
             var ct = CancellationToken.None;
-            var customersByName = _customers.ToDictionary(c => Normalize(c.DisplayName), c => c);
-            var customersByEmail = _customers
-                .Where(c => !string.IsNullOrWhiteSpace(c.Email))
-                .ToDictionary(c => c.Email!.Trim().ToLowerInvariant(), c => c);
 
-            var idxOf = new Dictionary<RentRollField, int>();
-            for (int i = 0; i < _mapping.Length; i++) idxOf[_mapping[i]] = i;
-
-            for (int rowNum = 0; rowNum < _parsed.Rows.Count; rowNum++)
+            foreach (var p in _plan)
             {
-                var row = _parsed.Rows[rowNum];
-                string Cell(RentRollField f) => idxOf.TryGetValue(f, out var i) && i < row.Length ? row[i] : "";
+                if (!p.IsValid)
+                {
+                    result.Skipped++;
+                    result.Errors.Add((p.RowNumber, p.Errors[0]));
+                    continue;
+                }
+                if (!p.Selected)
+                {
+                    result.Skipped++;
+                    continue;
+                }
 
                 try
                 {
-                    var name = Cell(RentRollField.TenantName).Trim();
-                    var rent = RentRollParser.ParseDecimal(Cell(RentRollField.MonthlyRent));
-                    var start = RentRollParser.ParseDate(Cell(RentRollField.StartDate));
-                    if (string.IsNullOrEmpty(name) || rent is null || start is null)
-                    {
-                        _result.Errors.Add((rowNum + 2, $"missing tenant ({name}), rent ({rent}), or start date ({start})"));
-                        continue;
-                    }
-
-                    var end = RentRollParser.ParseDate(Cell(RentRollField.EndDate));
-                    var unitLabel = Cell(RentRollField.UnitLabel);
-                    var email = Cell(RentRollField.Email)?.Trim().ToLowerInvariant();
-
-                    // Tenant match — try email first (high confidence), then name.
-                    Customer? matched = null;
-                    if (!string.IsNullOrEmpty(email) && customersByEmail.TryGetValue(email, out var byEmail))
-                    {
-                        matched = byEmail;
-                    }
-                    else if (customersByName.TryGetValue(Normalize(name), out var byName))
-                    {
-                        matched = byName;
-                    }
-                    if (matched is not null) _result.MatchedToCustomer++;
-                    else _result.UnmatchedRows++;
-
-                    // State — from row, or fall back to PM default.
-                    var stateCode = Cell(RentRollField.State).Trim().ToUpperInvariant();
-                    var stateId = _states.FirstOrDefault(s => s.Code == stateCode)?.Id ?? _defaultStateId;
-                    if (stateId == 0)
-                    {
-                        _result.Errors.Add((rowNum + 2, "no state on row and no default state selected"));
-                        continue;
-                    }
-
                     await LeaseWriter.CreateAsync(new NewLeaseInput(
                         PropertyManagerId: pmId,
-                        StateId: stateId,
-                        CustomerId: matched?.Id,
-                        MonthlyRent: rent.Value,
-                        StartDate: start.Value,
-                        EndDate: end,
-                        UnitLabel: unitLabel), ct);
-                    _result.Created++;
+                        StateId: p.StateId,
+                        CustomerId: p.Match?.Id,
+                        MonthlyRent: p.Rent!.Value,
+                        StartDate: p.Start!.Value,
+                        EndDate: p.End,
+                        UnitLabel: string.IsNullOrEmpty(p.UnitLabel) ? null : p.UnitLabel), ct);
+
+                    result.Created++;
+                    if (p.Match is not null) result.MatchedToCustomer++;
+                    else result.UnmatchedRows++;
                 }
                 catch (Exception ex)
                 {
-                    _result.Errors.Add((rowNum + 2, ex.Message));
+                    result.Skipped++;
+                    result.Errors.Add((p.RowNumber, ex.Message));
                 }
             }
 
+            _result = result;
             _stage = Stage.Done;
+        }
+        catch (Exception ex)
+        {
+            // e.g. PM context lookup failed — stay on Review and say so.
+            _commitError = ex.Message;
         }
         finally
         {
@@ -433,6 +722,8 @@
         _mapping = Array.Empty<RentRollField>();
         _fileName = string.Empty;
         _uploadError = string.Empty;
+        _commitError = string.Empty;
+        _plan = new();
         _result = null;
     }
 
