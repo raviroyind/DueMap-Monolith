@@ -6,6 +6,7 @@
 @using DueMap.Tenancy.Domain
 @using DueMap.Web.Services
 @inject PmContext Pm
+@inject PmMoney Money
 @inject ILeaseReader Leases
 @inject IGoLiveService GoLiveSvc
 @inject IFeatureFlags Flags
@@ -76,12 +77,12 @@
                         {
                             <tr>
                                 <td class="px-4 py-2">#@l.Id @(string.IsNullOrWhiteSpace(l.UnitLabel) ? "" : $"· {l.UnitLabel}")</td>
-                                <td class="px-3 py-2 tabular-nums">@l.MonthlyRent.ToString("C0", CultureInfo.GetCultureInfo("en-US"))</td>
+                                <td class="px-3 py-2 tabular-nums">@l.MonthlyRent.ToString("C0", _money)</td>
                                 <td class="px-3 py-2 tabular-nums">
                                     @(l.LateFeePercent is decimal p
                                         ? $"{p.ToString("0.##", CultureInfo.InvariantCulture)}%"
                                         : l.LateFeeFlatAmount is decimal f
-                                            ? f.ToString("C0", CultureInfo.GetCultureInfo("en-US"))
+                                            ? f.ToString("C0", _money)
                                             : "—")
                                 </td>
                                 <td class="px-3 py-2 tabular-nums">@(l.LateFeeGraceDays is byte g ? $"{g} day{(g == 1 ? "" : "s")}" : "—")</td>
@@ -122,9 +123,13 @@
     private string? _error;
     private List<Lease> _staged = new();
 
+    // PM-book currency for every amount on the page (never host locale).
+    private CultureInfo _money = MoneyCultures.Usd;
+
     protected override async Task OnInitializedAsync()
     {
         _pmId = await Pm.GetPmIdAsync();
+        _money = await Money.GetCultureAsync();
         _disabled = !await Flags.IsEnabledAsync("onboarding.v2", _pmId, CancellationToken.None);
         if (!_disabled)
         {

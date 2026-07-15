@@ -7,6 +7,7 @@
 @using DueMap.Tenancy.Domain
 @using DueMap.Web.Services
 @inject PmContext Pm
+@inject PmMoney Money
 @inject ILeaseReader LeaseReader
 @inject ICustomerRepository CustomerRepo
 @inject IRentInvoiceRepository InvoiceRepo
@@ -59,7 +60,7 @@
                 <p class="mt-1.5 text-sm text-muted">
                     Lease <span class="tabular-nums">#@_lease.Id</span>
                     <span class="mx-1.5 text-zinc-300 dark:text-body">·</span>
-                    monthly rent <span class="tabular-nums font-medium text-heading">@_lease.MonthlyRent.ToString("C")</span>
+                    monthly rent <span class="tabular-nums font-medium text-heading">@_lease.MonthlyRent.ToString("C", _money)</span>
                 </p>
             </div>
         </div>
@@ -111,10 +112,10 @@
                 <h3 class="text-xs font-medium uppercase tracking-wider text-muted mb-3">Lease</h3>
                 <dl class="grid grid-cols-2 gap-y-2.5 text-sm">
                     <dt class="text-muted">Monthly rent</dt>
-                    <dd class="tabular-nums font-medium text-right">@_lease.MonthlyRent.ToString("C")</dd>
+                    <dd class="tabular-nums font-medium text-right">@_lease.MonthlyRent.ToString("C", _money)</dd>
 
                     <dt class="text-muted">Outstanding balance</dt>
-                    <dd class="tabular-nums font-medium text-right @(_balance > 0 ? "text-rose-700 dark:text-rose-400" : "")">@_balance.ToString("C")</dd>
+                    <dd class="tabular-nums font-medium text-right @(_balance > 0 ? "text-rose-700 dark:text-rose-400" : "")">@_balance.ToString("C", _money)</dd>
 
                     <dt class="text-muted">Start date</dt>
                     <dd class="tabular-nums text-right">@_lease.StartDate.ToString("MMM d, yyyy")</dd>
@@ -267,7 +268,14 @@
     private string _waiveReason = string.Empty;
     private bool _waiving;
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    // PM-book currency for every amount on the page (never host locale).
+    private System.Globalization.CultureInfo _money = MoneyCultures.Usd;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _money = await Money.GetCultureAsync();
+        await LoadAsync();
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -357,8 +365,8 @@
             events.Add(new TimelineEvent
             {
                 Timestamp = inv.IssueDate?.ToDateTime(TimeOnly.MinValue) ?? inv.CreatedAt,
-                Title = $"Invoice {(inv.ExternalDocNumber ?? "#" + inv.Id)} — {inv.TotalAmount:C}",
-                Detail = $"due {inv.DueDate:yyyy-MM-dd} · balance {inv.Balance:C}",
+                Title = $"Invoice {(inv.ExternalDocNumber ?? "#" + inv.Id)} — {inv.TotalAmount.ToString("C", _money)}",
+                Detail = $"due {inv.DueDate:yyyy-MM-dd} · balance {inv.Balance.ToString("C", _money)}",
                 Pill = pill.Item1,
                 PillClass = pill.Item2,
                 IconBg = "bg-surface-2",
@@ -398,8 +406,8 @@
             {
                 Timestamp = f.CreatedAt,
                 Title = reversed
-                    ? $"Late fee waived — {f.FeeAmount:C}"
-                    : $"Late fee assessed — {f.FeeAmount:C}",
+                    ? $"Late fee waived — {f.FeeAmount.ToString("C", _money)}"
+                    : $"Late fee assessed — {f.FeeAmount.ToString("C", _money)}",
                 Detail = reversed
                     ? $"for period {f.DueDate:yyyy-MM-dd} · reason: {f.ReversalReason}"
                     : $"for period {f.DueDate:yyyy-MM-dd} on {f.AssessmentDate:yyyy-MM-dd}",

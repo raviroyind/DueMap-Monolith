@@ -67,6 +67,10 @@ builder.Services.AddHttpContextAccessor();
 // Claims-driven PM resolution; reads the PmId claim from the auth principal.
 builder.Services.AddScoped<DueMap.Web.Services.PmContext>();
 
+// Per-circuit money formatting keyed to the PM's book currency (never the
+// host machine's locale — see PmMoney).
+builder.Services.AddScoped<DueMap.Web.Services.PmMoney>();
+
 // Stateless Excel/CSV parser used by the rent-roll importer. Singleton is
 // safe — no mutable state, just helper methods over ClosedXML.
 builder.Services.AddSingleton<DueMap.Web.Services.RentRollParser>();

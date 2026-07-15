@@ -41,6 +41,7 @@ public sealed class TenancyModule : IModule
         services.AddScoped<ILeaseReader, LeaseReader>();
         services.AddScoped<ITenantContactResolver, TenantContactResolver>();
         services.AddScoped<IPmAccountingDefaultsService, PmAccountingDefaultsService>();
+        services.AddScoped<IPmCurrencyReader, PmCurrencyReader>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<IRentInvoiceRepository, RentInvoiceRepository>();
         services.AddScoped<IPropertyManagerReader, PropertyManagerReader>();

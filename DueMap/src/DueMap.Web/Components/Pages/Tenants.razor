@@ -4,6 +4,7 @@
 @using DueMap.Common.FeatureFlags
 @using DueMap.Web.Services
 @inject PmContext Pm
+@inject PmMoney Money
 @inject ITenantsGridService Grid
 @inject IFeatureFlags Flags
 
@@ -143,7 +144,7 @@
                                     else { <span class="text-muted text-xs">—</span> }
                                 </td>
                                 <td class="tabular">
-                                    @(r.MonthlyRent is decimal rent ? rent.ToString("C0", Usd) : "—")
+                                    @(r.MonthlyRent is decimal rent ? rent.ToString("C0", _money) : "—")
                                 </td>
                                 <td class="tabular">
                                     @(r.LateFeePercent is decimal p ? $"{p.ToString("0.##", CultureInfo.InvariantCulture)}%" : "—")
@@ -246,11 +247,13 @@
     private decimal _editRent;
     private int _editStateId;
 
-    private static readonly CultureInfo Usd = CultureInfo.GetCultureInfo("en-US");
+    // PM-book currency for every amount on the page (never host locale).
+    private CultureInfo _money = MoneyCultures.Usd;
 
     protected override async Task OnInitializedAsync()
     {
         _pmId = await Pm.GetPmIdAsync();
+        _money = await Money.GetCultureAsync();
         _disabled = !await Flags.IsEnabledAsync("tenancy.tenants_screen", _pmId, CancellationToken.None);
         if (!_disabled)
         {

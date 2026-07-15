@@ -3,6 +3,7 @@
 @using DueMap.Tenancy.Domain
 @using DueMap.Web.Services
 @inject PmContext Pm
+@inject PmMoney Money
 @inject IRentInvoiceRepository InvoiceRepo
 @inject ICustomerRepository Customers
 
@@ -79,8 +80,8 @@
                                     <td class="px-6 cell-strong font-mono text-xs">@(inv.ExternalDocNumber ?? $"#{inv.Id}")</td>
                                     <td class="px-3 cell-strong">@CustomerName(inv.CustomerId)</td>
                                     <td class="px-3 text-muted tabular">@inv.DueDate.ToString("yyyy-MM-dd")</td>
-                                    <td class="px-3 text-right tabular">@inv.TotalAmount.ToString("C")</td>
-                                    <td class="px-3 text-right tabular cell-strong">@inv.Balance.ToString("C")</td>
+                                    <td class="px-3 text-right tabular">@inv.TotalAmount.ToString("C", _money)</td>
+                                    <td class="px-3 text-right tabular cell-strong">@inv.Balance.ToString("C", _money)</td>
                                     <td class="px-3">
                                         <span class="badge @StatusBadge(inv)"><span class="dot"></span>@StatusLabel(inv)</span>
                                     </td>
@@ -176,10 +177,14 @@
     // (cheap for hundreds of rows; revisit if PMs cross 10k invoices).
     private List<RentInvoice> _displayed => SortRows(SearchRows(FilterRows(_all)));
 
+    // PM-book currency for every amount on the page (never host locale).
+    private System.Globalization.CultureInfo _money = MoneyCultures.Usd;
+
     protected override async Task OnInitializedAsync()
     {
         _pmId = await Pm.GetPmIdAsync();
         var ct = CancellationToken.None;
+        _money = await Money.GetCultureAsync(ct);
 
         _all = await InvoiceRepo.ListByPropertyManagerAsync(_pmId.Value, ct);
         var customers = await Customers.ListByPropertyManagerAsync(_pmId.Value, ct);

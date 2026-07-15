@@ -9,6 +9,7 @@
 @using DueMap.Tenancy.Domain
 @using DueMap.Web.Services
 @inject PmContext Pm
+@inject PmMoney Money
 @inject ILeaseReader LeaseReader
 @inject ILeaseWriter LeaseWriter
 @inject ILeaseNoticeSettingsService SettingsService
@@ -143,9 +144,9 @@
                                 <td>
                                     <span class="badge @StatusBadge(row.Status)"><span class="dot"></span>@StatusLabel(row)</span>
                                 </td>
-                                <td class="text-right tabular">@row.Lease.MonthlyRent.ToString("C")</td>
+                                <td class="text-right tabular">@row.Lease.MonthlyRent.ToString("C", _money)</td>
                                 <td class="text-right tabular @(row.Balance > 0 ? "cell-strong" : "text-muted")">
-                                    @row.Balance.ToString("C")
+                                    @row.Balance.ToString("C", _money)
                                 </td>
                                 <td class="text-xs text-muted">
                                     @if (row.LastNoticeAt is DateTime n)
@@ -454,9 +455,13 @@
 
     private bool AllSelected => _filtered.Count > 0 && _filtered.All(r => _selected.Contains(r.Lease.Id));
 
+    // PM-book currency for every amount on the page (never host locale).
+    private System.Globalization.CultureInfo _money = MoneyCultures.Usd;
+
     protected override async Task OnInitializedAsync()
     {
         _pmId = await Pm.GetPmIdAsync();
+        _money = await Money.GetCultureAsync();
         // P1-5: when the unified Tenants screen is enabled, this page is
         // superseded — redirect. Kept (un-redirected) for rollback when the
         // flag is off.

@@ -6,6 +6,7 @@
 @using DueMap.Tenancy.Services
 @using DueMap.Web.Services
 @inject TenantContext Tenant
+@inject IPmCurrencyReader CurrencyReader
 @inject ICustomerRepository Customers
 @inject ILeaseReader Leases
 @inject IPropertyManagerReader PmReader
@@ -73,7 +74,7 @@
                 <dl class="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
                     <div>
                         <dt class="text-xs uppercase tracking-wider font-medium text-muted mb-1">Monthly rent</dt>
-                        <dd class="tabular-nums">@_lease.MonthlyRent.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("en-US"))</dd>
+                        <dd class="tabular-nums">@_lease.MonthlyRent.ToString("C", _money)</dd>
                     </div>
                     <div>
                         <dt class="text-xs uppercase tracking-wider font-medium text-muted mb-1">Unit</dt>
@@ -120,6 +121,7 @@
     private Customer? _customer;
     private Lease? _lease;
     private string? _pmContactMailto;
+    private System.Globalization.CultureInfo _money = MoneyCultures.Usd;
 
     protected override async Task OnInitializedAsync()
     {
@@ -130,6 +132,10 @@
             Nav.NavigateTo("/t/login", replace: true);
             return;
         }
+
+        // Amounts render in the PM's book currency — the tenant portal has no
+        // signed-in PM circuit, so resolve directly from the session's PM id.
+        _money = MoneyCultures.For(await CurrencyReader.GetCurrencyCodeAsync(_session.PropertyManagerId, ct));
 
         _customer = await Customers.GetByIdAsync(_session.CustomerId, ct);
 

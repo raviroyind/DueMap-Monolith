@@ -5,6 +5,7 @@
 @using DueMap.Web.Services
 @using Microsoft.JSInterop
 @inject PmContext Pm
+@inject PmMoney Money
 @inject IAccountingConnectionService ConnectionSvc
 @inject ICustomerRepository Customers
 @inject IRentInvoiceRepository InvoiceRepo
@@ -155,7 +156,7 @@
                                     <td class="cell-strong font-mono text-xs">@(inv.ExternalDocNumber ?? $"#{inv.Id}")</td>
                                     <td>@CustomerName(inv.CustomerId)</td>
                                     <td class="text-muted tabular">@inv.DueDate.ToString("yyyy-MM-dd")</td>
-                                    <td class="text-right tabular cell-strong">@inv.Balance.ToString("C")</td>
+                                    <td class="text-right tabular cell-strong">@inv.Balance.ToString("C", _money)</td>
                                     <td>
                                         <span class="badge @StatusBadge(inv)"><span class="dot"></span>@StatusLabel(inv)</span>
                                     </td>
@@ -257,10 +258,14 @@
         await JS.InvokeVoidAsync("dueMapTour.start", new { force = true });
     }
 
+    // PM-book currency for every amount on the page (never host locale).
+    private System.Globalization.CultureInfo _money = MoneyCultures.Usd;
+
     protected override async Task OnInitializedAsync()
     {
         var pmId = await Pm.GetPmIdAsync();
         var ct = CancellationToken.None;
+        _money = await Money.GetCultureAsync(ct);
 
         _conn = await ConnectionSvc.GetActiveAsync(pmId, ct);
         if (_conn is null)
@@ -279,7 +284,7 @@
         _openCount      = _allInvoices.Count(i => i.Status == RentInvoiceStatus.Open);
         _overdueCount   = _allInvoices.Count(i => i.Status == RentInvoiceStatus.Open && i.DueDate < today);
         _unlinkedCount  = _allInvoices.Count(i => i.LeaseId is null);
-        _openSumLabel   = _allInvoices.Where(i => i.Status == RentInvoiceStatus.Open).Sum(i => i.Balance).ToString("C");
+        _openSumLabel   = _allInvoices.Where(i => i.Status == RentInvoiceStatus.Open).Sum(i => i.Balance).ToString("C", _money);
         _recentInvoices = _allInvoices.Take(6).ToList();
 
         var leases = await Leases.ListActiveAsync(pmId, today, ct);

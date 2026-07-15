@@ -3,6 +3,7 @@
 @using DueMap.Tenancy.Domain
 @using DueMap.Web.Services
 @inject PmContext Pm
+@inject PmMoney Money
 @inject ILeaseReader LeaseReader
 @inject ICustomerRepository Customers
 @inject ILeaseLinkService Linker
@@ -84,7 +85,7 @@
                             {
                                 <tr>
                                     <td class="cell-strong tabular">#@r.LeaseId</td>
-                                    <td class="text-right tabular">@r.MonthlyRent.ToString("C")</td>
+                                    <td class="text-right tabular">@r.MonthlyRent.ToString("C", _money)</td>
                                     <td class="text-muted tabular">@r.StartDate.ToString("yyyy-MM-dd")</td>
                                     <td>
                                         @if (r.CustomerId is int cid)
@@ -151,9 +152,13 @@
     private int? _busyLeaseId;
     private string? _toast;
 
+    // PM-book currency for every amount on the page (never host locale).
+    private System.Globalization.CultureInfo _money = MoneyCultures.Usd;
+
     protected override async Task OnInitializedAsync()
     {
         _pmId = await Pm.GetPmIdAsync();
+        _money = await Money.GetCultureAsync();
         // P1-5: superseded by the unified Tenants screen when the flag is on.
         if (await Flags.IsEnabledAsync("tenancy.tenants_screen", _pmId, CancellationToken.None))
         {
