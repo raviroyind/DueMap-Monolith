@@ -1,0 +1,17 @@
+@page "/not-found"
+@using DueMap.Web.Components.Shared
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+
+@*
+    Target route for UseStatusCodePagesWithReExecute: any body-less 4xx from
+    the pipeline (missing static file, API NotFound, etc.) re-executes here
+    and renders the branded 404 while keeping the original status code.
+
+    AllowAnonymous matters: the app has a global RequireAuthenticatedUser
+    fallback policy, and this page must render for signed-out visitors too.
+    (Signed-in users hitting unknown SPA paths are handled by the Router's
+    <NotFound> fragment instead — see Routes.razor.)
+*@
+
+<NotFoundContent />

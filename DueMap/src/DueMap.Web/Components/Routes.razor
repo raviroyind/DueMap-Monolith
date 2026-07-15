@@ -1,9 +1,18 @@
 @using Microsoft.AspNetCore.Components.Routing
 @using DueMap.Web.Components.Layout
+@using DueMap.Web.Components.Shared
 
 <Router AppAssembly="typeof(Program).Assembly">
     <Found Context="routeData">
         <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
+    <NotFound>
+        @* Signed-in users on an unknown path: the Blazor catch-all endpoint
+           matched but no component route did. Without this fragment the
+           Router rendered NOTHING — the page just went blank (QA ERR-1). *@
+        <LayoutView Layout="typeof(MainLayout)">
+            <NotFoundContent />
+        </LayoutView>
+    </NotFound>
 </Router>

@@ -341,6 +341,13 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseSerilogRequestLogging();
 app.UseStaticFiles();
+
+// Friendly 404: unknown paths match no component route, so the raw pipeline
+// answers with an EMPTY 404 body and the browser shows its own error page
+// (QA ERR-1). Re-execute body-less error statuses against the branded
+// /not-found page — the original status code is preserved.
+app.UseStatusCodePagesWithReExecute("/not-found");
+
 app.UseRouting();
 app.UseAuthentication();
 // Dev-only Basic-Auth gate for /admin/worker-logs — must sit between
