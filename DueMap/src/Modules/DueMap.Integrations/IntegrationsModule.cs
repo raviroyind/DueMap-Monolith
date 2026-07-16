@@ -93,6 +93,11 @@ public sealed class IntegrationsModule : IModule
         services.AddTransient<IOAuthProvider>(sp => sp.GetRequiredService<QuickBooksOAuthProvider>());
         services.AddTransient<IOAuthProvider>(sp => sp.GetRequiredService<XeroOAuthProvider>());
 
+        // OIDC userinfo for "Sign in with Intuit" — resolves the HUMAN's
+        // email when the id_token doesn't carry the claim itself.
+        services.AddHttpClient<IntuitUserInfoClient>();
+        services.AddTransient<IIntuitUserInfoClient>(sp => sp.GetRequiredService<IntuitUserInfoClient>());
+
         services.AddScoped<IAccountingConnectionService, AccountingConnectionService>();
 
         // ---- Accounting sync (customers + invoices → Tenancy) ----

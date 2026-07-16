@@ -23,6 +23,7 @@ internal sealed partial class IntuitSignInOrchestratorImpl : IIntuitSignInOrches
     private readonly IEnumerable<IOAuthProvider> _oauthProviders;
     private readonly IEnumerable<IAccountingDataClient> _clients;
     private readonly IAccountingConnectionService _connections;
+    private readonly IIntuitUserInfoClient _userInfo;
     private readonly UserManager<ApplicationUser> _users;
     private readonly IPropertyManagerWriter _pmWriter;
     private readonly IOnboardingProgressService _progress;
@@ -33,6 +34,7 @@ internal sealed partial class IntuitSignInOrchestratorImpl : IIntuitSignInOrches
         IEnumerable<IOAuthProvider> oauthProviders,
         IEnumerable<IAccountingDataClient> clients,
         IAccountingConnectionService connections,
+        IIntuitUserInfoClient userInfo,
         UserManager<ApplicationUser> users,
         IPropertyManagerWriter pmWriter,
         IOnboardingProgressService progress,
@@ -42,6 +44,7 @@ internal sealed partial class IntuitSignInOrchestratorImpl : IIntuitSignInOrches
         _oauthProviders = oauthProviders;
         _clients = clients;
         _connections = connections;
+        _userInfo = userInfo;
         _users = users;
         _pmWriter = pmWriter;
         _progress = progress;
@@ -109,7 +112,8 @@ internal sealed partial class IntuitSignInOrchestratorImpl : IIntuitSignInOrches
             return Error("Could not exchange the authorization code with Intuit. Please try again.");
         }
 
-        // 3. Resolve identity via CompanyInfo ----------------------------
+        // 3. Company profile — used for the WORKSPACE name (and as a legacy
+        //    identity fallback), never as the primary user identity.
         AccountingCompanyInfo? company;
         try
         {
@@ -122,18 +126,73 @@ internal sealed partial class IntuitSignInOrchestratorImpl : IIntuitSignInOrches
             return Error("Connected to QuickBooks but couldn't read your company profile. Please try again or sign up with email.");
         }
 
-        var email = company?.PrimaryEmail?.Trim();
+        var companyEmail = company?.PrimaryEmail?.Trim();
+        var workspaceName = !string.IsNullOrWhiteSpace(company?.CompanyName) ? company!.CompanyName : "My workspace";
+
+        // 3b. Resolve the HUMAN's identity (QA P3). The company's contact
+        //     email is shared per-company (the sandbox literally returns
+        //     noreply@quickbooks.com), so the signed-in identity must come
+        //     from OpenID Connect: the id_token's email claim when present,
+        //     else Intuit's userinfo endpoint. Only if BOTH are unavailable
+        //     (legacy accounting-only consent) do we degrade to the company
+        //     email, which older versions of this flow keyed accounts on.
+        var userEmail = TryReadEmailFromIdToken(tokens.IdToken);
+        if (string.IsNullOrWhiteSpace(userEmail))
+        {
+            try
+            {
+                userEmail = (await _userInfo.GetAsync(tokens.AccessToken, ct))?.Email?.Trim();
+            }
+            catch (Exception ex)
+            {
+                LogUserInfoFailed(_logger, ex);
+            }
+        }
+
+        var email = !string.IsNullOrWhiteSpace(userEmail) ? userEmail : companyEmail;
         if (string.IsNullOrWhiteSpace(email))
         {
-            // The sandbox demo company always has an email; production
-            // companies usually do too. If it's missing we don't have any
-            // way to identify the user — fall back to email sign-up.
-            return Error("Your QuickBooks company doesn't have a contact email on file, so we can't sign you in this way. Please sign up with an email and password instead.");
+            return Error("We couldn't read an email for your Intuit account or your QuickBooks company, so we can't sign you in this way. Please sign up with an email and password instead.");
         }
-        var workspaceName = !string.IsNullOrWhiteSpace(company!.CompanyName) ? company.CompanyName : "My workspace";
+        if (string.IsNullOrWhiteSpace(userEmail))
+        {
+            LogIdentityFellBackToCompanyEmail(_logger, tokens.RealmId);
+        }
 
         // 4. Find-or-create the user + PM --------------------------------
         var existing = await _users.FindByEmailAsync(email);
+
+        // Legacy upgrade: accounts provisioned by older builds were keyed to
+        // the COMPANY email. If the human's email finds no account but the
+        // company email does, that row is this person's workspace — rename it
+        // to the real identity so the header stops reading
+        // "noreply@quickbooks.com" and the account stops being shareable by
+        // coincidence.
+        if (existing is null
+            && !string.IsNullOrWhiteSpace(userEmail)
+            && !string.IsNullOrWhiteSpace(companyEmail)
+            && !string.Equals(userEmail, companyEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            var legacy = await _users.FindByEmailAsync(companyEmail);
+            if (legacy is not null)
+            {
+                var setEmail = await _users.SetEmailAsync(legacy, userEmail);
+                var setName  = setEmail.Succeeded ? await _users.SetUserNameAsync(legacy, userEmail) : setEmail;
+                if (setEmail.Succeeded && setName.Succeeded)
+                {
+                    existing = legacy;
+                    LogLegacyIdentityMigrated(_logger, legacy.Id, companyEmail, userEmail);
+                }
+                else
+                {
+                    // e.g. the target email already belongs to another user.
+                    // Don't half-rename; continue and provision fresh below.
+                    LogLegacyIdentityMigrationSkipped(_logger, legacy.Id,
+                        string.Join("; ", setEmail.Errors.Concat(setName.Errors).Select(e => e.Description)));
+                }
+            }
+        }
+
         bool isNewUser;
         ApplicationUser user;
 
@@ -209,6 +268,35 @@ internal sealed partial class IntuitSignInOrchestratorImpl : IIntuitSignInOrches
     private static IntuitSignInResult Error(string message) =>
         new(User: null, IsNewUser: false, Error: message);
 
+    /// <summary>
+    /// Best-effort read of the <c>email</c> claim from an OIDC id_token.
+    /// Signature is deliberately NOT validated: the token arrived directly
+    /// from Intuit's token endpoint over TLS during the code exchange, so the
+    /// transport is the trust boundary (same rationale the OIDC spec uses to
+    /// make validation optional in the code flow). Null on any shape problem.
+    /// </summary>
+    private static string? TryReadEmailFromIdToken(string? idToken)
+    {
+        if (string.IsNullOrWhiteSpace(idToken)) return null;
+        try
+        {
+            var parts = idToken.Split('.');
+            if (parts.Length < 2) return null;
+
+            var payload = parts[1].Replace('-', '+').Replace('_', '/');
+            payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+
+            using var doc = JsonDocument.Parse(Convert.FromBase64String(payload));
+            return doc.RootElement.TryGetProperty("email", out var e) && e.ValueKind == JsonValueKind.String
+                ? e.GetString()?.Trim()
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     /// <summary>State payload encrypted into the OAuth <c>state</c> param.</summary>
     private sealed record StateClaims(string Nonce, DateTime IssuedAt);
 
@@ -243,4 +331,20 @@ internal sealed partial class IntuitSignInOrchestratorImpl : IIntuitSignInOrches
     [LoggerMessage(EventId = 9108, Level = LogLevel.Warning,
         Message = "Intuit sign-in: accounting connection persist failed for pm_id={PropertyManagerId}. User is signed-in; onboarding will re-prompt to connect.")]
     static partial void LogConnectionPersistFailed(ILogger logger, Exception ex, int propertyManagerId);
+
+    [LoggerMessage(EventId = 9109, Level = LogLevel.Warning,
+        Message = "Intuit sign-in: userinfo endpoint call failed; falling back to other identity sources.")]
+    static partial void LogUserInfoFailed(ILogger logger, Exception ex);
+
+    [LoggerMessage(EventId = 9110, Level = LogLevel.Warning,
+        Message = "Intuit sign-in: no OIDC email available (legacy consent?) — identity fell back to the COMPANY email for realm={RealmId}.")]
+    static partial void LogIdentityFellBackToCompanyEmail(ILogger logger, string realmId);
+
+    [LoggerMessage(EventId = 9111, Level = LogLevel.Information,
+        Message = "Intuit sign-in: migrated legacy account user_id={UserId} from company email {OldEmail} to user email {NewEmail}.")]
+    static partial void LogLegacyIdentityMigrated(ILogger logger, int userId, string oldEmail, string newEmail);
+
+    [LoggerMessage(EventId = 9112, Level = LogLevel.Warning,
+        Message = "Intuit sign-in: legacy identity migration skipped for user_id={UserId}: {Reason}. Provisioning a fresh account instead.")]
+    static partial void LogLegacyIdentityMigrationSkipped(ILogger logger, int userId, string reason);
 }

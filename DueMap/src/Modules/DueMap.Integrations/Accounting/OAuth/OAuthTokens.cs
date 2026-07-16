@@ -10,4 +10,8 @@ public sealed record OAuthTokens(
     DateTime AccessTokenExpiresAt,
     DateTime? RefreshTokenExpiresAt,
     string? Scopes,
-    string RealmId);
+    string RealmId,
+    // Raw OIDC id_token from the code exchange, when openid scope was
+    // granted. Sign-in flows read the human's email from it; connect-only
+    // flows ignore it. Never persisted.
+    string? IdToken = null);

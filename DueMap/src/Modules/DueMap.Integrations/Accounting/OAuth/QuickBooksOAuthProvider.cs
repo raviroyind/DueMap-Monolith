@@ -113,7 +113,8 @@ internal sealed class QuickBooksOAuthProvider : IOAuthProvider
             AccessTokenExpiresAt:  now.AddSeconds(r.ExpiresIn),
             RefreshTokenExpiresAt: r.RefreshExpiresIn is int rExp ? now.AddSeconds(rExp) : null,
             Scopes:                null,    // QB doesn't echo scopes
-            RealmId:               realmId);
+            RealmId:               realmId,
+            IdToken:               r.IdToken);
     }
 
     private sealed record QbTokenResponse(
@@ -121,7 +122,8 @@ internal sealed class QuickBooksOAuthProvider : IOAuthProvider
         [property: JsonPropertyName("refresh_token")]     string RefreshToken,
         [property: JsonPropertyName("expires_in")]        int ExpiresIn,
         [property: JsonPropertyName("x_refresh_token_expires_in")] int? RefreshExpiresIn,
-        [property: JsonPropertyName("token_type")]        string? TokenType);
+        [property: JsonPropertyName("token_type")]        string? TokenType,
+        [property: JsonPropertyName("id_token")]          string? IdToken = null);
 }
 
 internal static class QueryStringUtil

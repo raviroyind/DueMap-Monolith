@@ -30,8 +30,14 @@ public sealed class IntegrationsOptions
         public string? ClientId { get; set; }
         public string? ClientSecret { get; set; }
 
-        /// <summary>Default scopes for accounting access.</summary>
-        public string Scopes { get; set; } = "com.intuit.quickbooks.accounting";
+        /// <summary>
+        /// OAuth scopes. OpenID scopes are included so "Sign in with Intuit"
+        /// can identify the HUMAN (id_token / userinfo email) instead of the
+        /// QuickBooks COMPANY's contact email — the company email is shared
+        /// (sandbox: noreply@quickbooks.com) and made the signed-in identity
+        /// display wrong (QA P3). One consent covers sign-in + books.
+        /// </summary>
+        public string Scopes { get; set; } = "openid profile email com.intuit.quickbooks.accounting";
 
         /// <summary>"sandbox" for Intuit's sandbox API; "production" otherwise.</summary>
         public string Environment { get; set; } = "sandbox";
