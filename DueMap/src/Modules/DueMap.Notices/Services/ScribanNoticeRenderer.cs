@@ -9,10 +9,13 @@ using Scriban.Runtime;
 namespace DueMap.Notices.Services;
 
 /// <summary>
-/// Renders a template version with Scriban. Compiled <see cref="Template"/>
-/// instances are cached by (version id, field) to avoid the parse cost on the
-/// hot path — Scriban parses are not cheap and templates are immutable once
-/// approved, so caching is safe.
+/// Renders a template version with Scriban in LIQUID mode. Every seeded copy
+/// and the editor's snippets use Liquid tags ({{ var }} + {% if %}…{% endif %});
+/// Scriban's native parser treats {% %} as plain text, which shipped the
+/// literal tag lines into rendered emails (QA P3). Compiled
+/// <see cref="Template"/> instances are cached by (version id, field) to avoid
+/// the parse cost on the hot path — Scriban parses are not cheap and templates
+/// are immutable once approved, so caching is safe.
 /// </summary>
 internal sealed class ScribanNoticeRenderer : INoticeRenderer
 {
@@ -47,7 +50,7 @@ internal sealed class ScribanNoticeRenderer : INoticeRenderer
         {
             scriptObject[k] = v;
         }
-        var context = new TemplateContext();
+        var context = new LiquidTemplateContext();
         context.PushGlobal(scriptObject);
 
         var subject  = await RenderFieldAsync(version.Id, "subject",  version.Subject,  context, ct);
@@ -64,11 +67,13 @@ internal sealed class ScribanNoticeRenderer : INoticeRenderer
         TemplateContext context,
         CancellationToken ct)
     {
-        var cacheKey = string.Create(CultureInfo.InvariantCulture, $"ntv-compiled::{versionId}::{field}");
+        // "liquid" in the key: a long-lived process must never serve a
+        // Scriban-native compile from before the parser switch.
+        var cacheKey = string.Create(CultureInfo.InvariantCulture, $"ntv-compiled-liquid::{versionId}::{field}");
         var compiled = _cache.GetOrCreate(cacheKey, entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = _options.CompiledTemplateCacheTtl;
-            var template = Template.Parse(templateSource);
+            var template = Template.ParseLiquid(templateSource);
             if (template.HasErrors)
             {
                 throw new InvalidOperationException(

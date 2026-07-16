@@ -313,9 +313,12 @@
     };
 
     /// <summary>
-    /// Renders the preview through real Scriban so {{ var }} substitutions
-    /// AND control flow like {% if pay_url %}…{% endif %} both work. We hand
-    /// it a synthetic variable bag built from <see cref="SampleValues"/>; the
+    /// Renders the preview in Scriban's LIQUID mode — the same dialect the
+    /// send pipeline (ScribanNoticeRenderer) parses — so {{ var }}
+    /// substitutions AND control flow like {% if pay_url %}…{% endif %} both
+    /// evaluate exactly as a sent email would. (Native Template.Parse treats
+    /// {% %} as plain text and printed the tags literally — QA P3.) We hand it
+    /// a synthetic variable bag built from <see cref="SampleValues"/>; the
     /// real send pipeline gets its values from the lease + invoice rows.
     ///
     /// Errors are swallowed and the raw template is returned so a typo in
@@ -326,7 +329,7 @@
     {
         try
         {
-            var template = Template.Parse(html);
+            var template = Template.ParseLiquid(html);
             if (template.HasErrors) return html;
 
             var script = new ScriptObject();
@@ -336,7 +339,7 @@
             }
             script["due_date"] = SampleDueDate;
 
-            var context = new TemplateContext();
+            var context = new LiquidTemplateContext();
             context.PushGlobal(script);
             return template.Render(context);
         }
