@@ -10,6 +10,7 @@
 @using DueMap.Web.Services
 @inject PmContext Pm
 @inject PmMoney Money
+@inject ToastService Toast
 @inject ILeaseReader LeaseReader
 @inject ILeaseWriter LeaseWriter
 @inject ILeaseNoticeSettingsService SettingsService
@@ -56,11 +57,6 @@
     }
     else
     {
-        @if (_toast is not null)
-        {
-            <div class="alert alert-success">@_toast</div>
-        }
-
         @* SEARCH + FILTER STRIP — sits on top of the table so the user can find
            a specific lease (search) OR narrow the list by collection status
            (filter chips). The status chip counts update live with the search. *@
@@ -436,7 +432,6 @@
     private bool _loading = true;
     private bool _showModal;
     private bool _applying;
-    private string? _toast;
     private PatchModel _patch = new();
     private string _search = string.Empty;
     private FilterKey _activeFilter = FilterKey.All;
@@ -677,7 +672,7 @@
             var ids = _selected.ToList();
             var patch = _patch.ToPatch();
             var n = await SettingsService.BulkApplyAsync(ids, patch, CancellationToken.None);
-            _toast = $"Applied to {ids.Count} lease(s), {n} row(s) written.";
+            Toast.Success($"Applied to {ids.Count} lease(s), {n} row(s) written.");
             _showModal = false;
             await LoadAsync();
         }
@@ -731,7 +726,7 @@
                 EndDate: _newLease.EndDate is DateTime end ? DateOnly.FromDateTime(end) : null);
 
             var lease = await LeaseWriter.CreateAsync(input, CancellationToken.None);
-            _toast = $"Lease #{lease.Id} created.";
+            Toast.Success($"Lease #{lease.Id} created.");
             _showNewLeaseModal = false;
             await LoadAsync();
         }

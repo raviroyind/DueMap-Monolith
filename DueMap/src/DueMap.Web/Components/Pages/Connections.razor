@@ -5,6 +5,7 @@
 @inject PmContext Pm
 @inject IAccountingConnectionService ConnectionSvc
 @inject IPmAccountingSync Sync
+@inject ToastService Toast
 @inject NavigationManager Nav
 
 <PageTitle>Accounting connection — DueMap</PageTitle>
@@ -169,12 +170,6 @@
                 <button class="btn btn-link text-danger" @onclick="Disconnect">Disconnect</button>
             </div>
 
-            @if (_syncMessage is not null)
-            {
-                <div class="px-6 pb-4 text-xs @(_syncOk ? "text-success" : "text-danger")">
-                    @_syncMessage
-                </div>
-            }
         </section>
     }
 </div>
@@ -184,8 +179,6 @@
     private PmAccountingConnection? _conn;
     private bool _onboarding;
     private bool _syncing;
-    private bool _syncOk;
-    private string? _syncMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -211,6 +204,7 @@
     {
         if (_pmId is not int id) return;
         await ConnectionSvc.DisconnectAsync(id, CancellationToken.None);
+        Toast.Info("Accounting connection disconnected.");
         await LoadAsync();
     }
 
@@ -218,20 +212,22 @@
     {
         if (_pmId is not int id) return;
         _syncing = true;
-        _syncMessage = null;
         StateHasChanged();
         try
         {
             var result = await Sync.SyncForAsync(id, CancellationToken.None);
-            _syncOk = result.Success;
-            _syncMessage = result.Success
-                ? $"Synced {result.CustomersSynced} customer(s) and {result.InvoicesSynced} invoice(s)."
-                : $"Sync failed: {result.FailureReason}";
+            if (result.Success)
+            {
+                Toast.Success($"Synced {result.CustomersSynced} customer(s) and {result.InvoicesSynced} invoice(s).");
+            }
+            else
+            {
+                Toast.Error($"Sync failed: {result.FailureReason}");
+            }
         }
         catch (Exception ex)
         {
-            _syncOk = false;
-            _syncMessage = $"Sync failed: {ex.Message}";
+            Toast.Error($"Sync failed: {ex.Message}");
         }
         finally
         {

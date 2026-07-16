@@ -6,6 +6,7 @@
 @using DueMap.Web.Components.Shared
 @using DueMap.Web.Services
 @inject PmContext Pm
+@inject ToastService Toast
 @inject IPmTemplateOverrideService Overrides
 @inject INoticeTypeReader NoticeTypes
 @inject IStateReader States
@@ -33,11 +34,6 @@
     }
     else
     {
-        @if (_toast is not null)
-        {
-            <div class="alert alert-success">@_toast</div>
-        }
-
         <!-- LIST -->
         <section class="card">
             <header class="card-header flex items-center justify-between gap-3">
@@ -104,7 +100,6 @@
     private List<PmTemplateOverride> _existing = new();
     private IReadOnlyList<NoticeType> _noticeTypes = Array.Empty<NoticeType>();
     private IReadOnlyList<RulesState> _states = Array.Empty<RulesState>();
-    private string? _toast;
     private EditTemplateModal? _modal;
 
     protected override async Task OnInitializedAsync()
@@ -138,14 +133,14 @@
 
     private async Task OnTemplateSavedAsync()
     {
-        _toast = "Template saved.";
+        Toast.Success("Template saved.");
         await LoadAsync();
     }
 
     private async Task Deactivate(int id)
     {
         await Overrides.DeactivateAsync(id, CancellationToken.None);
-        _toast = $"Removed override #{id}.";
+        Toast.Success($"Removed override #{id}.");
         await LoadAsync();
     }
 

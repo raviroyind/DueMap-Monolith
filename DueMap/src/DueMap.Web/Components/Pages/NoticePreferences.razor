@@ -4,6 +4,7 @@
 @using DueMap.Web.Components.Shared
 @using DueMap.Web.Services
 @inject PmContext Pm
+@inject ToastService Toast
 @inject IPmNoticePreferencesService Prefs
 
 <PageTitle>Notice preferences — DueMap</PageTitle>
@@ -25,17 +26,6 @@
     }
     else
     {
-        @if (_savedAt is not null)
-        {
-            <div class="alert alert-success">
-                <svg class="alert-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                <div class="flex-1 min-w-0">
-                    <div class="alert-title">Saved</div>
-                    <div class="text-xs mt-0.5">@_savedAt.Value.ToString("HH:mm:ss")</div>
-                </div>
-            </div>
-        }
-
         <!-- PRE-DUE -->
         <section class="card" data-disabled="@((!_model.PreDueMasterEnabled).ToString().ToLowerInvariant())">
             <header class="card-header flex items-start justify-between gap-4">
@@ -242,7 +232,6 @@
     private int? _pmId;
     private PmNoticePreferences? _model;
     private bool _saving;
-    private DateTime? _savedAt;
     private EditTemplateModal? _templateModal;
 
     protected override async Task OnInitializedAsync()
@@ -258,7 +247,11 @@
         try
         {
             _model = await Prefs.UpdateAsync(_model, CancellationToken.None);
-            _savedAt = DateTime.UtcNow;
+            Toast.Success("Notice preferences saved.");
+        }
+        catch (Exception ex)
+        {
+            Toast.Error($"Save failed: {ex.Message}");
         }
         finally
         {

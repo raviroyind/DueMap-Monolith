@@ -5,6 +5,7 @@
 @using DueMap.Web.Services
 @inject PmContext Pm
 @inject PmMoney Money
+@inject ToastService Toast
 @inject ITenantsGridService Grid
 @inject IFeatureFlags Flags
 
@@ -210,10 +211,6 @@
             </div>
         </div>
 
-        @if (_message is not null)
-        {
-            <div class="text-xs @(_messageOk ? "text-success" : "text-danger")">@_message</div>
-        }
     }
 </div>
 
@@ -222,8 +219,6 @@
     private bool _loading = true;
     private bool _disabled;
     private bool _busy;
-    private string? _message;
-    private bool _messageOk;
 
     private List<TenantRow> _rows = new();
     private List<TenantRow> _filtered = new();
@@ -360,31 +355,27 @@
         });
     }
 
-    // Shared run wrapper: guards re-entrancy, validates rent, reloads, sets message.
+    // Shared run wrapper: guards re-entrancy, validates rent, reloads, toasts the result.
     private async Task RunAsync(Func<Task<string>> action)
     {
         if (_busy) return;
         _busy = true;
-        _message = null;
         try
         {
             if ((_editingCustomerId is not null || _creatingCustomerId is not null) && _editRent <= 0m)
             {
-                _messageOk = false;
-                _message = "Rent must be greater than zero.";
+                Toast.Error("Rent must be greater than zero.");
                 return;
             }
             var ok = await action();
             _editingCustomerId = null;
             _creatingCustomerId = null;
             await ReloadAsync();
-            _messageOk = true;
-            _message = ok;
+            Toast.Success(ok);
         }
         catch (Exception ex)
         {
-            _messageOk = false;
-            _message = ex.Message;
+            Toast.Error(ex.Message);
         }
         finally
         {
