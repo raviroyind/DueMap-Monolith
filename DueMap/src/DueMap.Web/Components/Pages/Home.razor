@@ -60,9 +60,9 @@
                     }
 
                     <span class="text-sm text-muted">
-                        @* TODO: replace with conn.CompanyName once fetched from /companyinfo (task #61). *@
-                        <span class="font-medium text-heading">@WorkspaceLabel(_conn)</span>
-                        <span class="mx-1.5 text-muted">·</span>
+                        @* The raw realm id is a developer detail (QA P4) — it lives on
+                           /connections now. Show the CompanyName here once task #61
+                           fetches it from /companyinfo. *@
                         last sync @(_conn.LastSyncAt?.ToString("u") ?? "pending")
                     </span>
                 </div>
@@ -88,7 +88,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted group-hover:text-primary transition-colors"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
                 </div>
                 <div class="text-3xl font-semibold tracking-tight tabular-nums text-heading">@_customerCount</div>
-                <div class="mt-2 text-xs text-muted">@CustomerCaption(_customerCount, _unlinkedCount)</div>
+                <div class="mt-2 text-xs text-muted">@CustomerCaption(_customerCount, _linkedCustomerCount)</div>
             </a>
 
             <a href="invoices" class="card-link group">
@@ -106,7 +106,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted group-hover:text-danger transition-colors"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
                 </div>
                 <div class="text-3xl font-semibold tracking-tight tabular-nums @(_overdueCount > 0 ? "text-danger" : "text-heading")">@_overdueCount</div>
-                <div class="mt-2 text-xs text-muted">@(_overdueCount == 0 ? "all caught up" : "candidates for late fee")</div>
+                <div class="mt-2 text-xs text-muted">@OverdueCaption(_overdueCount, _staleOverdueCount)</div>
             </a>
 
             <a href="leases" class="card-link group">
@@ -225,6 +225,7 @@
     private bool _loading = true;
     private PmAccountingConnection? _conn;
     private int _customerCount, _unlinkedCount, _openCount, _overdueCount, _leaseCount;
+    private int _linkedCustomerCount, _staleOverdueCount;
     private string _openSumLabel = "$0.00";
     private IReadOnlyList<RentInvoice> _allInvoices = Array.Empty<RentInvoice>();
     private List<RentInvoice> _recentInvoices = new();
@@ -283,12 +284,22 @@
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         _openCount      = _allInvoices.Count(i => i.Status == RentInvoiceStatus.Open);
         _overdueCount   = _allInvoices.Count(i => i.Status == RentInvoiceStatus.Open && i.DueDate < today);
+        // Stale = overdue for 6+ months. A freshly-connected book usually
+        // carries historical junk (the sandbox has 2019 invoices); calling
+        // those "late-fee candidates" reads like we'd send 7-year-late
+        // warnings (QA P4).
+        var staleCutoff = today.AddDays(-StaleOverdueDays);
+        _staleOverdueCount = _allInvoices.Count(i => i.Status == RentInvoiceStatus.Open && i.DueDate < staleCutoff);
         _unlinkedCount  = _allInvoices.Count(i => i.LeaseId is null);
         _openSumLabel   = _allInvoices.Where(i => i.Status == RentInvoiceStatus.Open).Sum(i => i.Balance).ToString("C", _money);
         _recentInvoices = _allInvoices.Take(6).ToList();
 
         var leases = await Leases.ListActiveAsync(pmId, today, ct);
         _leaseCount = leases.Count;
+        _linkedCustomerCount = leases.Where(l => l.CustomerId is not null)
+                                     .Select(l => l.CustomerId)
+                                     .Distinct()
+                                     .Count();
 
         _loading = false;
     }
@@ -296,19 +307,26 @@
     private string CustomerName(int id) =>
         _customerNames.TryGetValue(id, out var n) ? n : $"Customer #{id}";
 
-    // Until we fetch the QB CompanyName during sync, the realm id is the
-    // best identifier we have. Truncate to a readable chunk.
-    private static string WorkspaceLabel(PmAccountingConnection conn)
-    {
-        var raw = conn.RealmId ?? "";
-        return raw.Length > 24 ? $"realm {raw[..8]}…{raw[^4..]}" : $"realm {raw}";
-    }
-
-    private static string CustomerCaption(int customers, int unlinkedInvoices)
+    // The CUSTOMERS tile caption talks about customers (the old copy paired
+    // the customer count with an invoice stat — read like a bug, QA P4).
+    private static string CustomerCaption(int customers, int linkedToLeases)
     {
         if (customers == 0) return "no customers synced yet";
-        if (unlinkedInvoices == 0) return "all linked to leases";
-        return $"{unlinkedInvoices} invoice{(unlinkedInvoices == 1 ? "" : "s")} awaiting link";
+        if (linkedToLeases == 0) return "none linked to a lease yet";
+        return $"{linkedToLeases} linked to lease{(linkedToLeases == 1 ? "" : "s")}";
+    }
+
+    // Overdue for longer than this is "historical junk from the synced
+    // books", not a live late-fee-warning candidate.
+    private const int StaleOverdueDays = 180;
+
+    private static string OverdueCaption(int overdue, int stale)
+    {
+        if (overdue == 0) return "all caught up";
+        var fresh = overdue - stale;
+        if (stale == 0) return "may trigger a late-fee warning";
+        if (fresh == 0) return $"all overdue 6+ months — likely pre-DueMap history";
+        return $"{fresh} recent · {stale} overdue 6+ months";
     }
 
     // Maps an invoice to an Osen badge family (the .dot inherits currentColor).
