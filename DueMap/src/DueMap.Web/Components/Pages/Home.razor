@@ -12,6 +12,7 @@
 @inject ILeaseReader Leases
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <PageTitle>DueMap — Dashboard</PageTitle>
 
@@ -120,6 +121,32 @@
                 <div class="mt-2 text-xs text-muted">in your portfolio</div>
             </a>
         </div>
+
+        @* STATS CHARTS — collections trend + outstanding-balance split.
+           ApexCharts, themed from the Osen tokens (re-skins on dark toggle). *@
+        @if (_allInvoices.Count > 0)
+        {
+            <div data-tour="stats-charts" class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                <section class="card lg:col-span-3">
+                    <header class="card-header py-4">
+                        <div class="card-title text-sm">Collections — last 6 months</div>
+                        <div class="card-subtitle">Invoiced vs collected, by invoice due month.</div>
+                    </header>
+                    <div class="px-4 pb-2">
+                        <div id="chart-collections"></div>
+                    </div>
+                </section>
+                <section class="card lg:col-span-2">
+                    <header class="card-header py-4">
+                        <div class="card-title text-sm">Outstanding balance</div>
+                        <div class="card-subtitle">Where the open money sits by age.</div>
+                    </header>
+                    <div class="px-4 pb-3">
+                        <div id="chart-outstanding"></div>
+                    </div>
+                </section>
+            </div>
+        }
 
         @* RECENT INVOICES — top 6 most recent, with a "View all" link.
            Doubles as a sanity check that data is actually flowing. *@
@@ -235,6 +262,9 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // Stats charts render once their payload is ready (guarded internally).
+        await RenderChartsAsync();
+
         // Tour only auto-fires when the URL says we just finished onboarding
         // (OnboardingSyncing redirects with ?tour=onboarding). Plain dashboard
         // visits — refresh, sidebar nav, etc. — never trigger the tour. Use
@@ -263,6 +293,95 @@
 
     // PM-book currency for every amount on the page (never host locale).
     private System.Globalization.CultureInfo _money = MoneyCultures.Usd;
+
+    // ---- Stats charts (task #115) ---------------------------------------
+    // Payloads computed once per load; rendered via JS interop after render.
+    private bool _chartsPending;
+    private double[] _donutSeries = Array.Empty<double>();
+    private string[] _barCategories = Array.Empty<string>();
+    private double[] _barInvoiced = Array.Empty<double>();
+    private double[] _barCollected = Array.Empty<double>();
+
+    private void ComputeChartData(DateOnly today)
+    {
+        // Donut: the OPEN balance split by age — the "where is my money" view.
+        var open = _allInvoices.Where(i => i.Status == RentInvoiceStatus.Open).ToList();
+        double NotDue()   => (double)open.Where(i => i.DueDate >= today).Sum(i => i.Balance);
+        double Od30()     => (double)open.Where(i => i.DueDate < today && today.DayNumber - i.DueDate.DayNumber <= 30).Sum(i => i.Balance);
+        double Od30Plus() => (double)open.Where(i => today.DayNumber - i.DueDate.DayNumber > 30).Sum(i => i.Balance);
+        _donutSeries = new[] { Math.Round(NotDue(), 2), Math.Round(Od30(), 2), Math.Round(Od30Plus(), 2) };
+
+        // Bar: invoiced vs collected for the last 6 due-months (voided excluded).
+        var startMonth = new DateOnly(today.Year, today.Month, 1).AddMonths(-5);
+        var cats = new List<string>(6);
+        var invoiced = new List<double>(6);
+        var collected = new List<double>(6);
+        for (var m = 0; m < 6; m++)
+        {
+            var monthStart = startMonth.AddMonths(m);
+            var monthEnd = monthStart.AddMonths(1);
+            var monthInvs = _allInvoices
+                .Where(i => i.Status != RentInvoiceStatus.Voided
+                         && i.DueDate >= monthStart && i.DueDate < monthEnd)
+                .ToList();
+            cats.Add(monthStart.ToString("MMM", System.Globalization.CultureInfo.InvariantCulture));
+            invoiced.Add((double)monthInvs.Sum(i => i.TotalAmount));
+            collected.Add((double)monthInvs.Sum(i => i.TotalAmount - i.Balance));
+        }
+        _barCategories = cats.ToArray();
+        _barInvoiced = invoiced.ToArray();
+        _barCollected = collected.ToArray();
+    }
+
+    private async Task RenderChartsAsync()
+    {
+        if (!_chartsPending) return;
+        _chartsPending = false;
+        try
+        {
+            var symbol = _money.NumberFormat.CurrencySymbol;
+            var locale = _money.Name;
+            await JS.InvokeVoidAsync("dueMapCharts.render", "chart-collections", new
+            {
+                type = "bar",
+                height = 250,
+                categories = _barCategories,
+                series = new object[]
+                {
+                    new { name = "Invoiced",  data = _barInvoiced },
+                    new { name = "Collected", data = _barCollected }
+                },
+                currencySymbol = symbol,
+                locale
+            });
+            await JS.InvokeVoidAsync("dueMapCharts.render", "chart-outstanding", new
+            {
+                type = "donut",
+                height = 250,
+                series = _donutSeries,
+                labels = new[] { "Not yet due", "Overdue < 30d", "Overdue 30+ d" },
+                currencySymbol = symbol,
+                locale
+            });
+        }
+        catch (Exception)
+        {
+            // Circuit tearing down / prerender — charts are cosmetic, never fatal.
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("dueMapCharts.destroy", "chart-collections");
+            await JS.InvokeVoidAsync("dueMapCharts.destroy", "chart-outstanding");
+        }
+        catch (Exception)
+        {
+            // JS runtime already disconnected — nothing to clean.
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -302,6 +421,9 @@
                                      .Select(l => l.CustomerId)
                                      .Distinct()
                                      .Count();
+
+        ComputeChartData(today);
+        _chartsPending = _allInvoices.Count > 0;
 
         _loading = false;
     }
