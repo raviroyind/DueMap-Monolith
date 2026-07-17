@@ -313,9 +313,11 @@
 /* -------------------------------------------------------------------------- */
 /* Osen sidebar palette.                                                       */
 /* Light theme: deep navy (the classic Osen index look) against a light app.   */
-/* Dark theme: the navy would clash with the cold near-black app bg, so the    */
-/* .dark block below retunes it to a harmonized navy-slate that sits a step     */
-/* above --app (#16191f) and reads as an elevated panel.                        */
+/* Dark theme: per the theme kit's style guide, panels in dark mode live on    */
+/* the SURFACE family — the StyleGuide's own sidebar demo is                   */
+/* `background: var(--surface)` with a border-line divider. Referencing the    */
+/* kit tokens directly (instead of bespoke hex) keeps the sidebar, topbar and  */
+/* cards in one palette so the two darks always go together.                   */
 /* -------------------------------------------------------------------------- */
 :root {
   --sidebar-bg:         #232e51;
@@ -330,14 +332,14 @@
 }
 
 .dark {
-  --sidebar-bg:         #1c2030;   /* one step above --app (#16191f), navy-tinted */
-  --sidebar-border:     #2c3346;
-  --sidebar-title:      #707d92;
-  --sidebar-item:       #9aa4b8;
-  --sidebar-item-hover: #ffffff;
-  --sidebar-hover-bg:   #272d40;
-  --sidebar-active:     #ffffff;
-  --sidebar-active-bg:  #272d40;
+  --sidebar-bg:         var(--surface);       /* #232734 — same panel as topbar/cards */
+  --sidebar-border:     var(--line);          /* #333a49 */
+  --sidebar-title:      var(--text-muted);    /* #7e899b */
+  --sidebar-item:       var(--text-base);     /* #aeb6c4 */
+  --sidebar-item-hover: var(--text-heading);  /* #f0f2f7 */
+  --sidebar-hover-bg:   var(--surface-2);     /* #2b3040 */
+  --sidebar-active:     var(--text-heading);
+  --sidebar-active-bg:  var(--surface-2);
 }
 
 .app-sidebar { background: var(--sidebar-bg); color: var(--sidebar-item); }
