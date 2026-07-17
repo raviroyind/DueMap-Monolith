@@ -60,10 +60,12 @@
                     }
 
                     <span class="text-sm text-muted">
-                        @* The raw realm id is a developer detail (QA P4) — it lives on
-                           /connections now. Show the CompanyName here once task #61
-                           fetches it from /companyinfo. *@
-                        last sync @(_conn.LastSyncAt?.ToString("u") ?? "pending")
+                        @if (!string.IsNullOrEmpty(_conn.CompanyName))
+                        {
+                            <span class="font-medium text-heading">@_conn.CompanyName</span>
+                            <span class="mx-1.5 text-muted">·</span>
+                        }
+                        last sync @FriendlyTime.Utc(_conn.LastSyncAt, "pending")
                     </span>
                 </div>
             </div>

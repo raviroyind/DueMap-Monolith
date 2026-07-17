@@ -616,6 +616,7 @@ oauthGroup.MapGet("/{provider}/connect/{pmId:int}", async (
 
 oauthGroup.MapGet("/{provider}/callback", async (
     string provider, HttpRequest req, IAccountingConnectionService svc,
+    IEnumerable<DueMap.Integrations.Accounting.Sync.IAccountingDataClient> dataClients,
     Hangfire.IBackgroundJobClient jobs, CancellationToken ct) =>
 {
     if (!TryParseProvider(provider, out var parsed))
@@ -631,11 +632,43 @@ oauthGroup.MapGet("/{provider}/callback", async (
         return Results.BadRequest("Missing code or state.");
     }
 
-    var conn = await svc.CompleteAsync(new ConnectionCallbackInput(
-        Provider: parsed,
-        Code: code,
-        State: state,
-        RealmId: string.IsNullOrEmpty(realmId) ? null : realmId), ct);
+    PmAccountingConnection conn;
+    try
+    {
+        conn = await svc.CompleteAsync(new ConnectionCallbackInput(
+            Provider: parsed,
+            Code: code,
+            State: state,
+            RealmId: string.IsNullOrEmpty(realmId) ? null : realmId), ct);
+    }
+    catch (DueMap.Integrations.Accounting.RealmMismatchException ex)
+    {
+        // One workspace = one set of books. Bounce back to the connections
+        // page which explains the situation instead of silently mixing two
+        // companies' data.
+        return Results.Redirect(
+            $"/connections?error=realm_mismatch&current={Uri.EscapeDataString(ex.CurrentRealmId)}&attempted={Uri.EscapeDataString(ex.AttemptedRealmId)}");
+    }
+
+    // Capture the organisation name while the fresh token is in hand — this
+    // is the human-facing identity (dashboard chip, topbar). Non-fatal.
+    try
+    {
+        var client = dataClients.FirstOrDefault(c => c.Provider == parsed);
+        var token  = await svc.GetAccessTokenAsync(conn.PropertyManagerId, ct);
+        if (client is not null && token is not null)
+        {
+            var info = await client.GetCompanyInfoAsync(token, conn.RealmId, ct);
+            if (!string.IsNullOrWhiteSpace(info?.CompanyName))
+            {
+                await svc.SetCompanyNameAsync(conn.PropertyManagerId, info!.CompanyName, ct);
+            }
+        }
+    }
+    catch
+    {
+        // Sync backfills it later.
+    }
 
     // Guarantee a first sync server-side the moment the connection is
     // persisted — independent of any UI page. This is what keeps a freshly

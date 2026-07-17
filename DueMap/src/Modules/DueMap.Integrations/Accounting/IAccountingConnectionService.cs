@@ -35,7 +35,18 @@ public interface IAccountingConnectionService
     /// </summary>
     Task<string?> GetAccessTokenAsync(int propertyManagerId, CancellationToken ct);
 
-    Task DisconnectAsync(int propertyManagerId, CancellationToken ct);
+    /// <summary>
+    /// Marks the connection Disconnected (row is kept — it pins the workspace's
+    /// realm and preserves history). <paramref name="reason"/> is the PM's
+    /// optional free-text answer from the disconnect flow.
+    /// </summary>
+    Task DisconnectAsync(int propertyManagerId, string? reason, CancellationToken ct);
+
+    /// <summary>
+    /// Stores the provider organisation name ("Sandbox Company_US_1") on the
+    /// connection row. Called at connect time and by sync backfill.
+    /// </summary>
+    Task SetCompanyNameAsync(int propertyManagerId, string companyName, CancellationToken ct);
 
     /// <summary>
     /// Persists an already-exchanged OAuth token bundle as the PM's accounting

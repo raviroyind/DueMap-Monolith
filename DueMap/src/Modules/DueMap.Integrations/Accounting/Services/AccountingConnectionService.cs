@@ -99,6 +99,7 @@ internal sealed partial class AccountingConnectionService : IAccountingConnectio
             db.PmAccountingConnections.Add(conn);
         }
 
+        GuardRealmUnchanged(conn, input.Provider, tokens.RealmId);
         Hydrate(conn, input.Provider, tokens);
         await db.SaveChangesAsync(ct);
 
@@ -127,6 +128,7 @@ internal sealed partial class AccountingConnectionService : IAccountingConnectio
             db.PmAccountingConnections.Add(conn);
         }
 
+        GuardRealmUnchanged(conn, provider, tokens.RealmId);
         Hydrate(conn, provider, tokens);
         await db.SaveChangesAsync(ct);
 
@@ -190,15 +192,42 @@ internal sealed partial class AccountingConnectionService : IAccountingConnectio
         }
     }
 
-    public async Task DisconnectAsync(int propertyManagerId, CancellationToken ct)
+    public async Task DisconnectAsync(int propertyManagerId, string? reason, CancellationToken ct)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
         var conn = await db.PmAccountingConnections
             .FirstOrDefaultAsync(c => c.PropertyManagerId == propertyManagerId, ct);
         if (conn is null) return;
         conn.Status = ConnectionStatus.Disconnected;
+        conn.DisconnectReason = string.IsNullOrWhiteSpace(reason) ? null : Truncate(reason.Trim(), 500);
+        conn.DisconnectedAt = DateTime.UtcNow;
         conn.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
+    }
+
+    public async Task SetCompanyNameAsync(int propertyManagerId, string companyName, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(companyName);
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var conn = await db.PmAccountingConnections
+            .FirstOrDefaultAsync(c => c.PropertyManagerId == propertyManagerId, ct);
+        if (conn is null) return;
+        conn.CompanyName = Truncate(companyName.Trim(), 200);
+        conn.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// One workspace = one set of books. The connection row (kept even when
+    /// disconnected) pins the realm; connecting a different realm — or a
+    /// different provider — would silently mix two portfolios' customers,
+    /// invoices and leases. Same realm reconnects pass through untouched.
+    /// </summary>
+    private static void GuardRealmUnchanged(PmAccountingConnection conn, AccountingProvider provider, string newRealmId)
+    {
+        if (string.IsNullOrEmpty(conn.RealmId)) return;   // brand-new row — nothing bound yet
+        if (conn.Provider == provider && string.Equals(conn.RealmId, newRealmId, StringComparison.Ordinal)) return;
+        throw new RealmMismatchException(conn.Provider, conn.RealmId, provider, newRealmId);
     }
 
     private void Hydrate(PmAccountingConnection conn, AccountingProvider provider, OAuthTokens tokens)
@@ -222,6 +251,10 @@ internal sealed partial class AccountingConnectionService : IAccountingConnectio
         conn.HealthStatus    = ConnectionHealthStatus.Healthy;
         conn.PausedReason    = null;
         conn.LastHealthCheck = now;
+
+        // v28: a live connection has no disconnect story.
+        conn.DisconnectReason = null;
+        conn.DisconnectedAt   = null;
     }
 
     // ---- v17 / P0-3: health management --------------------------------------

@@ -26,6 +26,26 @@
     }
     else if (_conn is null)
     {
+        @* Realm-mismatch: the user OAuth'd into a DIFFERENT accounting company
+           than this workspace is bound to. Persistent alert (not a toast) —
+           this one has to be read, not glanced at. *@
+        @if (_realmMismatch)
+        {
+            <div class="alert alert-danger">
+                <svg class="alert-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                <div class="flex-1 min-w-0">
+                    <div class="alert-title">That's a different accounting company</div>
+                    <div class="text-xs mt-0.5 leading-relaxed">
+                        This workspace is linked to company <code class="font-mono">@_mismatchCurrent</code>, but you just
+                        authorized <code class="font-mono">@_mismatchAttempted</code>. To keep your tenants, invoices and
+                        leases from mixing two sets of books, DueMap allows one accounting company per workspace —
+                        nothing was changed. Reconnect using the original company, or create a separate DueMap
+                        workspace for the other one.
+                    </div>
+                </div>
+            </div>
+        }
+
         @* Onboarding banner — only shown when redirected from the dashboard
            gate. Explains why the user is here so they don't feel lost. *@
         @if (_onboarding)
@@ -47,7 +67,7 @@
         <section class="card">
             <header class="card-header">
                 <div class="card-title">Choose a provider</div>
-                <div class="card-subtitle">One active connection per workspace. You can switch providers later.</div>
+                <div class="card-subtitle">One accounting company per workspace — if this workspace was connected before, reconnect the same company.</div>
             </header>
             <div class="p-6 space-y-3">
                 @* Connect to QuickBooks — Intuit's official green-button SVG, used verbatim.
@@ -103,9 +123,13 @@
                     </div>
                     <div class="min-w-0">
                         <div class="flex items-center gap-2 flex-wrap">
-                            <h3 class="text-base font-semibold text-heading">@(_conn.Provider == AccountingProvider.QuickBooks ? "QuickBooks Online" : "Xero")</h3>
+                            <h3 class="text-base font-semibold text-heading">@(_conn.CompanyName ?? (_conn.Provider == AccountingProvider.QuickBooks ? "QuickBooks Online" : "Xero"))</h3>
                             <span class="badge @StatusBadge(_conn.Status)"><span class="dot"></span>@_conn.Status</span>
                         </div>
+                        @if (_conn.CompanyName is not null)
+                        {
+                            <div class="text-xs text-muted mt-0.5">@(_conn.Provider == AccountingProvider.QuickBooks ? "QuickBooks Online" : "Xero")</div>
+                        }
                         <div class="mt-1 text-xs text-muted flex flex-wrap items-center gap-x-3 gap-y-1">
                             <span class="inline-flex items-center gap-1">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
@@ -121,15 +145,15 @@
             <div class="px-6 py-5 grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-5">
                 <div>
                     <div class="text-xs uppercase tracking-wider font-medium text-muted mb-1.5">Last sync</div>
-                    <div class="text-lg font-semibold tracking-tight tabular-nums text-heading">@(_conn.LastSyncAt?.ToString("u") ?? "never")</div>
+                    <div class="text-lg font-semibold tracking-tight text-heading">@FriendlyTime.Utc(_conn.LastSyncAt)</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-wider font-medium text-muted mb-1.5">Access token expires</div>
-                    <div class="text-lg font-semibold tracking-tight tabular-nums text-heading">@_conn.AccessTokenExpiresAt.ToString("u")</div>
+                    <div class="text-lg font-semibold tracking-tight text-heading">@FriendlyTime.Utc(_conn.AccessTokenExpiresAt)</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-wider font-medium text-muted mb-1.5">Connected on</div>
-                    <div class="text-lg font-semibold tracking-tight tabular-nums text-heading">@_conn.ConnectedAt.ToString("u")</div>
+                    <div class="text-lg font-semibold tracking-tight text-heading">@FriendlyTime.Utc(_conn.ConnectedAt)</div>
                 </div>
             </div>
 
@@ -167,18 +191,62 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
                     Reconnect
                 </a>
-                <button class="btn btn-link text-danger" @onclick="Disconnect">Disconnect</button>
+                <button class="btn btn-link text-danger" @onclick="OpenDisconnect">Disconnect</button>
             </div>
 
         </section>
     }
 </div>
 
+@* DISCONNECT MODAL — confirm + optional reason (free-text, never required) *@
+@if (_showDisconnectModal)
+{
+    <div class="fixed inset-0 z-50 bg-[rgb(49_58_70/0.35)] backdrop-blur-sm flex items-center justify-center p-6"
+         @onclick="CloseDisconnect">
+        <div class="w-full max-w-md rounded-2xl bg-surface shadow-xl border border-line"
+             @onclick:stopPropagation="true">
+            <header class="px-6 py-4 border-b border-line">
+                <h3 class="text-base font-semibold">Disconnect @(_conn?.CompanyName ?? "your accounting system")?</h3>
+                <p class="text-xs text-muted mt-1 leading-relaxed">
+                    Syncing stops and every reminder and late-fee warning pauses until you reconnect.
+                    Your synced data stays in DueMap, and this workspace remains linked to the same
+                    company for when you come back.
+                </p>
+            </header>
+            <div class="px-6 py-5">
+                <label class="block text-sm font-medium text-heading mb-1.5">
+                    Why are you disconnecting? <span class="text-muted font-normal">(optional)</span>
+                </label>
+                <textarea rows="3" @bind="_disconnectReason" maxlength="500"
+                          placeholder="e.g. switching accountants, pausing for the season, testing something…"
+                          class="w-full px-3 py-2 rounded-lg bg-surface text-sm border border-line focus:outline-none focus:border-primary focus:ring-2 focus:ring-indigo-500/20"></textarea>
+            </div>
+            <footer class="px-6 py-3.5 border-t border-line bg-surface-2 flex items-center justify-end gap-2">
+                <button class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-heading hover:bg-surface-2 transition-colors"
+                        @onclick="CloseDisconnect">Cancel</button>
+                <button class="btn btn-danger btn-sm" @onclick="DisconnectAsync" disabled="@_disconnecting">
+                    @(_disconnecting ? "Disconnecting…" : "Disconnect")
+                </button>
+            </footer>
+        </div>
+    </div>
+}
+
 @code {
     private int? _pmId;
     private PmAccountingConnection? _conn;
     private bool _onboarding;
     private bool _syncing;
+
+    // Disconnect flow (v28)
+    private bool _showDisconnectModal;
+    private bool _disconnecting;
+    private string _disconnectReason = string.Empty;
+
+    // Realm-mismatch surfaced from the OAuth callback redirect
+    private bool _realmMismatch;
+    private string _mismatchCurrent = string.Empty;
+    private string _mismatchAttempted = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -188,6 +256,14 @@
         var uri = new Uri(Nav.Uri);
         var query = QueryHelpers.ParseQuery(uri.Query);
         _onboarding = query.TryGetValue("onboarding", out var v) && v == "1";
+
+        // The OAuth callback bounces realm-mismatch attempts back here.
+        if (query.TryGetValue("error", out var err) && err == "realm_mismatch")
+        {
+            _realmMismatch = true;
+            _mismatchCurrent   = query.TryGetValue("current", out var cur) ? cur.ToString() : "(unknown)";
+            _mismatchAttempted = query.TryGetValue("attempted", out var att) ? att.ToString() : "(unknown)";
+        }
 
         _pmId = await Pm.GetPmIdAsync();
         await LoadAsync();
@@ -200,12 +276,33 @@
         StateHasChanged();
     }
 
-    private async Task Disconnect()
+    private void OpenDisconnect()
     {
-        if (_pmId is not int id) return;
-        await ConnectionSvc.DisconnectAsync(id, CancellationToken.None);
-        Toast.Info("Accounting connection disconnected.");
-        await LoadAsync();
+        _disconnectReason = string.Empty;
+        _showDisconnectModal = true;
+    }
+
+    private void CloseDisconnect() => _showDisconnectModal = false;
+
+    private async Task DisconnectAsync()
+    {
+        if (_pmId is not int id || _disconnecting) return;
+        _disconnecting = true;
+        try
+        {
+            await ConnectionSvc.DisconnectAsync(id, _disconnectReason, CancellationToken.None);
+            _showDisconnectModal = false;
+            Toast.Info("Disconnected — syncing and notices are paused until you reconnect.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toast.Error($"Disconnect failed: {ex.Message}");
+        }
+        finally
+        {
+            _disconnecting = false;
+        }
     }
 
     private async Task SyncNow()

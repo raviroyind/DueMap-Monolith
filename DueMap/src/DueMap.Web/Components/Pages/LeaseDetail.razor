@@ -215,7 +215,7 @@
                                 {
                                     <div class="text-xs text-muted mt-0.5">@ev.Detail</div>
                                 }
-                                <div class="text-[11px] text-muted tabular-nums mt-1">@ev.Timestamp.ToString("u")</div>
+                                <div class="text-[11px] text-muted tabular-nums mt-1">@FriendlyTime.Utc(ev.Timestamp)</div>
                             </div>
                             @if (ev.WaiveAssessmentId is int feeId)
                             {

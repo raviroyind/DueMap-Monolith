@@ -57,6 +57,10 @@ public sealed class IntegrationsDbContext : DbContext
                 .HasConversion<byte>();
             e.Property(x => x.LastHealthCheck).HasColumnName("last_health_check");
             e.Property(x => x.PausedReason).HasColumnName("paused_reason").HasMaxLength(200);
+            // v28 — connection identity + disconnect telemetry.
+            e.Property(x => x.CompanyName).HasColumnName("company_name").HasMaxLength(200);
+            e.Property(x => x.DisconnectReason).HasColumnName("disconnect_reason").HasMaxLength(500);
+            e.Property(x => x.DisconnectedAt).HasColumnName("disconnected_at");
         });
 
         modelBuilder.Entity<OAuthAttempt>(e =>

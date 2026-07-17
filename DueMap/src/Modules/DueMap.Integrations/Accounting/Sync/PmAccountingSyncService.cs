@@ -74,6 +74,26 @@ internal sealed partial class PmAccountingSyncService : IPmAccountingSync
         var tenancyProvider = MapProvider(conn.Provider);
         var since = conn.LastSyncAt;   // null = full sync on first run
 
+        // v28 backfill: connections made before company_name existed learn
+        // their organisation name on the next sync. One extra API call, only
+        // while the name is missing; connect-time capture covers new ones.
+        if (string.IsNullOrEmpty(conn.CompanyName))
+        {
+            try
+            {
+                var info = await client.GetCompanyInfoAsync(accessToken, conn.RealmId, ct);
+                if (!string.IsNullOrWhiteSpace(info?.CompanyName))
+                {
+                    await _connections.SetCompanyNameAsync(propertyManagerId, info!.CompanyName, ct);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Cosmetic metadata — never fail a sync over it.
+                LogCompanyNameFetchFailed(_logger, ex, propertyManagerId);
+            }
+        }
+
         try
         {
             var customers = await client.ListCustomersAsync(accessToken, conn.RealmId, since, ct);
@@ -273,4 +293,8 @@ internal sealed partial class PmAccountingSyncService : IPmAccountingSync
     [LoggerMessage(EventId = 7003, Level = LogLevel.Error,
         Message = "Sync failed for pm={PropertyManagerId} provider={Provider}")]
     static partial void LogSyncFailed(ILogger logger, Exception ex, int propertyManagerId, AccountingProvider provider);
+
+    [LoggerMessage(EventId = 7004, Level = LogLevel.Warning,
+        Message = "Company-name backfill failed for pm={PropertyManagerId}; will retry next sync")]
+    static partial void LogCompanyNameFetchFailed(ILogger logger, Exception ex, int propertyManagerId);
 }

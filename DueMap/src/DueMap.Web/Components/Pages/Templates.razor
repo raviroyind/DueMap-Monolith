@@ -73,7 +73,7 @@
                                     <td class="cell-strong">@TypeName(o.NoticeTypeId)</td>
                                     <td>@(o.StateId.HasValue ? StateCode(o.StateId.Value) : "All states")</td>
                                     <td class="font-mono text-xs">@Truncate(o.Subject, 60)</td>
-                                    <td class="text-muted tabular">@o.UpdatedAt.ToString("u")</td>
+                                    <td class="text-muted tabular">@FriendlyTime.Utc(o.UpdatedAt)</td>
                                     <td class="text-right">
                                         <button class="btn btn-sm btn-secondary" @onclick="@(() => OpenExistingAsync(o))">Edit</button>
                                         <button class="btn btn-sm btn-link text-danger" @onclick="@(() => Deactivate(o.Id))">Remove</button>

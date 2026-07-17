@@ -12,6 +12,13 @@ public sealed class PmAccountingConnection
     public AccountingProvider Provider { get; set; }
     public string RealmId { get; set; } = default!;
 
+    /// <summary>
+    /// The QBO/Xero organisation name ("Sandbox Company_US_1"), captured at
+    /// connect time and backfilled by sync when missing. The human-facing
+    /// identity everywhere the raw realm id used to leak.
+    /// </summary>
+    public string? CompanyName { get; set; }
+
     public string AccessTokenProtected { get; set; } = default!;
     public string RefreshTokenProtected { get; set; } = default!;
     public DateTime AccessTokenExpiresAt { get; set; }
@@ -33,4 +40,37 @@ public sealed class PmAccountingConnection
 
     /// <summary>Short human reason for the current <see cref="ConnectionHealthStatus.Broken"/> state.</summary>
     public string? PausedReason { get; set; }
+
+    // ---- v28: disconnect telemetry --------------------------------------
+    /// <summary>Optional PM-supplied reason from the disconnect flow. Cleared on reconnect.</summary>
+    public string? DisconnectReason { get; set; }
+    public DateTime? DisconnectedAt { get; set; }
+}
+
+/// <summary>
+/// Thrown when a connect/reconnect attempt targets a DIFFERENT accounting
+/// company (realm/tenant, or a different provider) than the one this
+/// workspace is bound to. One workspace = one set of books: hydrating a new
+/// realm over existing customers/invoices/leases would silently mix two
+/// portfolios. The UI turns this into a "this workspace is linked to X"
+/// explanation instead of letting the switch happen.
+/// </summary>
+public sealed class RealmMismatchException : InvalidOperationException
+{
+    public AccountingProvider CurrentProvider { get; }
+    public string CurrentRealmId { get; }
+    public AccountingProvider AttemptedProvider { get; }
+    public string AttemptedRealmId { get; }
+
+    public RealmMismatchException(
+        AccountingProvider currentProvider, string currentRealmId,
+        AccountingProvider attemptedProvider, string attemptedRealmId)
+        : base($"This workspace is bound to {currentProvider} company (realm {currentRealmId}); " +
+               $"refusing to connect {attemptedProvider} realm {attemptedRealmId}.")
+    {
+        CurrentProvider = currentProvider;
+        CurrentRealmId = currentRealmId;
+        AttemptedProvider = attemptedProvider;
+        AttemptedRealmId = attemptedRealmId;
+    }
 }

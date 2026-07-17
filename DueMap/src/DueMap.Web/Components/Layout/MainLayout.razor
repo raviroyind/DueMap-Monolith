@@ -61,11 +61,11 @@ else if (_connected)
             <AuthorizeView>
                 <Authorized>
                     <div class="border-t sidebar-line p-3 shrink-0">
-                        <div class="side-link w-full">
+                        <div class="side-link w-full" title="@context.User.Identity?.Name">
                             <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0" style="background:var(--sidebar-hover-bg);color:var(--sidebar-item-hover);">
-                                @Initials(context.User.Identity?.Name)
+                                @Initials(_orgName ?? context.User.Identity?.Name)
                             </span>
-                            <span class="flex-1 min-w-0 text-left text-sm font-medium truncate" style="color:var(--sidebar-item-hover);">@(context.User.Identity?.Name ?? "User")</span>
+                            <span class="flex-1 min-w-0 text-left text-sm font-medium truncate" style="color:var(--sidebar-item-hover);">@(_orgName ?? context.User.Identity?.Name ?? "User")</span>
                         </div>
                     </div>
                 </Authorized>
@@ -86,7 +86,9 @@ else if (_connected)
                 <div class="flex items-center gap-2">
                     <AuthorizeView>
                         <Authorized>
-                            <span class="text-sm text-muted hidden md:inline">@context.User.Identity?.Name</span>
+                            @* Org name once the books are connected — the workspace
+                               identity a PM recognizes; email is the fallback. *@
+                            <span class="text-sm text-muted hidden md:inline" title="@context.User.Identity?.Name">@(_orgName ?? context.User.Identity?.Name)</span>
                             <form method="post" action="/Account/Logout">
                                 <button type="submit" class="btn btn-sm btn-secondary">Sign out</button>
                             </form>
@@ -135,6 +137,12 @@ else
 @code {
     private bool _initialized;
     private bool _connected;
+
+    // v28: the accounting organisation name ("Sandbox Company_US_2") shown as
+    // the workspace identity in the topbar + sidebar footer. Null until the
+    // books are connected (or for pre-v28 connections until sync backfills it),
+    // in which case the signed-in email renders instead.
+    private string? _orgName;
 
     // Mobile nav drawer. Hidden on desktop (md+), where the sidebar is a static
     // column. On mobile the hamburger toggles it; navigating or tapping the
@@ -211,6 +219,12 @@ else
         // to whichever step is still pending.
         var progress = await OnboardingProgress.GetAsync(pmId, CancellationToken.None);
         _connected = progress.IsComplete;
+
+        if (_connected)
+        {
+            var conn = await ConnectionSvc.GetActiveAsync(pmId, CancellationToken.None);
+            _orgName = string.IsNullOrWhiteSpace(conn?.CompanyName) ? null : conn!.CompanyName;
+        }
 
         if (!_connected)
         {

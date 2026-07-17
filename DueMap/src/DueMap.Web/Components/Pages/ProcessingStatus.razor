@@ -77,11 +77,11 @@
                                     <span class="w-1 h-1 rounded-full bg-line"></span>
                                     <span><span class="tabular-nums">@r.ActionsExecuted</span> actions</span>
                                     <span class="w-1 h-1 rounded-full bg-line"></span>
-                                    <span class="tabular-nums">@r.StartedAt.ToString("u")</span>
+                                    <span class="tabular-nums">@FriendlyTime.Utc(r.StartedAt)</span>
                                     @if (r.CompletedAt is not null)
                                     {
                                         <span class="w-1 h-1 rounded-full bg-line"></span>
-                                        <span class="tabular-nums">finished @r.CompletedAt.Value.ToString("u")</span>
+                                        <span class="tabular-nums">finished @FriendlyTime.Utc(r.CompletedAt.Value)</span>
                                     }
                                 </div>
                                 @if (!string.IsNullOrEmpty(r.FailureReason))

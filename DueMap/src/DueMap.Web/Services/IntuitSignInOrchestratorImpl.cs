@@ -241,12 +241,20 @@ internal sealed partial class IntuitSignInOrchestratorImpl : IIntuitSignInOrches
         try
         {
             await _connections.PersistDirectAsync(user.PropertyManagerId, AccountingProvider.QuickBooks, tokens, ct);
+            // The org name is the human-facing identity everywhere (topbar,
+            // dashboard chip) — we already fetched CompanyInfo above.
+            if (!string.IsNullOrWhiteSpace(company?.CompanyName))
+            {
+                await _connections.SetCompanyNameAsync(user.PropertyManagerId, company!.CompanyName, ct);
+            }
             await _progress.MarkConnectDoneAsync(user.PropertyManagerId, ct);
         }
         catch (Exception ex)
         {
             // Non-fatal: the user is signed-up + signed-in. They'll just be
             // routed through onboarding step 1 like a normal new user.
+            // (A RealmMismatchException lands here too — their workspace is
+            // bound to a different company; the connections page explains.)
             LogConnectionPersistFailed(_logger, ex, user.PropertyManagerId);
         }
 
