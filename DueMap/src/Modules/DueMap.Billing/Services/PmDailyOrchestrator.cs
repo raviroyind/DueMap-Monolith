@@ -14,6 +14,7 @@ internal sealed partial class PmDailyOrchestrator : IPmDailyOrchestrator
     private readonly ILeaseReader _leases;
     private readonly IAssessmentPlanner _planner;
     private readonly IActionExecutor _executor;
+    private readonly IPaymentPromiseService _promises;
     private readonly IFeatureFlags _flags;
     private readonly ILogger<PmDailyOrchestrator> _logger;
 
@@ -24,6 +25,7 @@ internal sealed partial class PmDailyOrchestrator : IPmDailyOrchestrator
         ILeaseReader leases,
         IAssessmentPlanner planner,
         IActionExecutor executor,
+        IPaymentPromiseService promises,
         IFeatureFlags flags,
         ILogger<PmDailyOrchestrator> logger)
     {
@@ -33,6 +35,7 @@ internal sealed partial class PmDailyOrchestrator : IPmDailyOrchestrator
         _leases = leases;
         _planner = planner;
         _executor = executor;
+        _promises = promises;
         _flags = flags;
         _logger = logger;
     }
@@ -110,6 +113,16 @@ internal sealed partial class PmDailyOrchestrator : IPmDailyOrchestrator
                 var reason = $"Accounting sync failed: {syncResult.FailureReason}";
                 await _runs.MarkFailedAsync(run.Id, reason, ct);
                 return new PmProcessingOutcome(true, 0, 0, 0, 0, reason);
+            }
+
+            // 2b. Resolve promises that came due — AFTER the sync so the
+            // kept-vs-broken decision sees today's balances. A kept promise
+            // closes quietly; a broken one flips to Broken so the planner
+            // stops suppressing and escalation resumes THIS run (task #112).
+            var promisesBroken = await _promises.ResolveDueAsync(propertyManagerId, businessDate, ct);
+            if (promisesBroken > 0)
+            {
+                LogPromisesBroken(_logger, promisesBroken, propertyManagerId, businessDate);
             }
 
             // 3. Plan + execute for each active lease.
@@ -223,6 +236,10 @@ internal sealed partial class PmDailyOrchestrator : IPmDailyOrchestrator
     [LoggerMessage(EventId = 4103, Level = LogLevel.Error,
         Message = "Processing crashed for PM {PropertyManagerId} on {BusinessDate}")]
     static partial void LogProcessingCrashed(ILogger logger, Exception ex, int propertyManagerId, DateOnly businessDate);
+
+    [LoggerMessage(EventId = 4104, Level = LogLevel.Information,
+        Message = "{Count} payment promise(s) broke for PM {PropertyManagerId} on {BusinessDate}; escalation resumes this run")]
+    static partial void LogPromisesBroken(ILogger logger, int count, int propertyManagerId, DateOnly businessDate);
 
     [LoggerMessage(EventId = 4111, Level = LogLevel.Information,
         Message = "DryRun completed for PM {PropertyManagerId} on {BusinessDate}: leases={LeasesPlanned} previews={ActionsPreviewed}")]

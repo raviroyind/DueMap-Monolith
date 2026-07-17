@@ -16,6 +16,7 @@
 @inject IPmNoticePreferencesService PmPrefs
 @inject ILateFeeAssessmentRepository LateFees
 @inject INoticeDeliveryRepository Deliveries
+@inject IPaymentPromiseService Promises
 @inject NavigationManager Nav
 
 <PageTitle>@(_lease is null ? "Lease" : $"Lease #{_lease.Id}") — DueMap</PageTitle>
@@ -58,7 +59,42 @@
                     monthly rent <span class="tabular-nums font-medium text-heading">@_lease.MonthlyRent.ToString("C", _money)</span>
                 </p>
             </div>
+            @if (_activePromise is null)
+            {
+                <button type="button" class="btn btn-sm btn-secondary shrink-0" @onclick="OpenPromise">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 12H3"/><path d="m15 16 4-4-4-4"/><path d="M21 12h-2"/></svg>
+                    Log promise to pay
+                </button>
+            }
         </div>
+
+        @* ACTIVE PROMISE — the machine is paused for this lease. Loud on
+           purpose: the PM must always be able to see WHY nothing is sending. *@
+        @if (_activePromise is not null)
+        {
+            <section class="rounded-xl border border-sky-200/70 dark:border-sky-500/20 bg-sky-50/60 dark:bg-sky-500/[0.07] px-5 py-4 flex items-start gap-3 flex-wrap">
+                <div class="w-9 h-9 rounded-full shrink-0 flex items-center justify-center bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                </div>
+                <div class="flex-1 min-w-[240px]">
+                    <div class="text-sm font-semibold text-sky-900 dark:text-sky-200">
+                        Notices paused — promise to pay @(_activePromise.Amount is decimal amt ? amt.ToString("C", _money) : "the full balance") by @_activePromise.PromisedDate.ToString("MMMM d, yyyy")
+                    </div>
+                    <div class="text-xs text-sky-800/80 dark:text-sky-300/80 mt-0.5 leading-relaxed">
+                        No reminders or late-fee warnings go out for this lease through the promised date.
+                        If the balance due by then isn't cleared, the promise is marked broken and escalation resumes automatically.
+                        @if (!string.IsNullOrEmpty(_activePromise.Note))
+                        {
+                            <span class="italic">"@_activePromise.Note"</span>
+                        }
+                    </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-ghost text-sky-800 dark:text-sky-300 shrink-0"
+                        @onclick="CancelPromiseAsync" disabled="@_promiseSaving">
+                    Cancel promise
+                </button>
+            </section>
+        }
 
         <!-- TENANT + LEASE FACTS -->
         <div class="grid md:grid-cols-2 gap-4">
@@ -196,6 +232,51 @@
     }
 </div>
 
+@* LOG PROMISE MODAL — records the verbal agreement and pauses the machine *@
+@if (_showPromiseModal)
+{
+    <div class="fixed inset-0 z-50 bg-[rgb(49_58_70/0.35)] backdrop-blur-sm flex items-center justify-center p-6"
+         @onclick="ClosePromise">
+        <div class="w-full max-w-md rounded-2xl bg-surface shadow-xl border border-line"
+             @onclick:stopPropagation="true">
+            <header class="px-6 py-4 border-b border-line">
+                <h3 class="text-base font-semibold">Log a promise to pay</h3>
+                <p class="text-xs text-muted mt-1">
+                    Pauses every reminder and late-fee warning for this lease through the promised date.
+                    If the balance isn't cleared by then, the promise is marked broken and escalation
+                    resumes automatically — with the whole history kept on the timeline.
+                </p>
+            </header>
+            <div class="px-6 py-5 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-heading mb-1.5">Promised amount <span class="text-muted font-normal">(blank = full balance)</span></label>
+                    <input type="number" step="0.01" min="0" @bind="_promiseAmount"
+                           placeholder="@(_balance > 0 ? _balance.ToString("0.##") : "1200")"
+                           class="w-full px-3 py-2 rounded-lg bg-surface text-sm border border-line focus:outline-none focus:border-primary focus:ring-2 focus:ring-indigo-500/20" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-heading mb-1.5">Pay-by date</label>
+                    <input type="date" @bind="_promiseDate" @bind:format="yyyy-MM-dd"
+                           class="w-full px-3 py-2 rounded-lg bg-surface text-sm border border-line focus:outline-none focus:border-primary focus:ring-2 focus:ring-indigo-500/20" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-heading mb-1.5">Note</label>
+                    <textarea rows="2" @bind="_promiseNote" maxlength="500"
+                              placeholder="e.g. agreed by phone — gets paid Friday"
+                              class="w-full px-3 py-2 rounded-lg bg-surface text-sm border border-line focus:outline-none focus:border-primary focus:ring-2 focus:ring-indigo-500/20"></textarea>
+                </div>
+            </div>
+            <footer class="px-6 py-3.5 border-t border-line bg-surface-2 flex items-center justify-end gap-2">
+                <button class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-heading hover:bg-surface-2 transition-colors"
+                        @onclick="ClosePromise">Cancel</button>
+                <button class="btn btn-primary btn-sm" @onclick="LogPromiseAsync" disabled="@_promiseSaving">
+                    @(_promiseSaving ? "Logging…" : "Log promise")
+                </button>
+            </footer>
+        </div>
+    </div>
+}
+
 @* WAIVE LATE FEE MODAL — requires a written reason so the audit trail is meaningful *@
 @if (_waiveFeeId is int)
 {
@@ -262,6 +343,74 @@
     private string _waiveReason = string.Empty;
     private bool _waiving;
 
+    // Promise-to-pay (task #112)
+    private IReadOnlyList<PaymentPromise> _promiseHistory = Array.Empty<PaymentPromise>();
+    private PaymentPromise? _activePromise;
+    private bool _showPromiseModal;
+    private bool _promiseSaving;
+    private decimal? _promiseAmount;
+    private DateTime _promiseDate = DateTime.Today.AddDays(3);
+    private string _promiseNote = string.Empty;
+
+    private void OpenPromise()
+    {
+        _promiseAmount = null;
+        _promiseDate = DateTime.Today.AddDays(3);
+        _promiseNote = string.Empty;
+        _showPromiseModal = true;
+    }
+
+    private void ClosePromise() => _showPromiseModal = false;
+
+    private async Task LogPromiseAsync()
+    {
+        if (_promiseSaving) return;
+        _promiseSaving = true;
+        try
+        {
+            var pmId = await Pm.GetPmIdAsync();
+            await Promises.CreateAsync(new NewPromiseInput(
+                PropertyManagerId: pmId,
+                LeaseId: LeaseId,
+                Amount: _promiseAmount,
+                PromisedDate: DateOnly.FromDateTime(_promiseDate),
+                Note: _promiseNote), CancellationToken.None);
+
+            _showPromiseModal = false;
+            Toast.Success($"Promise logged — notices for this lease are paused through {_promiseDate:MMMM d}.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toast.Error(ex.Message);
+        }
+        finally
+        {
+            _promiseSaving = false;
+        }
+    }
+
+    private async Task CancelPromiseAsync()
+    {
+        if (_activePromise is null || _promiseSaving) return;
+        _promiseSaving = true;
+        try
+        {
+            var pmId = await Pm.GetPmIdAsync();
+            await Promises.CancelAsync(_activePromise.Id, pmId, CancellationToken.None);
+            Toast.Info("Promise cancelled — notices resume on the next run.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toast.Error(ex.Message);
+        }
+        finally
+        {
+            _promiseSaving = false;
+        }
+    }
+
     // PM-book currency for every amount on the page (never host locale).
     private System.Globalization.CultureInfo _money = MoneyCultures.Usd;
 
@@ -269,6 +418,16 @@
     {
         _money = await Money.GetCultureAsync();
         await LoadAsync();
+
+        // Deep-link from the Today queue: /leases/{id}?promise=1 lands with
+        // the log-promise modal already open.
+        var query = new Uri(Nav.Uri).Query;
+        if (_lease is not null && _activePromise is null
+            && Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(query).TryGetValue("promise", out var v)
+            && v == "1")
+        {
+            OpenPromise();
+        }
     }
 
     protected override async Task OnParametersSetAsync()
@@ -312,6 +471,8 @@
                         .Where(i => i.LeaseId == LeaseId)
                         .OrderByDescending(i => i.DueDate)
                         .ToList();
+        _promiseHistory = await Promises.ListForLeaseAsync(LeaseId, ct);
+        _activePromise  = _promiseHistory.FirstOrDefault(p => p.Status == PromiseStatus.Active);
 
         _fees        = (await feesTask).ToList();
         _deliveries  = (await deliveryTask).ToList();
@@ -413,6 +574,61 @@
                 IconSvg = """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>""",
                 WaiveAssessmentId = reversed ? null : f.Id
             });
+        }
+
+        // Promise-to-pay (#112): a resolved promise contributes TWO events —
+        // "logged" (CreatedAt) and "kept/broken/cancelled" (ResolvedAt) — so
+        // the record reads exactly the way an eviction filing needs it:
+        // "tenant promised twice and broke both."
+        const string promiseIcon = """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>""";
+        foreach (var p in _promiseHistory)
+        {
+            var amountLabel = p.Amount is decimal a ? a.ToString("C", _money) : "full balance";
+            var noteLabel = string.IsNullOrEmpty(p.Note) ? "" : $" · \"{p.Note}\"";
+
+            events.Add(new TimelineEvent
+            {
+                Timestamp = p.CreatedAt,
+                Title = $"Promise to pay logged — {amountLabel} by {p.PromisedDate:yyyy-MM-dd}",
+                Detail = $"notices paused through the promised date{noteLabel}",
+                Pill = "Promise",
+                PillClass = "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400",
+                IconBg = "bg-sky-50 dark:bg-sky-500/10",
+                IconColor = "text-sky-600 dark:text-sky-400",
+                IconSvg = promiseIcon
+            });
+
+            if (p.ResolvedAt is DateTime resolved && p.Status != PromiseStatus.Active)
+            {
+                var (title, pill, pillClass, iconBg, iconColor) = p.Status switch
+                {
+                    PromiseStatus.Kept => (
+                        $"Promise kept — {amountLabel} paid by {p.PromisedDate:yyyy-MM-dd}",
+                        "Kept", "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400",
+                        "bg-emerald-50 dark:bg-emerald-500/10", "text-emerald-600 dark:text-emerald-400"),
+                    PromiseStatus.Broken => (
+                        $"Promise broken — {amountLabel} was due by {p.PromisedDate:yyyy-MM-dd}",
+                        "Broken", "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400",
+                        "bg-rose-50 dark:bg-rose-500/10", "text-rose-600 dark:text-rose-400"),
+                    _ => (
+                        $"Promise cancelled — {amountLabel} by {p.PromisedDate:yyyy-MM-dd}",
+                        "Cancelled", "bg-zinc-100 text-body dark:bg-zinc-800 dark:text-muted",
+                        "bg-surface-2", "text-muted")
+                };
+                events.Add(new TimelineEvent
+                {
+                    Timestamp = resolved,
+                    Title = title,
+                    Detail = p.Status == PromiseStatus.Broken
+                        ? "escalation resumed automatically"
+                        : "",
+                    Pill = pill,
+                    PillClass = pillClass,
+                    IconBg = iconBg,
+                    IconColor = iconColor,
+                    IconSvg = promiseIcon
+                });
+            }
         }
 
         return events.OrderByDescending(e => e.Timestamp).ToList();

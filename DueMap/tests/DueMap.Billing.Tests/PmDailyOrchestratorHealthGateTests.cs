@@ -33,10 +33,11 @@ public sealed class PmDailyOrchestratorHealthGateTests
     private readonly ILeaseReader               _leases      = Substitute.For<ILeaseReader>();
     private readonly IAssessmentPlanner         _planner     = Substitute.For<IAssessmentPlanner>();
     private readonly IActionExecutor            _executor    = Substitute.For<IActionExecutor>();
+    private readonly IPaymentPromiseService     _promises    = Substitute.For<IPaymentPromiseService>();
     private readonly IFeatureFlags              _flags       = Substitute.For<IFeatureFlags>();
 
     private PmDailyOrchestrator NewSut() => new(
-        _runs, _sync, _connections, _leases, _planner, _executor, _flags,
+        _runs, _sync, _connections, _leases, _planner, _executor, _promises, _flags,
         NullLogger<PmDailyOrchestrator>.Instance);
 
     // ----------------------------------------------------------------------

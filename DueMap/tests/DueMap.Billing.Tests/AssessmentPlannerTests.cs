@@ -18,10 +18,21 @@ public sealed class AssessmentPlannerTests
     private readonly IRentInvoiceRepository _invoices = Substitute.For<IRentInvoiceRepository>();
     private readonly IRulesService _rules = Substitute.For<IRulesService>();
     private readonly ISequenceResolver _sequences = Substitute.For<ISequenceResolver>();
+    private readonly IPaymentPromiseReader _promises = Substitute.For<IPaymentPromiseReader>();
     private readonly DueMap.Common.FeatureFlags.IFeatureFlags _flags = Substitute.For<DueMap.Common.FeatureFlags.IFeatureFlags>();
 
     // billing.sequences defaults OFF (mock returns false) → legacy cadence.
-    private AssessmentPlanner NewSut() => new(_policy, _schedule, _invoices, _rules, _sequences, _flags);
+    // The promise mock defaults to null → no suppression.
+    private AssessmentPlanner NewSut() => new(_policy, _schedule, _invoices, _rules, _sequences, _promises, _flags);
+
+    private void StubActivePromise(DateOnly promisedDate) =>
+        _promises.GetActiveForLeaseAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+                 .Returns(new PaymentPromise
+                 {
+                     Id = 7, LeaseId = 1, PropertyManagerId = 10,
+                     Amount = 1200m, PromisedDate = promisedDate,
+                     Status = PromiseStatus.Active, CreatedAt = DateTime.UtcNow
+                 });
 
     private static Lease Lease() =>
         new() { Id = 1, PropertyManagerId = 10, StateId = 5, MonthlyRent = 2000m,
@@ -233,5 +244,46 @@ public sealed class AssessmentPlannerTests
         var plan = await NewSut().PlanAsync(Lease(), Today, CancellationToken.None);
 
         Assert.Equal(4, plan.DaysRelativeToDue);
+    }
+
+    // ---- Promise-to-pay (task #112) --------------------------------------
+
+    [Fact]
+    public async Task Active_promise_covering_the_date_pauses_the_whole_sequence()
+    {
+        // Tenant is 1 day late — normally the grace reminder would fire.
+        StubPolicy(Policy());
+        StubDueDate(Today.AddDays(-1));
+        StubActivePromise(promisedDate: Today.AddDays(3));   // "I'll pay Friday"
+
+        var plan = await NewSut().PlanAsync(Lease(), Today, CancellationToken.None);
+
+        Assert.Empty(plan.Actions);
+    }
+
+    [Fact]
+    public async Task Promise_pauses_through_the_promised_day_itself()
+    {
+        StubPolicy(Policy());
+        StubDueDate(Today.AddDays(-1));
+        StubActivePromise(promisedDate: Today);   // due TODAY — tenant has all day
+
+        var plan = await NewSut().PlanAsync(Lease(), Today, CancellationToken.None);
+
+        Assert.Empty(plan.Actions);
+    }
+
+    [Fact]
+    public async Task Stale_active_promise_past_its_date_does_not_suppress()
+    {
+        // Belt-and-braces: if resolution didn't run for some reason, an Active
+        // promise whose date already passed must NOT keep the machine paused.
+        StubPolicy(Policy());
+        StubDueDate(Today.AddDays(-1));           // grace reminder day
+        StubActivePromise(promisedDate: Today.AddDays(-1));
+
+        var plan = await NewSut().PlanAsync(Lease(), Today, CancellationToken.None);
+
+        Assert.Contains(plan.Actions, a => a.Kind == ActionKind.SendGracePeriodReminder);
     }
 }

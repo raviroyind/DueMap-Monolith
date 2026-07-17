@@ -48,6 +48,10 @@ public sealed class TenancyModule : IModule
         services.AddScoped<IPropertyManagerWriter, PropertyManagerWriter>();
         services.AddScoped<ILeaseLinkService, LeaseLinkService>();
         services.AddScoped<ILeaseWriter, LeaseWriter>();
+        // Promise-to-pay (#112). The reader alias gives the Billing planner a
+        // read-only surface without exposing the mutating service.
+        services.AddScoped<IPaymentPromiseService, PaymentPromiseService>();
+        services.AddScoped<IPaymentPromiseReader>(sp => sp.GetRequiredService<IPaymentPromiseService>());
         services.AddScoped<IOnboardingProgressService, OnboardingProgressService>();
         services.AddScoped<IPmDailyCloseSettingsService, PmDailyCloseSettingsService>();
         services.AddScoped<ITenantPortalAuth, TenantPortalAuth>();

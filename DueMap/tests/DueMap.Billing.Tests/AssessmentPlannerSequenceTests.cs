@@ -24,11 +24,12 @@ public sealed class AssessmentPlannerSequenceTests
     private readonly IRentInvoiceRepository  _invoices = Substitute.For<IRentInvoiceRepository>();
     private readonly IRulesService           _rules    = Substitute.For<IRulesService>();
     private readonly ISequenceResolver       _sequences = Substitute.For<ISequenceResolver>();
+    private readonly IPaymentPromiseReader   _promises = Substitute.For<IPaymentPromiseReader>();
     private readonly IFeatureFlags           _flags    = Substitute.For<IFeatureFlags>();
 
     private const int PmId = 10;
 
-    private AssessmentPlanner NewSut() => new(_policy, _schedule, _invoices, _rules, _sequences, _flags);
+    private AssessmentPlanner NewSut() => new(_policy, _schedule, _invoices, _rules, _sequences, _promises, _flags);
 
     private static Lease Lease() =>
         new() { Id = 1, PropertyManagerId = PmId, StateId = 5, MonthlyRent = 2000m, StartDate = new DateOnly(2024, 1, 1) };

@@ -31,6 +31,7 @@ internal sealed class AssessmentPlanner : IAssessmentPlanner
     private readonly IRentInvoiceRepository _invoices;
     private readonly IRulesService _rules;
     private readonly ISequenceResolver _sequences;
+    private readonly IPaymentPromiseReader _promises;
     private readonly IFeatureFlags _flags;
 
     public AssessmentPlanner(
@@ -39,6 +40,7 @@ internal sealed class AssessmentPlanner : IAssessmentPlanner
         IRentInvoiceRepository invoices,
         IRulesService rules,
         ISequenceResolver sequences,
+        IPaymentPromiseReader promises,
         IFeatureFlags flags)
     {
         _policySvc = policySvc;
@@ -46,6 +48,7 @@ internal sealed class AssessmentPlanner : IAssessmentPlanner
         _invoices = invoices;
         _rules = rules;
         _sequences = sequences;
+        _promises = promises;
         _flags = flags;
     }
 
@@ -70,6 +73,28 @@ internal sealed class AssessmentPlanner : IAssessmentPlanner
                 CurrentDueDate:    stagedDueDate,
                 AssessmentDate:    assessmentDate,
                 DaysRelativeToDue: assessmentDate.DayNumber - stagedDueDate.DayNumber,
+                Actions:           Array.Empty<PlannedAction>());
+        }
+
+        // Promise-to-pay (task #112): a logged promise pauses this lease's
+        // WHOLE notice sequence through the promised date — the tenant said
+        // "I'll pay Friday" and escalating anyway makes the PM look like a
+        // liar. The orchestrator resolves overdue promises (Kept/Broken)
+        // BEFORE planning, so by the time we run here an Active promise is
+        // either still covering the date (suppress) or freshly Broken (no
+        // suppression — escalation resumes this very run). The date guard is
+        // belt-and-braces for an unresolved stale row: an Active promise whose
+        // date has passed must never keep the machine paused.
+        var promise = await _promises.GetActiveForLeaseAsync(lease.Id, ct);
+        if (promise is not null && assessmentDate <= promise.PromisedDate)
+        {
+            var pausedDueDate = await _invoices.GetCurrentDueDateAsync(lease.Id, assessmentDate, ct)
+                              ?? _schedule.GetCurrentDueDate(lease, assessmentDate);
+            return new AssessmentPlan(
+                LeaseId:           lease.Id,
+                CurrentDueDate:    pausedDueDate,
+                AssessmentDate:    assessmentDate,
+                DaysRelativeToDue: assessmentDate.DayNumber - pausedDueDate.DayNumber,
                 Actions:           Array.Empty<PlannedAction>());
         }
 

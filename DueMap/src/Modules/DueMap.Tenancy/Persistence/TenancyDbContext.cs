@@ -16,12 +16,31 @@ public sealed class TenancyDbContext : DbContext
     public DbSet<RentInvoice>          RentInvoices         => Set<RentInvoice>();
     public DbSet<PmDailyCloseSettings> PmDailyCloseSettings => Set<PmDailyCloseSettings>();
     public DbSet<TenantLogin>          TenantLogins         => Set<TenantLogin>();
+    public DbSet<PaymentPromise>       PaymentPromises      => Set<PaymentPromise>();
     public DbSet<TenantMagicLink>      TenantMagicLinks     => Set<TenantMagicLink>();
     public DbSet<TenantSession>        TenantSessions       => Set<TenantSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("tenancy");
+
+        // v27 — promise-to-pay (task #112).
+        modelBuilder.Entity<PaymentPromise>(e =>
+        {
+            e.ToTable("payment_promises");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.PropertyManagerId).HasColumnName("property_manager_id");
+            e.Property(x => x.LeaseId).HasColumnName("lease_id");
+            e.Property(x => x.Amount).HasColumnName("amount").HasColumnType("decimal(18,2)");
+            e.Property(x => x.PromisedDate).HasColumnName("promised_date");
+            e.Property(x => x.Note).HasColumnName("note").HasMaxLength(500);
+            e.Property(x => x.Status).HasColumnName("status").HasConversion<byte>();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.ResolvedAt).HasColumnName("resolved_at");
+            e.HasIndex(x => new { x.LeaseId, x.Status });
+            e.HasIndex(x => new { x.PropertyManagerId, x.Status, x.PromisedDate });
+        });
 
         modelBuilder.Entity<PropertyManager>(e =>
         {
