@@ -371,6 +371,7 @@
    without an ic-* class fall back to the muted --sidebar-item colour. The
    colour persists in the active state (the active row is already cued by the
    filled bg, bold label and inset primary bar). */
+.side-link.ic-today      { --icon-color: #fbbf24; } /* gold — the inbox */
 .side-link.ic-dashboard  { --icon-color: #727cf5; } /* indigo */
 .side-link.ic-assistant  { --icon-color: #e879f9; } /* fuchsia */
 .side-link.ic-accounting { --icon-color: #39afd1; } /* cyan   */

@@ -17,6 +17,7 @@ public sealed class TenancyDbContext : DbContext
     public DbSet<PmDailyCloseSettings> PmDailyCloseSettings => Set<PmDailyCloseSettings>();
     public DbSet<TenantLogin>          TenantLogins         => Set<TenantLogin>();
     public DbSet<PaymentPromise>       PaymentPromises      => Set<PaymentPromise>();
+    public DbSet<WorkItemDismissal>    WorkItemDismissals   => Set<WorkItemDismissal>();
     public DbSet<TenantMagicLink>      TenantMagicLinks     => Set<TenantMagicLink>();
     public DbSet<TenantSession>        TenantSessions       => Set<TenantSession>();
 
@@ -40,6 +41,18 @@ public sealed class TenancyDbContext : DbContext
             e.Property(x => x.ResolvedAt).HasColumnName("resolved_at");
             e.HasIndex(x => new { x.LeaseId, x.Status });
             e.HasIndex(x => new { x.PropertyManagerId, x.Status, x.PromisedDate });
+        });
+
+        // v27 — Today-queue dismissals (task #113).
+        modelBuilder.Entity<WorkItemDismissal>(e =>
+        {
+            e.ToTable("work_item_dismissals");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.PropertyManagerId).HasColumnName("property_manager_id");
+            e.Property(x => x.ItemKey).HasColumnName("item_key").HasMaxLength(200).IsRequired();
+            e.Property(x => x.DismissedAt).HasColumnName("dismissed_at");
+            e.HasIndex(x => new { x.PropertyManagerId, x.ItemKey }).IsUnique();
         });
 
         modelBuilder.Entity<PropertyManager>(e =>

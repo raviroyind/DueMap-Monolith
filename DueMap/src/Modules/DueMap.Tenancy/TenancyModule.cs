@@ -52,6 +52,8 @@ public sealed class TenancyModule : IModule
         // read-only surface without exposing the mutating service.
         services.AddScoped<IPaymentPromiseService, PaymentPromiseService>();
         services.AddScoped<IPaymentPromiseReader>(sp => sp.GetRequiredService<IPaymentPromiseService>());
+        // Today-queue dismissals (#113).
+        services.AddScoped<IWorkQueueDismissalService, WorkQueueDismissalService>();
         services.AddScoped<IOnboardingProgressService, OnboardingProgressService>();
         services.AddScoped<IPmDailyCloseSettingsService, PmDailyCloseSettingsService>();
         services.AddScoped<ITenantPortalAuth, TenantPortalAuth>();

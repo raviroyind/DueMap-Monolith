@@ -74,6 +74,9 @@ builder.Services.AddScoped<DueMap.Web.Services.PmMoney>();
 // Transient action-feedback toasts, rendered by ToastHost in every layout.
 builder.Services.AddScoped<DueMap.Web.Services.ToastService>();
 
+// /today work-queue aggregation (task #113) — composes existing readers.
+builder.Services.AddScoped<DueMap.Web.Services.TodayQueueService>();
+
 // Stateless Excel/CSV parser used by the rent-roll importer. Singleton is
 // safe — no mutable state, just helper methods over ClosedXML.
 builder.Services.AddSingleton<DueMap.Web.Services.RentRollParser>();

@@ -1,0 +1,155 @@
+@page "/today"
+@using DueMap.Tenancy
+@using DueMap.Web.Services
+@inject PmContext Pm
+@inject TodayQueueService Queue
+@inject IWorkQueueDismissalService Dismissals
+@inject ToastService Toast
+@inject NavigationManager Nav
+
+<PageTitle>Today — DueMap</PageTitle>
+
+<div class="max-w-5xl mx-auto px-8 py-8 space-y-6">
+
+    <div class="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+            <h2 class="page-title">Today</h2>
+            <p class="mt-1.5 text-sm text-muted max-w-2xl leading-relaxed">
+                What needs a human — not what the robot did. Failed notices, broken promises,
+                fees about to post, autopay trouble, leases running out. Handle it or dismiss it.
+            </p>
+        </div>
+        <button type="button" class="btn btn-sm btn-secondary shrink-0" @onclick="ReloadAsync" disabled="@_loading">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="@(_loading ? "animate-spin" : "")"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+            Refresh
+        </button>
+    </div>
+
+    @if (_loading)
+    {
+        <p class="text-muted">Checking the portfolio…</p>
+    }
+    else if (_items.Count == 0)
+    {
+        <section class="rounded-2xl border border-emerald-200/70 dark:border-emerald-500/20 bg-emerald-50/40 dark:bg-emerald-500/[0.06] px-8 py-14 text-center">
+            <div class="inline-flex w-12 h-12 rounded-2xl bg-emerald-500 items-center justify-center text-white mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </div>
+            <h3 class="text-lg font-semibold tracking-tight">Nothing needs you</h3>
+            <p class="mt-1.5 text-sm text-muted">Every notice delivered, no promises broken, no fees imminent. The machine is running clean.</p>
+        </section>
+    }
+    else
+    {
+        <section class="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
+            <header class="px-6 py-4 border-b border-line flex items-center justify-between">
+                <h3 class="text-sm font-semibold">@_items.Count item@(_items.Count == 1 ? "" : "s") need@(_items.Count == 1 ? "s" : "") attention</h3>
+                <span class="text-xs text-muted">highest urgency first</span>
+            </header>
+            <ol class="divide-y divide-[color:var(--line)]">
+                @foreach (var item in _items)
+                {
+                    var it = item;
+                    <li class="px-6 py-4 flex items-start gap-4">
+                        <div class="w-9 h-9 rounded-full shrink-0 flex items-center justify-center @IconClasses(it.Priority)">
+                            @((MarkupString)IconSvg(it.Priority))
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-sm font-medium">@it.Title</span>
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wider @ChipClasses(it.Priority)">@it.Category</span>
+                            </div>
+                            <div class="text-xs text-muted mt-0.5 leading-relaxed">@it.Detail</div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            @if (it.LeaseId is int leaseId)
+                            {
+                                <a href="/leases/@leaseId" class="btn btn-sm btn-secondary">Open lease</a>
+                                @if (it.OfferPromise)
+                                {
+                                    <a href="/leases/@leaseId?promise=1" class="btn btn-sm btn-soft-primary">Log promise</a>
+                                }
+                            }
+                            <button type="button" class="btn btn-icon btn-sm btn-ghost" title="Dismiss — don't show this again"
+                                    @onclick="@(() => DismissAsync(it))">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                            </button>
+                        </div>
+                    </li>
+                }
+            </ol>
+        </section>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private IReadOnlyList<TodayItem> _items = Array.Empty<TodayItem>();
+    private int _pmId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _pmId = await Pm.GetPmIdAsync();
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            _items = await Queue.BuildAsync(_pmId, today, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Toast.Error($"Couldn't build the queue: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task DismissAsync(TodayItem item)
+    {
+        try
+        {
+            await Dismissals.DismissAsync(_pmId, item.Key, CancellationToken.None);
+            _items = _items.Where(i => i.Key != item.Key).ToList();
+            Toast.Info("Dismissed — it won't come back.");
+        }
+        catch (Exception ex)
+        {
+            Toast.Error(ex.Message);
+        }
+    }
+
+    private static string IconClasses(TodayPriority p) => p switch
+    {
+        TodayPriority.DeliveryFailed => "bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400",
+        TodayPriority.PromiseBroken  => "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400",
+        TodayPriority.FeeImminent    => "bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400",
+        TodayPriority.AutopayProblem => "bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400",
+        _                            => "bg-surface-2 text-muted"
+    };
+
+    private static string ChipClasses(TodayPriority p) => p switch
+    {
+        TodayPriority.DeliveryFailed => "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400",
+        TodayPriority.PromiseBroken  => "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400",
+        TodayPriority.FeeImminent    => "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400",
+        TodayPriority.AutopayProblem => "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400",
+        _                            => "bg-zinc-100 text-body dark:bg-zinc-800 dark:text-muted"
+    };
+
+    private static string IconSvg(TodayPriority p) => p switch
+    {
+        TodayPriority.DeliveryFailed => """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/><path d="m17 17 4 4"/><path d="m21 17-4 4"/></svg>""",
+        TodayPriority.PromiseBroken  => """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>""",
+        TodayPriority.FeeImminent    => """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>""",
+        TodayPriority.AutopayProblem => """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>""",
+        _                            => """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>"""
+    };
+}
