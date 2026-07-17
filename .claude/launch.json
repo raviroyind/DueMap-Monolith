@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "duemap-web",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "DueMap/src/DueMap.Web/DueMap.Web.csproj", "--no-build", "--launch-profile", "DueMap.Web", "--", "--urls", "http://localhost:63055"],
+      "port": 63055
+    }
+  ]
+}

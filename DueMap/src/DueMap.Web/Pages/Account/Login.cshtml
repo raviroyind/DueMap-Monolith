@@ -5,6 +5,12 @@
     ViewData["Subtitle"] = "Sign in to your property manager account";
 }
 
+
+@if (ViewData["Subtitle"] is string sub)
+{
+    <p class="mt-1 text-sm text-muted">@sub</p>
+}
+
 @if (TempData["SsoNotice"] is string ssoNotice)
 {
     <div class="alert alert-primary mb-5">@ssoNotice</div>
