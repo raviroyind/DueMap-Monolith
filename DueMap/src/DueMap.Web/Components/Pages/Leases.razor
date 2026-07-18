@@ -32,7 +32,7 @@
         <div>
             <div class="flex items-center gap-3">
                 <h2 class="page-title">Leases</h2>
-                <span class="badge badge-neutral tabular">@_rows.Count active</span>
+                <span class="badge badge-neutral tabular">@_rows.Count lease@(_rows.Count == 1 ? "" : "s")</span>
             </div>
             <p class="mt-1.5 text-sm text-muted">
                 Per-lease status, balances, and notice settings. Empty settings inherit your
@@ -64,14 +64,14 @@
             <div class="relative flex-1 min-w-[280px] max-w-md">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none z-10"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                 <input type="search" placeholder="Search tenant name or lease id"
-                       @bind="_search" @bind:event="oninput"
+                       @bind="_search" @bind:event="oninput" @bind:after="() => _page = 0"
                        class="form-control pl-9" />
             </div>
             <div class="flex items-center gap-1.5 flex-wrap">
                 @foreach (var f in _filters)
                 {
                     var active = _activeFilter == f.Key;
-                    <button type="button" @onclick="@(() => _activeFilter = f.Key)"
+                    <button type="button" @onclick="@(() => { _activeFilter = f.Key; _page = 0; })"
                             class="@(active ? "btn btn-sm btn-primary" : "btn btn-sm btn-secondary")">
                         @f.Label
                         <span class="text-[11px] tabular-nums opacity-80">@CountFor(f.Key)</span>
@@ -125,7 +125,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var row in _filtered)
+                        @foreach (var row in _paged)
                         {
                             var isSelected = _selected.Contains(row.Lease.Id);
                             var leaseId = row.Lease.Id;
@@ -177,13 +177,15 @@
                         @if (_filtered.Count == 0)
                         {
                             <tr><td colspan="7" class="px-6 py-12 text-center text-sm text-muted">
-                                @if (_rows.Count == 0) { @("No active leases.") }
+                                @if (_rows.Count == 0) { @("No leases yet — import a rent roll or create one.") }
                                 else if (!string.IsNullOrEmpty(_search)) { @($"No leases match \"{_search}\".") }
                                 else { @("No leases match this filter.") }
                             </td></tr>
                         }
                     </tbody>
                 </table>
+                <Pager Page="_page" PageSize="PageSize" TotalItems="_filtered.Count"
+                       ItemNoun="lease" PageChanged="OnPageChanged" />
             </div>
         </div>
     }
@@ -403,8 +405,10 @@
 }
 
 @code {
-    private enum LeaseStatus { Current, InGrace, Overdue, LateFeePosted }
-    private enum FilterKey { All, Current, InGrace, Overdue, LateFee }
+    // Upcoming/Ended are lifecycle states outside the collection cycle: the
+    // engine ignores those leases, but the PM still has to see them.
+    private enum LeaseStatus { Upcoming, Current, InGrace, Overdue, LateFeePosted, Ended }
+    private enum FilterKey { All, Upcoming, Current, InGrace, Overdue, LateFee, Ended }
 
     private sealed record Row(
         Lease Lease,
@@ -420,10 +424,12 @@
     private readonly Filter[] _filters =
     {
         new(FilterKey.All,        "All"),
+        new(FilterKey.Upcoming,   "Upcoming"),
         new(FilterKey.Current,    "Current"),
         new(FilterKey.InGrace,    "In grace"),
         new(FilterKey.Overdue,    "Overdue"),
-        new(FilterKey.LateFee,    "Late fee posted")
+        new(FilterKey.LateFee,    "Late fee posted"),
+        new(FilterKey.Ended,      "Ended")
     };
 
     private int? _pmId;
@@ -447,6 +453,25 @@
     private List<RulesState> _allStates = new();
 
     private List<Row> _filtered => ApplyFilter();
+
+    // --- paging ------------------------------------------------------------
+    private const int PageSize = 25;
+    private int _page;
+
+    /// <summary>The slice actually rendered. Clamped so a filter/search that
+    /// shrinks the result set can't strand the user on an empty page.</summary>
+    private List<Row> _paged
+    {
+        get
+        {
+            var rows = _filtered;
+            var maxPage = Math.Max(0, (int)Math.Ceiling(rows.Count / (double)PageSize) - 1);
+            if (_page > maxPage) _page = maxPage;
+            return rows.Skip(_page * PageSize).Take(PageSize).ToList();
+        }
+    }
+
+    private void OnPageChanged(int page) => _page = page;
 
     private bool AllSelected => _filtered.Count > 0 && _filtered.All(r => _selected.Contains(r.Lease.Id));
 
@@ -485,7 +510,11 @@
         // Tenancy services to IDbContextFactory.)
         var lastNoticeTask = Deliveries.ListLatestByLeaseAsync(id, ct);
 
-        var leases    = await LeaseReader.ListActiveAsync(id, today, ct);
+        // The whole portfolio — not just today's active window. A future-dated
+        // or ended lease still belongs on this screen (it just can't be in a
+        // collection state); showing only active ones made the grid look empty
+        // to a PM who definitely had leases.
+        var leases    = await LeaseReader.ListAllAsync(id, ct);
         var settings  = (await SettingsService.ListForPropertyManagerAsync(id, ct)).ToDictionary(s => s.LeaseId);
         var customerList = await CustomerRepo.ListByPropertyManagerAsync(id, ct);
         _allCustomers = customerList.Where(c => c.IsActive).ToList();
@@ -519,7 +548,7 @@
             var balance       = leaseInvoices.Where(i => i.Status == RentInvoiceStatus.Open).Sum(i => i.Balance);
             var oldestOpen    = leaseInvoices.Where(i => i.Status == RentInvoiceStatus.Open).OrderBy(i => i.DueDate).FirstOrDefault();
             var daysPastDue   = oldestOpen is null ? 0 : Math.Max(0, today.DayNumber - oldestOpen.DueDate.DayNumber);
-            var status        = DeriveStatus(daysPastDue, oldestOpen, leaseSettings, prefs, feesByLease.GetValueOrDefault(l.Id));
+            var status        = DeriveStatus(l, today, daysPastDue, oldestOpen, leaseSettings, prefs, feesByLease.GetValueOrDefault(l.Id));
             var lastNoticeRow = lastNotice.TryGetValue(l.Id, out var nd) ? nd : null;
 
             return new Row(
@@ -539,10 +568,17 @@
 
     // Status taxonomy — the order of these checks matters.
     private static LeaseStatus DeriveStatus(
+        Lease lease, DateOnly today,
         int daysPastDue, RentInvoice? oldestOpen,
         LeaseNoticeSettings leaseSettings, PmNoticePreferences prefs,
         LateFeeAssessment? assessedFee)
     {
+        // 0. Outside its term the lease has no collection state — the engine
+        //    skips it (ListActiveAsync uses the same window), so say so rather
+        //    than implying it's current.
+        if (lease.StartDate > today) return LeaseStatus.Upcoming;
+        if (lease.EndDate is DateOnly end && end < today) return LeaseStatus.Ended;
+
         // 1. Active late fee posted for the current cycle → that wins.
         if (assessedFee is not null && oldestOpen is not null && assessedFee.DueDate == oldestOpen.DueDate)
         {
@@ -569,10 +605,12 @@
 
         q = _activeFilter switch
         {
+            FilterKey.Upcoming => q.Where(r => r.Status == LeaseStatus.Upcoming),
             FilterKey.Current => q.Where(r => r.Status == LeaseStatus.Current),
             FilterKey.InGrace => q.Where(r => r.Status == LeaseStatus.InGrace),
             FilterKey.Overdue => q.Where(r => r.Status == LeaseStatus.Overdue),
             FilterKey.LateFee => q.Where(r => r.Status == LeaseStatus.LateFeePosted),
+            FilterKey.Ended   => q.Where(r => r.Status == LeaseStatus.Ended),
             _ => q
         };
 
@@ -591,6 +629,8 @@
             FilterKey.InGrace => pool.Count(r => r.Status == LeaseStatus.InGrace),
             FilterKey.Overdue => pool.Count(r => r.Status == LeaseStatus.Overdue),
             FilterKey.LateFee => pool.Count(r => r.Status == LeaseStatus.LateFeePosted),
+            FilterKey.Upcoming => pool.Count(r => r.Status == LeaseStatus.Upcoming),
+            FilterKey.Ended    => pool.Count(r => r.Status == LeaseStatus.Ended),
             _ => pool.Count
         };
     }
@@ -604,6 +644,7 @@
         LeaseStatus.InGrace        => "badge-warning",
         LeaseStatus.Overdue        => "badge-danger",
         LeaseStatus.LateFeePosted  => "badge-danger font-semibold",
+        LeaseStatus.Upcoming       => "badge-info",
         _ => "badge-neutral"
     };
 
@@ -613,6 +654,8 @@
         LeaseStatus.InGrace        => $"In grace · {r.DaysPastDue}d",
         LeaseStatus.Overdue        => $"Overdue {r.DaysPastDue}d",
         LeaseStatus.LateFeePosted  => "Late fee posted",
+        LeaseStatus.Upcoming       => $"Starts {r.Lease.StartDate:MMM d}",
+        LeaseStatus.Ended          => r.Lease.EndDate is DateOnly e ? $"Ended {e:MMM d}" : "Ended",
         _ => "—"
     };
 

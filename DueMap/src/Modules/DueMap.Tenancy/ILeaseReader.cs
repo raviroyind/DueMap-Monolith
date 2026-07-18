@@ -21,6 +21,15 @@ public interface ILeaseReader
     Task<IReadOnlyList<int>> ListPropertyManagerIdsWithActiveLeasesAsync(DateOnly asOf, CancellationToken ct);
 
     /// <summary>
+    /// EVERY lease for the PM regardless of date — including ones that haven't
+    /// started yet and ones that have ended. The engine only ever assesses
+    /// ACTIVE leases (<see cref="ListActiveAsync"/>), but the Leases screen has
+    /// to show the whole portfolio: a PM who created a future-dated lease and
+    /// then saw an empty grid reasonably concluded the app had lost it.
+    /// </summary>
+    Task<IReadOnlyList<Lease>> ListAllAsync(int propertyManagerId, CancellationToken ct);
+
+    /// <summary>
     /// Lease projections for the mapping UI: each lease with its currently
     /// linked customer's display name (or null if unmapped).
     /// </summary>

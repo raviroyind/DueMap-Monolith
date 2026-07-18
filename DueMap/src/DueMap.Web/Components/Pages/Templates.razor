@@ -68,7 +68,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var o in _existing)
+                            @foreach (var o in _pagedOverrides)
                             {
                                 <tr>
                                     <td class="cell-strong">@TypeName(o.NoticeTypeId)</td>
@@ -83,6 +83,8 @@
                             }
                         </tbody>
                     </table>
+                    <Pager Page="_page" PageSize="PageSize" TotalItems="_existing.Count"
+                           ItemNoun="override" PageChanged="OnPageChanged" />
                 </div>
             }
         </section>
@@ -99,6 +101,22 @@
 @code {
     private int? _pmId;
     private List<PmTemplateOverride> _existing = new();
+
+    // --- paging ------------------------------------------------------------
+    private const int PageSize = 25;
+    private int _page;
+
+    private List<PmTemplateOverride> _pagedOverrides
+    {
+        get
+        {
+            var maxPage = Math.Max(0, (int)Math.Ceiling(_existing.Count / (double)PageSize) - 1);
+            if (_page > maxPage) _page = maxPage;
+            return _existing.Skip(_page * PageSize).Take(PageSize).ToList();
+        }
+    }
+
+    private void OnPageChanged(int page) => _page = page;
     private IReadOnlyList<NoticeType> _noticeTypes = Array.Empty<NoticeType>();
     private IReadOnlyList<RulesState> _states = Array.Empty<RulesState>();
     private EditTemplateModal? _modal;

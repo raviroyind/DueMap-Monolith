@@ -24,6 +24,15 @@ internal sealed class LeaseReader : ILeaseReader
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<Lease>> ListAllAsync(int propertyManagerId, CancellationToken ct)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        return await db.Leases.AsNoTracking()
+            .Where(l => l.PropertyManagerId == propertyManagerId)
+            .OrderByDescending(l => l.StartDate)
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<int>> ListPropertyManagerIdsWithActiveLeasesAsync(
         DateOnly asOf,
         CancellationToken ct)

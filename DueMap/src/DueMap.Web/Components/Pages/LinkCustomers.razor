@@ -77,7 +77,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var r in _rows)
+                            @foreach (var r in _pagedRows)
                             {
                                 <tr>
                                     <td class="cell-strong tabular">#@r.LeaseId</td>
@@ -133,6 +133,8 @@
                             }
                         </tbody>
                     </table>
+                    <Pager Page="_page" PageSize="PageSize" TotalItems="_rows.Count"
+                           ItemNoun="lease" PageChanged="OnPageChanged" />
                 </div>
             </div>
         }
@@ -142,6 +144,22 @@
 @code {
     private int? _pmId;
     private IReadOnlyList<LeaseWithCustomer> _rows = Array.Empty<LeaseWithCustomer>();
+
+    // --- paging ------------------------------------------------------------
+    private const int PageSize = 25;
+    private int _page;
+
+    private IReadOnlyList<LeaseWithCustomer> _pagedRows
+    {
+        get
+        {
+            var maxPage = Math.Max(0, (int)Math.Ceiling(_rows.Count / (double)PageSize) - 1);
+            if (_page > maxPage) _page = maxPage;
+            return _rows.Skip(_page * PageSize).Take(PageSize).ToList();
+        }
+    }
+
+    private void OnPageChanged(int page) => _page = page;
     private IReadOnlyList<Customer> _customers = Array.Empty<Customer>();
     private readonly Dictionary<int, int> _selection = new();
     private bool _loading = true;

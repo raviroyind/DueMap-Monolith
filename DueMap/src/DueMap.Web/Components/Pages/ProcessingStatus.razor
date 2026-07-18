@@ -47,7 +47,7 @@
             </header>
 
             <ul class="divide-y divide-[color:var(--line)]">
-                @foreach (var r in _runs)
+                @foreach (var r in _pagedRuns)
                 {
                     var (iconBg, iconColor, leftBorder) = StatusVisuals(r.Status);
                     <li class="@(string.IsNullOrEmpty(leftBorder) ? "" : $"border-l-2 {leftBorder}")">
@@ -99,6 +99,8 @@
                     </li>
                 }
             </ul>
+            <Pager Page="_page" PageSize="PageSize" TotalItems="_runs.Count"
+                   ItemNoun="run" PageChanged="OnPageChanged" />
         </section>
     }
 </div>
@@ -106,6 +108,22 @@
 @code {
     private int? _pmId;
     private IReadOnlyList<PmProcessingRun> _runs = Array.Empty<PmProcessingRun>();
+
+    // --- paging ------------------------------------------------------------
+    private const int PageSize = 25;
+    private int _page;
+
+    private IReadOnlyList<PmProcessingRun> _pagedRuns
+    {
+        get
+        {
+            var maxPage = Math.Max(0, (int)Math.Ceiling(_runs.Count / (double)PageSize) - 1);
+            if (_page > maxPage) _page = maxPage;
+            return _runs.Skip(_page * PageSize).Take(PageSize).ToList();
+        }
+    }
+
+    private void OnPageChanged(int page) => _page = page;
     private bool _loading = true;
 
     // Workspace time zone — run timestamps render in the PM's local time.
