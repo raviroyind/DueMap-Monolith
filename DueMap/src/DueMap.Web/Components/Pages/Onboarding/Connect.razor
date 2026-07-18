@@ -1,5 +1,6 @@
 @page "/onboarding/connect"
 @layout DueMap.Web.Components.Layout.OnboardingShell
+@using DueMap.Integrations.Accounting
 @using DueMap.Web.Services
 @inject PmContext Pm
 
@@ -30,7 +31,7 @@
                    class="block group rounded-xl border border-line p-5 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md transition-all duration-200">
                     <div class="flex items-center gap-5">
                         <div class="flex-1 min-w-0">
-                            <div class="text-sm font-semibold">QuickBooks Online</div>
+                            <ProviderMark Provider="AccountingProvider.QuickBooks" Size="20" NameClass="text-sm font-semibold text-heading" />
                             <div class="text-xs text-muted mt-0.5">Customers + invoices · OAuth 2.0, tokens encrypted at rest</div>
                         </div>
                         @* Root-relative path (no ~/) — Razor's tilde resolver
@@ -46,7 +47,7 @@
                    class="block group rounded-xl border border-line p-5 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md transition-all duration-200">
                     <div class="flex items-center gap-5">
                         <div class="flex-1 min-w-0">
-                            <div class="text-sm font-semibold">Xero</div>
+                            <ProviderMark Provider="AccountingProvider.Xero" Size="20" NameClass="text-sm font-semibold text-heading" />
                             <div class="text-xs text-muted mt-0.5">Contacts + invoices · OAuth 2.0, tokens encrypted at rest</div>
                         </div>
                         <span class="btn-xero-signin h-11 w-auto shrink-0" style="width:auto;padding:0 22px;">

@@ -71,6 +71,10 @@ builder.Services.AddScoped<DueMap.Web.Services.PmContext>();
 // host machine's locale — see PmMoney).
 builder.Services.AddScoped<DueMap.Web.Services.PmMoney>();
 
+// Per-circuit time zone (from the PM's QBO/Xero org) so timestamps render in
+// the PM's local time rather than UTC.
+builder.Services.AddScoped<DueMap.Web.Services.PmClock>();
+
 // Transient action-feedback toasts, rendered by ToastHost in every layout.
 builder.Services.AddScoped<DueMap.Web.Services.ToastService>();
 
@@ -617,6 +621,8 @@ oauthGroup.MapGet("/{provider}/connect/{pmId:int}", async (
 oauthGroup.MapGet("/{provider}/callback", async (
     string provider, HttpRequest req, IAccountingConnectionService svc,
     IEnumerable<DueMap.Integrations.Accounting.Sync.IAccountingDataClient> dataClients,
+    DueMap.Integrations.Accounting.Sync.IAccountingTimezoneSuggester tzSuggester,
+    DueMap.Tenancy.IPropertyManagerWriter pmWriter,
     Hangfire.IBackgroundJobClient jobs, CancellationToken ct) =>
 {
     if (!TryParseProvider(provider, out var parsed))
@@ -668,6 +674,22 @@ oauthGroup.MapGet("/{provider}/callback", async (
     catch
     {
         // Sync backfills it later.
+    }
+
+    // Adopt the accounting org's time zone so every timestamp the PM sees is
+    // in their local time. onlyIfDefault: never overwrite a zone the PM has
+    // deliberately chosen in Daily Close settings.
+    try
+    {
+        var tz = await tzSuggester.SuggestForPmAsync(conn.PropertyManagerId, ct);
+        if (tz is not null)
+        {
+            await pmWriter.SetTimeZoneAsync(conn.PropertyManagerId, tz.IanaTimeZoneId, onlyIfDefault: true, ct);
+        }
+    }
+    catch
+    {
+        // Cosmetic/scheduling nicety — never block the connection on it.
     }
 
     // Guarantee a first sync server-side the moment the connection is

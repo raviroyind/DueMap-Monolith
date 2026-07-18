@@ -6,6 +6,7 @@
 @using Microsoft.JSInterop
 @inject PmContext Pm
 @inject PmMoney Money
+@inject PmClock Clock
 @inject IAccountingConnectionService ConnectionSvc
 @inject ICustomerRepository Customers
 @inject IRentInvoiceRepository InvoiceRepo
@@ -41,24 +42,16 @@
                     @* Brand-coloured connection chip — QuickBooks green or Xero blue.
                        Carries the realm ID; once we fetch the QB CompanyName from
                        /companyinfo the workspace name takes its place. *@
-                    @if (_conn.Provider == AccountingProvider.QuickBooks)
-                    {
-                        <a href="connections" data-tour="connection-pill"
-                           class="badge badge-solid-success text-white"
-                           style="background:#2CA01C">
-                            <span class="dot"></span>
-                            <span>Connected to QuickBooks</span>
-                        </a>
-                    }
-                    else
-                    {
-                        <a href="connections" data-tour="connection-pill"
-                           class="badge text-white"
-                           style="background:#13B5EA">
-                            <span class="dot"></span>
-                            <span>Connected to Xero</span>
-                        </a>
-                    }
+                    @* Brand mark + name, on the provider's own brand colour. *@
+                    <a href="connections" data-tour="connection-pill"
+                       class="badge text-white gap-1.5"
+                       style="background:@(_conn.Provider == AccountingProvider.QuickBooks ? "#2CA01C" : "#13B5EA")">
+                        <span class="dot"></span>
+                        <ProviderMark Provider="_conn.Provider" Size="14"
+                                      NameClass="text-xs font-medium text-white"
+                                      CssClass="gap-1.5" />
+                        <span class="text-xs">connected</span>
+                    </a>
 
                     <span class="text-sm text-muted">
                         @if (!string.IsNullOrEmpty(_conn.CompanyName))
@@ -66,7 +59,7 @@
                             <span class="font-medium text-heading">@_conn.CompanyName</span>
                             <span class="mx-1.5 text-muted">·</span>
                         }
-                        last sync @FriendlyTime.Utc(_conn.LastSyncAt, "pending")
+                        last sync @FriendlyTime.Local(_conn.LastSyncAt, _zone, "pending")
                     </span>
                 </div>
             </div>
@@ -294,6 +287,9 @@
     // PM-book currency for every amount on the page (never host locale).
     private System.Globalization.CultureInfo _money = MoneyCultures.Usd;
 
+    // Workspace time zone for timestamps.
+    private TimeZoneInfo _zone = TimeZoneInfo.Utc;
+
     // ---- Stats charts (task #115) ---------------------------------------
     // Payloads computed once per load; rendered via JS interop after render.
     private bool _chartsPending;
@@ -388,6 +384,7 @@
         var pmId = await Pm.GetPmIdAsync();
         var ct = CancellationToken.None;
         _money = await Money.GetCultureAsync(ct);
+        _zone  = await Clock.GetZoneAsync(ct);
 
         _conn = await ConnectionSvc.GetActiveAsync(pmId, ct);
         if (_conn is null)

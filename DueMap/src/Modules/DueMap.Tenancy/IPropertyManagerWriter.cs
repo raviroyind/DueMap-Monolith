@@ -32,4 +32,13 @@ public interface IPropertyManagerWriter
     /// to UtcNow. Idempotent — re-running AutoSetup overwrites.
     /// </summary>
     Task RecordAutoSetupSummaryAsync(int propertyManagerId, string summaryJson, CancellationToken ct);
+
+    /// <summary>
+    /// Set the workspace's IANA time zone — the zone every PM-facing timestamp
+    /// renders in, and the zone the daily close runs on.
+    /// <paramref name="onlyIfDefault"/> = true (the connect-time path) writes
+    /// only when the PM is still on the "UTC" default, so an org value from
+    /// QuickBooks/Xero never silently overwrites a zone the PM chose.
+    /// </summary>
+    Task SetTimeZoneAsync(int propertyManagerId, string ianaTimeZoneId, bool onlyIfDefault, CancellationToken ct);
 }

@@ -8,6 +8,7 @@
 @using DueMap.Web.Services
 @inject PmContext Pm
 @inject PmMoney Money
+@inject PmClock Clock
 @inject ToastService Toast
 @inject ILeaseReader LeaseReader
 @inject ICustomerRepository CustomerRepo
@@ -215,7 +216,7 @@
                                 {
                                     <div class="text-xs text-muted mt-0.5">@ev.Detail</div>
                                 }
-                                <div class="text-[11px] text-muted tabular-nums mt-1">@FriendlyTime.Utc(ev.Timestamp)</div>
+                                <div class="text-[11px] text-muted tabular-nums mt-1">@FriendlyTime.Local(ev.Timestamp, _zone)</div>
                             </div>
                             @if (ev.WaiveAssessmentId is int feeId)
                             {
@@ -414,9 +415,13 @@
     // PM-book currency for every amount on the page (never host locale).
     private System.Globalization.CultureInfo _money = MoneyCultures.Usd;
 
+    // Workspace time zone for the activity timeline.
+    private TimeZoneInfo _zone = TimeZoneInfo.Utc;
+
     protected override async Task OnInitializedAsync()
     {
         _money = await Money.GetCultureAsync();
+        _zone  = await Clock.GetZoneAsync();
         await LoadAsync();
 
         // Deep-link from the Today queue: /leases/{id}?promise=1 lands with

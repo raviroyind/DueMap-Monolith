@@ -1,0 +1,102 @@
+@using DueMap.Integrations.Accounting
+@inject IWebHostEnvironment Env
+
+@*
+    Accounting-provider brand mark + name, used everywhere the app refers to
+    QuickBooks or Xero.
+
+    Asset licensing note: Xero's brand pack (wwwroot/img/Xero) includes a
+    standalone square logo, so Xero always renders its real mark. Intuit's kit
+    ships only "Connect to QuickBooks" ACTION BUTTONS (163x24) — per Intuit's
+    brand rules those must be used verbatim as buttons and are not a logo — so
+    there is no licensed QuickBooks mark in the repo. Drop the official one at
+    wwwroot/img/intuit/quickbooks-logo.(svg|png) and it is picked up here
+    automatically; until then we render a neutral lettermark rather than
+    imitating the trademark.
+*@
+
+<span class="inline-flex items-center gap-2 min-w-0 @CssClass">
+    @if (LogoUrl is not null)
+    {
+        <img src="@LogoUrl" alt="@Name logo" width="@Size" height="@Size"
+             class="shrink-0 rounded-[4px] object-contain"
+             style="width:@(Size)px;height:@(Size)px" />
+    }
+    else
+    {
+        <span class="shrink-0 rounded-[4px] bg-surface-2 text-muted flex items-center justify-center font-semibold select-none"
+              style="width:@(Size)px;height:@(Size)px;font-size:@(Math.Max(9, Size * 0.38))px"
+              title="@Name">
+            @Initials
+        </span>
+    }
+
+    @if (ShowName)
+    {
+        <span class="truncate @NameClass">@Name</span>
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired] public AccountingProvider Provider { get; set; }
+
+    /// <summary>Square logo edge in px.</summary>
+    [Parameter] public int Size { get; set; } = 20;
+
+    [Parameter] public bool ShowName { get; set; } = true;
+
+    /// <summary>Classes for the provider name text (caller controls size/weight).</summary>
+    [Parameter] public string NameClass { get; set; } = "text-sm font-medium text-heading";
+
+    /// <summary>Classes applied to the wrapper.</summary>
+    [Parameter] public string CssClass { get; set; } = "";
+
+    public string Name => Provider switch
+    {
+        AccountingProvider.QuickBooks => "QuickBooks Online",
+        AccountingProvider.Xero       => "Xero",
+        _                             => Provider.ToString()
+    };
+
+    private string Initials => Provider switch
+    {
+        AccountingProvider.QuickBooks => "QB",
+        AccountingProvider.Xero       => "X",
+        _                             => "?"
+    };
+
+    // Candidate paths, most-preferred first. Resolved against wwwroot so a
+    // missing drop-in file degrades to the lettermark instead of a broken img.
+    private string[] Candidates => Provider switch
+    {
+        AccountingProvider.Xero => new[]
+        {
+            "img/Xero/Xero logo 1x1.svg",
+            "img/Xero/Xero logo 1x1.png"
+        },
+        AccountingProvider.QuickBooks => new[]
+        {
+            "img/intuit/quickbooks-logo.svg",
+            "img/intuit/quickbooks-logo.png"
+        },
+        _ => Array.Empty<string>()
+    };
+
+    private string? LogoUrl
+    {
+        get
+        {
+            foreach (var rel in Candidates)
+            {
+                if (Env.WebRootFileProvider.GetFileInfo(rel).Exists)
+                {
+                    // Brand files carry spaces — encode each segment so the
+                    // URL is valid without renaming the vendor's assets.
+                    var encoded = string.Join('/', rel.Split('/').Select(Uri.EscapeDataString));
+                    return "/" + encoded;
+                }
+            }
+            return null;
+        }
+    }
+}

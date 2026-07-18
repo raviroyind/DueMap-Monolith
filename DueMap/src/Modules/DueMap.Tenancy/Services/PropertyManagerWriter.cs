@@ -63,4 +63,33 @@ internal sealed class PropertyManagerWriter : IPropertyManagerWriter
         row.AutoSetupDoneAt  = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
     }
+
+    public async Task SetTimeZoneAsync(int propertyManagerId, string ianaTimeZoneId, bool onlyIfDefault, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ianaTimeZoneId);
+
+        // Validate before persisting — a bad id would throw later, deep inside
+        // rendering, on every page the PM opens.
+        try
+        {
+            _ = TimeZoneInfo.FindSystemTimeZoneById(ianaTimeZoneId);
+        }
+        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            throw new ArgumentException($"'{ianaTimeZoneId}' is not a recognised time zone id.", nameof(ianaTimeZoneId));
+        }
+
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var row = await db.PropertyManagers.FirstOrDefaultAsync(p => p.Id == propertyManagerId, ct)
+            ?? throw new InvalidOperationException($"PropertyManager {propertyManagerId} not found.");
+
+        // Never clobber a zone the PM deliberately set.
+        if (onlyIfDefault && !string.Equals(row.TimeZoneId, "UTC", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        row.TimeZoneId = ianaTimeZoneId;
+        await db.SaveChangesAsync(ct);
+    }
 }

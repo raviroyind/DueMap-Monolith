@@ -3,6 +3,7 @@
 @using DueMap.Billing.Domain
 @using DueMap.Web.Services
 @inject PmContext Pm
+@inject PmClock Clock
 @inject IPmProcessingRunRepository Runs
 
 <PageTitle>Processing status — DueMap</PageTitle>
@@ -77,11 +78,11 @@
                                     <span class="w-1 h-1 rounded-full bg-line"></span>
                                     <span><span class="tabular-nums">@r.ActionsExecuted</span> actions</span>
                                     <span class="w-1 h-1 rounded-full bg-line"></span>
-                                    <span class="tabular-nums">@FriendlyTime.Utc(r.StartedAt)</span>
+                                    <span class="tabular-nums">@FriendlyTime.Local(r.StartedAt, _zone)</span>
                                     @if (r.CompletedAt is not null)
                                     {
                                         <span class="w-1 h-1 rounded-full bg-line"></span>
-                                        <span class="tabular-nums">finished @FriendlyTime.Utc(r.CompletedAt.Value)</span>
+                                        <span class="tabular-nums">finished @FriendlyTime.Local(r.CompletedAt.Value, _zone)</span>
                                     }
                                 </div>
                                 @if (!string.IsNullOrEmpty(r.FailureReason))
@@ -107,9 +108,13 @@
     private IReadOnlyList<PmProcessingRun> _runs = Array.Empty<PmProcessingRun>();
     private bool _loading = true;
 
+    // Workspace time zone — run timestamps render in the PM's local time.
+    private TimeZoneInfo _zone = TimeZoneInfo.Utc;
+
     protected override async Task OnInitializedAsync()
     {
         _pmId = await Pm.GetPmIdAsync();
+        _zone = await Clock.GetZoneAsync();
         await LoadAsync();
     }
 

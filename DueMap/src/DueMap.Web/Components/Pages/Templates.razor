@@ -6,6 +6,7 @@
 @using DueMap.Web.Components.Shared
 @using DueMap.Web.Services
 @inject PmContext Pm
+@inject PmClock Clock
 @inject ToastService Toast
 @inject IPmTemplateOverrideService Overrides
 @inject INoticeTypeReader NoticeTypes
@@ -73,7 +74,7 @@
                                     <td class="cell-strong">@TypeName(o.NoticeTypeId)</td>
                                     <td>@(o.StateId.HasValue ? StateCode(o.StateId.Value) : "All states")</td>
                                     <td class="font-mono text-xs">@Truncate(o.Subject, 60)</td>
-                                    <td class="text-muted tabular">@FriendlyTime.Utc(o.UpdatedAt)</td>
+                                    <td class="text-muted tabular">@FriendlyTime.Local(o.UpdatedAt, _zone)</td>
                                     <td class="text-right">
                                         <button class="btn btn-sm btn-secondary" @onclick="@(() => OpenExistingAsync(o))">Edit</button>
                                         <button class="btn btn-sm btn-link text-danger" @onclick="@(() => Deactivate(o.Id))">Remove</button>
@@ -102,9 +103,13 @@
     private IReadOnlyList<RulesState> _states = Array.Empty<RulesState>();
     private EditTemplateModal? _modal;
 
+    // Workspace time zone for the "updated" column.
+    private TimeZoneInfo _zone = TimeZoneInfo.Utc;
+
     protected override async Task OnInitializedAsync()
     {
         _pmId = await Pm.GetPmIdAsync();
+        _zone = await Clock.GetZoneAsync();
         _noticeTypes = await NoticeTypes.ListAllAsync(CancellationToken.None);
         _states = await States.ListAllAsync(CancellationToken.None);
         await LoadAsync();

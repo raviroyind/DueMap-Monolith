@@ -5,6 +5,7 @@
 @inject PmContext Pm
 @inject IAccountingConnectionService ConnectionSvc
 @inject IPmAccountingSync Sync
+@inject PmClock Clock
 @inject ToastService Toast
 @inject NavigationManager Nav
 
@@ -76,7 +77,7 @@
                    class="block border border-line rounded-card p-5 hover:shadow-pop transition-all duration-200">
                     <div class="flex items-center gap-5">
                         <div class="flex-1 min-w-0">
-                            <div class="text-sm font-medium text-heading">QuickBooks Online</div>
+                            <ProviderMark Provider="AccountingProvider.QuickBooks" Size="20" />
                             <div class="text-xs text-muted mt-0.5">Sync customers + invoices · OAuth 2.0, tokens encrypted at rest</div>
                         </div>
                         @* Root-relative — Razor's ~/ resolver doesn't fire in
@@ -94,7 +95,7 @@
                    class="block border border-line rounded-card p-5 hover:shadow-pop transition-all duration-200">
                     <div class="flex items-center gap-5">
                         <div class="flex-1 min-w-0">
-                            <div class="text-sm font-medium text-heading">Xero</div>
+                            <ProviderMark Provider="AccountingProvider.Xero" Size="20" />
                             <div class="text-xs text-muted mt-0.5">Sync contacts + invoices · OAuth 2.0, tokens encrypted at rest</div>
                         </div>
                         <span class="btn-xero-signin h-11 w-auto shrink-0" style="width:auto;padding:0 22px;">
@@ -118,17 +119,17 @@
 
             <div class="card-header flex items-start justify-between gap-4">
                 <div class="flex items-start gap-4">
-                    <div class="w-12 h-12 rounded-card bg-surface-2 flex items-center justify-center text-lg font-semibold text-heading shrink-0 select-none">
-                        @(_conn.Provider == AccountingProvider.QuickBooks ? "Q" : "X")
-                    </div>
+                    <ProviderMark Provider="_conn.Provider" Size="48" ShowName="false" CssClass="shrink-0" />
                     <div class="min-w-0">
                         <div class="flex items-center gap-2 flex-wrap">
-                            <h3 class="text-base font-semibold text-heading">@(_conn.CompanyName ?? (_conn.Provider == AccountingProvider.QuickBooks ? "QuickBooks Online" : "Xero"))</h3>
+                            <h3 class="text-base font-semibold text-heading">@(_conn.CompanyName ?? ProviderName(_conn.Provider))</h3>
                             <span class="badge @StatusBadge(_conn.Status)"><span class="dot"></span>@_conn.Status</span>
                         </div>
                         @if (_conn.CompanyName is not null)
                         {
-                            <div class="text-xs text-muted mt-0.5">@(_conn.Provider == AccountingProvider.QuickBooks ? "QuickBooks Online" : "Xero")</div>
+                            <div class="mt-0.5">
+                                <ProviderMark Provider="_conn.Provider" Size="14" NameClass="text-xs text-muted" />
+                            </div>
                         }
                         <div class="mt-1 text-xs text-muted flex flex-wrap items-center gap-x-3 gap-y-1">
                             <span class="inline-flex items-center gap-1">
@@ -145,15 +146,15 @@
             <div class="px-6 py-5 grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-5">
                 <div>
                     <div class="text-xs uppercase tracking-wider font-medium text-muted mb-1.5">Last sync</div>
-                    <div class="text-lg font-semibold tracking-tight text-heading">@FriendlyTime.Utc(_conn.LastSyncAt)</div>
+                    <div class="text-lg font-semibold tracking-tight text-heading">@FriendlyTime.Local(_conn.LastSyncAt, _zone)</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-wider font-medium text-muted mb-1.5">Access token expires</div>
-                    <div class="text-lg font-semibold tracking-tight text-heading">@FriendlyTime.Utc(_conn.AccessTokenExpiresAt)</div>
+                    <div class="text-lg font-semibold tracking-tight text-heading">@FriendlyTime.Local(_conn.AccessTokenExpiresAt, _zone)</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-wider font-medium text-muted mb-1.5">Connected on</div>
-                    <div class="text-lg font-semibold tracking-tight text-heading">@FriendlyTime.Utc(_conn.ConnectedAt)</div>
+                    <div class="text-lg font-semibold tracking-tight text-heading">@FriendlyTime.Local(_conn.ConnectedAt, _zone)</div>
                 </div>
             </div>
 
@@ -243,6 +244,9 @@
     private bool _disconnecting;
     private string _disconnectReason = string.Empty;
 
+    // Workspace time zone — all timestamps on this page render in it.
+    private TimeZoneInfo _zone = TimeZoneInfo.Utc;
+
     // Realm-mismatch surfaced from the OAuth callback redirect
     private bool _realmMismatch;
     private string _mismatchCurrent = string.Empty;
@@ -266,6 +270,7 @@
         }
 
         _pmId = await Pm.GetPmIdAsync();
+        _zone = await Clock.GetZoneAsync();
         await LoadAsync();
     }
 
@@ -332,6 +337,13 @@
             await LoadAsync();   // refresh LastSyncAt / LastSyncError
         }
     }
+
+    private static string ProviderName(AccountingProvider p) => p switch
+    {
+        AccountingProvider.QuickBooks => "QuickBooks Online",
+        AccountingProvider.Xero       => "Xero",
+        _                             => p.ToString()
+    };
 
     // Maps a connection status to an Osen badge family (the .dot inherits color).
     private static string StatusBadge(ConnectionStatus s) => s switch
