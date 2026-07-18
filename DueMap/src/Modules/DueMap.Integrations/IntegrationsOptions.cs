@@ -48,7 +48,15 @@ public sealed class IntegrationsOptions
         public string? ClientId { get; set; }
         public string? ClientSecret { get; set; }
 
-        /// <summary>Space-separated OAuth scopes.</summary>
-        public string Scopes { get; set; } = "openid profile email accounting.transactions accounting.contacts offline_access";
+        /// <summary>
+        /// Space-separated OAuth scopes. GRANULAR read scopes (Xero's 2026
+        /// model): the broad accounting.transactions / accounting.contacts are
+        /// rejected as invalid_scope on apps created from ~Mar 2026 onward.
+        /// DueMap only READS from Xero — invoices, contacts, and the org name
+        /// (settings) — so read-only granular scopes are the minimal correct
+        /// set. openid/profile/email identify the org; offline_access gives us
+        /// the refresh token. Ref: developer.xero.com/faq/granular-scopes
+        /// </summary>
+        public string Scopes { get; set; } = "openid profile email accounting.contacts.read accounting.invoices.read accounting.settings.read offline_access";
     }
 }
