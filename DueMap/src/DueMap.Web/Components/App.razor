@@ -1,3 +1,4 @@
+@using DueMap.Web.Services
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @inject IHttpContextAccessor HttpContextAccessor
 
@@ -5,7 +6,9 @@
 <html lang="en" class="h-full">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    @* viewport-fit=cover lets env(safe-area-inset-*) resolve to real values on
+       notched devices; without it they are always 0 and the notch clips content. *@
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <base href="/" />
     <title>DueMap</title>
 
@@ -13,7 +16,10 @@
        (no flash) and exposes window.DueMapTheme for the toggle. *@
     <script src="js/theme.js"></script>
 
-    <link rel="stylesheet" href="css/app.css" />
+    @* Cache-busted by the compiled asset's own mtime. Tailwind rewrites app.css
+       on every build, and without this the browser keeps serving the previous
+       copy — you rebuild, reload, and see stale styling with no clue why. *@
+    <link rel="stylesheet" href="css/app.css?v=@AssetVersion.Css" />
 
     @* Medium Editor — WYSIWYG body editor for the notice-template modal.
        Self-hosted (pinned v5.23.3) so it works offline in dev/Docker and carries

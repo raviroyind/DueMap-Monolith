@@ -8,7 +8,7 @@
 
 <PageTitle>Processing status — DueMap</PageTitle>
 
-<div class="max-w-6xl mx-auto px-8 py-8 space-y-6">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
     <!-- PAGE HEADER -->
     <div class="flex items-end justify-between gap-4">
@@ -18,8 +18,7 @@
                 Daily runs of the late-fee orchestrator. The sweep job ticks every 15 minutes; each run processes one PM's leases for the business date in their local time zone.
             </p>
         </div>
-        <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-heading bg-surface border border-line hover:bg-surface-2 shadow-sm transition-colors duration-150"
-                @onclick="LoadAsync">
+        <button class="btn btn-sm btn-secondary" @onclick="LoadAsync">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
             Refresh
         </button>

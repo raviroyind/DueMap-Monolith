@@ -635,3 +635,117 @@ html, body {
 .dark .sso-divider { color: rgb(82 82 91); }
 .dark .sso-divider::before,
 .dark .sso-divider::after { background-color: rgb(39 39 42); }
+
+/* ===========================================================================
+   MOBILE / TOUCH LAYER
+   ---------------------------------------------------------------------------
+   The app is a base for future iOS + Android clients, so the same markup has
+   to survive a 375px viewport and a finger instead of a mouse. Three concerns,
+   all handled here rather than sprinkled through the pages:
+
+     1. Touch targets. Apple HIG asks for 44pt, Material for 48dp. The desktop
+        control sizes (btn 36px, btn-sm 30px) are well under that, so on a
+        coarse pointer we raise the minimum without touching mouse density.
+     2. iOS focus zoom. Mobile Safari auto-zooms when a focused input has a
+        font smaller than 16px, which shoves the layout sideways and does not
+        zoom back out. Our form controls are 13px, so they get bumped.
+     3. Notch / home-indicator insets. Fixed edges need the safe-area values
+        or content sits under the status bar and the gesture bar.
+--------------------------------------------------------------------------- */
+
+/* Horizontal scroll is always a bug at these widths; catching it at the root
+   keeps one runaway child from making the whole page swipe sideways. */
+html { -webkit-text-size-adjust: 100%; }
+body { overflow-x: hidden; }
+
+/* Standard escape hatch for wide content (tables, chart rows, code). Scrolls
+   itself instead of the page, with momentum on iOS. */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+/* Media queries live outside a layer so they win over the component defaults
+   without needing an importance flag.
+
+   Two triggers, deliberately: a coarse pointer is the real signal, but a
+   viewport under 40rem is a phone often enough that it should get finger-sized
+   controls too -- and unlike pointer type, width is something a desktop browser
+   can reproduce, so the sizing is actually verifiable during development. */
+@media (pointer: coarse), (max-width: 40rem) {
+  /* 2.75rem == 44px, the Apple HIG minimum. btn-sm gets it too: the compact
+     size exists for desktop row density, which stops being a virtue the moment
+     the pointer is a fingertip. */
+  .btn, .btn-sm, .btn-link { min-height: 2.75rem; }
+  .btn-icon, .btn-icon.btn-sm { min-width: 2.75rem; }
+
+  .form-control, .form-select, .form-textarea {
+    min-height: 2.75rem;
+    font-size: 1rem;
+  }
+  .form-textarea { min-height: 5rem; }
+
+  .form-check input[type="checkbox"],
+  .form-check input[type="radio"] { width: 1.25rem; height: 1.25rem; }
+
+  /* Row actions and nav rows get a real tap height too. */
+  .menu-item, .side-link { min-height: 2.75rem; }
+
+  /* Safety net. Not every control in the app routes through .btn — a handful
+     are styled with raw utilities — and new markup will drift the same way.
+     Element selectors catch all of them, so tap size stops depending on
+     whether an author remembered the right class. Anchors are excluded on
+     purpose: they'd match every inline link in running text. */
+  button,
+  select,
+  textarea,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) {
+    min-height: 2.75rem;
+  }
+}
+
+/* Safe-area insets — no-ops in a desktop browser, real values in a webview or
+   an installed PWA on a notched device. */
+.app-sidebar {
+  padding-left: env(safe-area-inset-left);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ---------------------------------------------------------------------------
+   OFF-CANVAS NAV DRAWER
+   ---------------------------------------------------------------------------
+   Owned here rather than by Tailwind's translate-x utilities. Those set the
+   standalone `translate` property indirectly, as
+   `translate: var(--tw-translate-x) var(--tw-translate-y)`. Swapping the
+   utility class updates the custom property, but the transition on `translate`
+   keeps rendering its pre-transition value, so the panel stayed parked at
+   -100% while --tw-translate-x already read 0px -- the drawer opened its
+   backdrop and never slid in.
+
+   Transitioning `transform` directly has none of that indirection.
+--------------------------------------------------------------------------- */
+.app-sidebar {
+  transform: translateX(-100%);
+  transition: transform .2s ease-out;
+}
+.app-sidebar.is-open { transform: translateX(0); }
+
+@media (min-width: 48rem) {
+  /* Static column on desktop; no drawer, no animation. */
+  .app-sidebar { transform: none; transition: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar { transition: none; }
+}
+
+header.sticky {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+}

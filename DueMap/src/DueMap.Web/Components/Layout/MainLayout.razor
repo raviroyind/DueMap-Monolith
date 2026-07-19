@@ -47,7 +47,10 @@ else if (_connected)
         }
 
         <!-- SIDEBAR (Osen dark) — static column on desktop, slide-in drawer on mobile -->
-        <aside class="app-sidebar w-[260px] shrink-0 flex flex-col fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-out md:static md:translate-x-0 @(_sidebarOpen ? "translate-x-0" : "-translate-x-full")">
+        @* Slide state lives in .app-sidebar / .is-open (see input.css), not in
+           Tailwind's translate utilities — those animate a var()-derived
+           `translate` and leave the panel stuck off-canvas. *@
+        <aside class="app-sidebar w-[260px] shrink-0 flex flex-col fixed inset-y-0 left-0 z-50 md:static @(_sidebarOpen ? "is-open" : "")">
             <div class="h-[70px] flex items-center gap-2.5 px-5 border-b sidebar-line shrink-0">
                 <span class="brand-mark">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
@@ -76,7 +79,7 @@ else if (_connected)
         <div class="flex-1 flex flex-col min-w-0">
 
             <!-- TOPBAR -->
-            <header class="sticky top-0 z-30 h-[70px] flex items-center justify-between px-4 sm:px-6 md:px-8 border-b border-line bg-surface gap-3">
+            <header class="sticky top-0 z-30 h-[70px] flex items-center justify-between px-4 sm:px-4 sm:px-6 lg:px-8 border-b border-line bg-surface gap-3">
                 <div class="flex items-center gap-2 min-w-0">
                     <button type="button" class="btn btn-icon btn-sm btn-ghost md:hidden shrink-0" @onclick="ToggleSidebar" aria-label="Open menu">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
@@ -109,7 +112,7 @@ else
     @* KIOSK MODE — no sidebar, no app nav. Only the brand mark and a sign-out
        affordance live in the header so the user isn't trapped. *@
     <div class="min-h-screen flex flex-col bg-app">
-        <header class="sticky top-0 z-30 h-14 flex items-center justify-between px-6 md:px-8 border-b border-line bg-surface">
+        <header class="sticky top-0 z-30 h-14 flex items-center justify-between gap-2 px-4 sm:px-6 lg:px-8 border-b border-line bg-surface">
             <div class="flex items-center gap-2.5">
                 <span class="brand-mark">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>

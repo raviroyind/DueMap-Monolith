@@ -14,7 +14,7 @@
 
 <PageTitle>Notify your tenants — DueMap</PageTitle>
 
-<div class="max-w-6xl mx-auto px-8 py-10 space-y-6">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
 
     <div>
         <h2 class="text-2xl font-semibold tracking-tight">Notify your tenants (optional)</h2>
@@ -70,7 +70,8 @@
 
         @* ---- GRID ---- *@
         <div class="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
-            <table class="w-full text-sm">
+            <div class="table-wrap">
+              <table class="w-full text-sm">
                 <thead class="bg-surface-2 text-left">
                     <tr>
                         <th class="px-4 py-2.5 w-10">
@@ -126,7 +127,8 @@
                         </tr>
                     }
                 </tbody>
-            </table>
+              </table>
+            </div>
 
             @* ---- PAGER ---- *@
             <div class="px-4 py-3 border-t border-line flex items-center justify-between text-xs text-muted">
