@@ -102,7 +102,7 @@
 
             <div class="flex items-center gap-3 pt-1">
                 <button @onclick="GoLiveAsync" disabled="@_busy"
-                        class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm disabled:opacity-50">
+                        class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm disabled:opacity-50 @(_busy ? "is-loading" : "")">
                     @(_busy ? "Going live…" : "Go live")
                 </button>
                 <a href="/onboarding/review" class="text-sm text-muted hover:underline">Back to review</a>

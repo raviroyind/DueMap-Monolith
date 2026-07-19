@@ -310,7 +310,7 @@
 
             <footer class="card-footer flex items-center justify-end gap-2">
                 <button class="btn btn-ghost" @onclick="CloseModal">Cancel</button>
-                <button class="btn btn-primary" @onclick="ApplyBulk" disabled="@_applying">
+                <button class="btn btn-primary @(_applying ? "is-loading" : "")" @onclick="ApplyBulk" disabled="@_applying">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
                     @(_applying ? "Applying…" : $"Apply to {_selected.Count} lease(s)")
                 </button>
@@ -396,7 +396,7 @@
             </div>
             <footer class="card-footer flex items-center justify-end gap-2">
                 <button class="btn btn-ghost" @onclick="CloseNewLeaseModal">Cancel</button>
-                <button class="btn btn-primary" @onclick="CreateLeaseAsync" disabled="@_creatingLease">
+                <button class="btn btn-primary @(_creatingLease ? "is-loading" : "")" @onclick="CreateLeaseAsync" disabled="@_creatingLease">
                     @(_creatingLease ? "Creating…" : "Create lease")
                 </button>
             </footer>

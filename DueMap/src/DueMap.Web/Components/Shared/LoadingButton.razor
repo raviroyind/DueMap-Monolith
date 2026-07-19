@@ -1,0 +1,69 @@
+@*
+    Button that shows a spinner and refuses further clicks while its handler runs.
+
+    Why a component rather than a global JS click hook: only the caller's async
+    method knows when the work is actually finished. JS can set a busy state on
+    click but has no idea when to clear it, and Blazor's diffing would fight it
+    on the next render anyway. Owning the flag here means the state is exactly
+    as long-lived as the awaited call.
+
+    Usage — replace:
+        <button class="btn btn-primary" @onclick="SaveAsync">Save</button>
+    with:
+        <LoadingButton Class="btn btn-primary" OnClick="SaveAsync">Save</LoadingButton>
+*@
+
+<button type="@Type"
+        class="@Class @(_busy ? "is-loading" : "")"
+        disabled="@(_busy || Disabled)"
+        aria-busy="@(_busy ? "true" : null)"
+        title="@Title"
+        @attributes="Extra"
+        @onclick="RunAsync">
+    @ChildContent
+</button>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Full class list, e.g. "btn btn-sm btn-primary". `is-loading` is appended while busy.</summary>
+    [Parameter] public string Class { get; set; } = "btn btn-primary";
+
+    [Parameter] public string Type { get; set; } = "button";
+
+    /// <summary>Caller-controlled disable, independent of the busy state.</summary>
+    [Parameter] public bool Disabled { get; set; }
+
+    [Parameter] public string? Title { get; set; }
+
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? Extra { get; set; }
+
+    private bool _busy;
+
+    private async Task RunAsync()
+    {
+        // Re-entrancy guard. `disabled` already blocks the pointer, but a
+        // queued click or a keyboard Enter can still land before the browser
+        // applies it, and double-submitting a payment-adjacent action is
+        // exactly the failure this component exists to prevent.
+        if (_busy) return;
+
+        _busy = true;
+        StateHasChanged();          // paint the spinner before the await
+
+        try
+        {
+            await OnClick.InvokeAsync();
+        }
+        finally
+        {
+            // Always clear, including when the handler throws — otherwise a
+            // transient failure leaves a permanently spinning, dead button and
+            // the only way out is a page reload.
+            _busy = false;
+        }
+    }
+}

@@ -15,6 +15,9 @@
     @* Theme bootstrap FIRST — applies the saved light/dark class before paint
        (no flash) and exposes window.DueMapTheme for the toggle. *@
     <script src="js/theme.js"></script>
+    @* Covers the non-Blazor POSTs that still exist inside the app shell —
+       sign-out and the SSO handoffs. Blazor's own buttons use LoadingButton. *@
+    <script src="js/form-busy.js" defer></script>
 
     @* Cache-busted by the compiled asset's own mtime. Tailwind rewrites app.css
        on every build, and without this the browser keeps serving the previous

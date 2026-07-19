@@ -749,3 +749,57 @@ header.sticky {
 @supports (padding: env(safe-area-inset-bottom)) {
   .safe-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
 }
+
+/* ===========================================================================
+   BUTTON LOADING STATE
+   ---------------------------------------------------------------------------
+   Click -> a spinner appears in the button and it stops accepting input, so a
+   slow save can't be fired twice and the click visibly registered.
+
+   The spinner is prepended and the label stays put. The tidier-looking
+   alternative -- hide the label, centre a spinner over it -- can't be done
+   reliably here: most of these buttons hold their label as a bare text node
+   ("Sign in" followed by an arrow svg), and a text node can't be targeted by a
+   selector, so it would show through. Keeping the label also reads better:
+   you can still see which action is in flight.
+
+   Trailing decorative icons are dropped while loading, which roughly offsets
+   the width the spinner adds.
+--------------------------------------------------------------------------- */
+button.is-loading,
+.btn.is-loading {
+  pointer-events: none;   /* belt and braces alongside the disabled attribute */
+  cursor: default;
+}
+
+/* .btn:disabled dims to .55; combined with a spinner that reads as "broken"
+   rather than "working", so loading gets its own, lighter treatment. */
+button.is-loading:disabled,
+.btn.is-loading:disabled,
+.btn.is-loading[aria-disabled="true"],
+button.is-loading[aria-disabled="true"] { opacity: .85; cursor: default; }
+
+button.is-loading::before,
+.btn.is-loading::before {
+  content: "";
+  flex: none;
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 9999px;
+  animation: btn-spin .6s linear infinite;
+}
+
+/* Decorative icons only — the spinner is the status indicator now. */
+button.is-loading > svg,
+.btn.is-loading > svg { display: none; }
+
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Still say "working", without the rotation. */
+  button.is-loading::before,
+  .btn.is-loading::before { animation: btn-pulse 1.2s ease-in-out infinite; }
+  @keyframes btn-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+}

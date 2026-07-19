@@ -220,7 +220,7 @@
                     Cancel
                 </button>
                 <button @onclick="SendAsync" disabled="@_sending"
-                        class="inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary-hover shadow-sm disabled:opacity-50">
+                        class="inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary-hover shadow-sm disabled:opacity-50 @(_sending ? "is-loading" : "")">
                     @(_sending ? "Sending…" : $"Send to {_selected.Count}")
                 </button>
             </div>

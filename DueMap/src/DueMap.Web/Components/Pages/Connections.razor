@@ -225,7 +225,7 @@
             <footer class="px-6 py-3.5 border-t border-line bg-surface-2 flex items-center justify-end gap-2">
                 <button class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-heading hover:bg-surface-2 transition-colors"
                         @onclick="CloseDisconnect">Cancel</button>
-                <button class="btn btn-danger btn-sm" @onclick="DisconnectAsync" disabled="@_disconnecting">
+                <button class="btn btn-danger btn-sm @(_disconnecting ? "is-loading" : "")" @onclick="DisconnectAsync" disabled="@_disconnecting">
                     @(_disconnecting ? "Disconnecting…" : "Disconnect")
                 </button>
             </footer>

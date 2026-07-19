@@ -131,7 +131,7 @@
                                     Editing — save to update rent &amp; state.
                                 </td>
                                 <td class="text-right whitespace-nowrap">
-                                    <button @onclick="SaveEditAsync" disabled="@_busy" class="btn btn-sm btn-primary">Save</button>
+                                    <button @onclick="SaveEditAsync" disabled="@_busy" class="@(_busy ? "is-loading" : "") btn btn-sm btn-primary">Save</button>
                                     <button @onclick="CancelEdit" class="btn btn-sm btn-link">Cancel</button>
                                 </td>
                             }
@@ -191,7 +191,7 @@
                                             <label class="block text-[11px] text-muted mb-1">Monthly rent</label>
                                             <input type="number" step="0.01" min="0" @bind="_editRent" class="form-control w-32 h-9" />
                                         </div>
-                                        <button @onclick="SaveCreateAsync" disabled="@_busy" class="btn btn-sm btn-primary">Create &amp; link</button>
+                                        <button @onclick="SaveCreateAsync" disabled="@_busy" class="@(_busy ? "is-loading" : "") btn btn-sm btn-primary">Create &amp; link</button>
                                         <button @onclick="CancelEdit" class="btn btn-sm btn-link">Cancel</button>
                                     </div>
                                 </td>

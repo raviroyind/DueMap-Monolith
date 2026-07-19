@@ -43,9 +43,16 @@ public sealed class IdentityModule : IModule
                 // can sign in. SSO (Intuit/Xero) and the demo seeder create users
                 // with EmailConfirmed=true, so they're unaffected by this gate.
                 o.SignIn.RequireConfirmedAccount  = true;
+
+                // Password-reset tokens get their own provider so they can
+                // expire in an hour without dragging the 24-hour email
+                // confirmation window down with them.
+                o.Tokens.PasswordResetTokenProvider = PasswordResetTokenProvider<ApplicationUser>.ProviderName;
             })
             .AddEntityFrameworkStores<AppIdentityDbContext>()
-            .AddDefaultTokenProviders();
+            .AddDefaultTokenProviders()
+            .AddTokenProvider<PasswordResetTokenProvider<ApplicationUser>>(
+                PasswordResetTokenProvider<ApplicationUser>.ProviderName);
 
         // Replace the default ClaimsFactory so every sign-in carries the PmId claim.
         services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, PmClaimsFactory>();

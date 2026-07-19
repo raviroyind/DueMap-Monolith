@@ -8,6 +8,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>@title — DueMap</title>
     <script src="~/js/theme.js"></script>
+    @* Spinner + disable on submit, so a slow sign-in can't be double-posted. *@
+    <script src="~/js/form-busy.js" asp-append-version="true" defer></script>
     <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
 </head>
 @* Body colour/font come from the Osen base layer (bg-app / Inter). *@
